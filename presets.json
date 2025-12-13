@@ -1,0 +1,116 @@
+{
+  "BTC_1h_Connors_Long": {
+    "coin": "BTC",
+    "interval": "2h",
+    "strat_id": "Connors",
+    "direction": "Long",
+    "params": {
+      "rsi_ob": 70,
+      "rsi2_ob": 80,
+      "ema_len": 200,
+      "sma1_len": 20,
+      "sma2_len": 60,
+      "adx_thr": 25,
+      "donch": 20,
+      "tp_pct": 2.0,
+      "sl_pct": 1.0,
+      "max_bars": 48,
+      "leverage": 10,
+      "entry_fee_pct": 0.04,
+      "exit_fee_pct": 0.04
+    }
+  },
+  "김기명의 칼": {
+    "coin": "BTC",
+    "interval": "2h",
+    "strat_id": "Connors",
+    "direction": "Long",
+    "params": {
+      "rsi_ob": 70,
+      "rsi2_ob": 80,
+      "ema_len": 200,
+      "sma1_len": 20,
+      "sma2_len": 60,
+      "adx_thr": 25,
+      "donch": 20,
+      "tp_pct": 2.0,
+      "sl_pct": 1.0,
+      "max_bars": 48,
+      "leverage": 10,
+      "entry_fee_pct": 0.04,
+      "exit_fee_pct": 0.04
+    }
+  },
+  "김덕배": {
+    "coin": "BTC",
+    "interval": "2h",
+    "strat_id": "Connors",
+    "direction": "Long",
+    "params": {
+      "rsi_ob": 55,
+      "rsi2_ob": 20,
+      "ema_len": 200,
+      "sma1_len": 20,
+      "sma2_len": 60,
+      "adx_thr": 25,
+      "donch": 20,
+      "tp_pct": 1.0,
+      "sl_pct": 1.0,
+      "max_bars": 48,
+      "leverage": 10,
+      "entry_fee_pct": 0.04,
+      "exit_fee_pct": 0.04
+    }
+  },
+  "BTC_2h_Connors_Long": {
+    "coin": "BTC",
+    "interval": "1h",
+    "strat_id": "Connors",
+    "direction": "Long",
+    "params": {
+      "rsi_ob": 55,
+      "rsi2_ob": 26,
+      "ema_len": 199,
+      "sma1_len": 20,
+      "sma2_len": 60,
+      "adx_thr": 25,
+      "donch": 20,
+      "tp_pct": 1.5,
+      "sl_pct": 0.9,
+      "max_bars": 41,
+      "leverage": 10,
+      "entry_fee_pct": 0.04,
+      "exit_fee_pct": 0.04
+    }
+  },
+  "ETH_1h_Connors_Long": {
+    "coin": "ETH",
+    "interval": "1h",
+    "strat_id": "Connors",
+    "direction": "Long",
+    "params": {
+      "tp_pct": 2.0,
+      "sl_pct": 1.0,
+      "max_bars": 48,
+      "leverage": 10,
+      "entry_fee_pct": 0.04,
+      "exit_fee_pct": 0.04,
+      "rsi_ob": 70,
+      "rsi2_ob": 80,
+      "ema_len": 200,
+      "sma1_len": 20,
+      "sma2_len": 60,
+      "adx_thr": 25,
+      "donch": 20,
+      "macd_fast": 12,
+      "macd_slow": 26,
+      "macd_signal": 9,
+      "bb_length": 20,
+      "bb_std_mult": 2.0,
+      "atr_length": 20,
+      "kc_mult": 1.5,
+      "vol_ma_len": 20,
+      "vol_spike_k": 2.0
+    }
+  }
+}

@@ -1,0 +1,12 @@
+.DS_Store
+__pycache__/
+*.pyc
+.env
+__pycache__/
+*.pyc
+.env
+.DS_Store
+binance_klines/
+myenv/ # 가상환경 폴더 있으면
+__pycache__/
+.DS_Store
