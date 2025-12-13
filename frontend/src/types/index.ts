@@ -133,6 +133,34 @@ export interface Preset {
   params: Partial<BacktestParams>;
 }
 
+export interface MaCrossParams {
+  coin: string;
+  interval: string;
+  cross_type: 'golden' | 'dead';
+  pairs: number[][];
+  horizons: number[];
+  up_thresholds: number[];
+  down_thresholds: number[];
+  use_csv: boolean;
+}
+
+export interface MaCrossStat {
+  pair: string;
+  horizon: number;
+  type: 'up' | 'down';
+  threshold_value: number;
+  threshold_label: string;
+  probability: number;
+  signals: number;
+}
+
+export interface MaCrossResult {
+  data: MaCrossStat[];
+  cross_type: string;
+  available_pairs: string[];
+  horizons: number[];
+}
+
 export type Language = 'ko' | 'en';
 
 export type Coin = 'BTC' | 'ETH' | 'SOL' | 'XRP';

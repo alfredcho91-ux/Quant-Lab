@@ -94,6 +94,17 @@ class PresetSaveRequest(BaseModel):
     params: Dict[str, Any]
 
 
+class MaCrossParams(BaseModel):
+    coin: str = "BTC"
+    interval: str = "1h"
+    cross_type: str = "golden"  # "golden" or "dead"
+    pairs: List[List[int]] = [[5, 20], [5, 60], [20, 60], [20, 240], [60, 240]]
+    horizons: List[int] = [1, 2, 3, 4, 5]
+    up_thresholds: List[float] = [0.5, 1.0, 2.0]  # in percent
+    down_thresholds: List[float] = [0.5, 1.0, 2.0]  # in percent
+    use_csv: bool = False
+
+
 # ========== API Endpoints ==========
 
 @app.get("/")
@@ -527,6 +538,170 @@ async def api_strategy_info(
         return {"success": False, "error": f"Strategy {strategy_id} not found"}
     
     return {"success": True, "data": explainers[strategy_id]}
+
+
+# ========== MA Cross Statistics ==========
+
+def _calculate_smas(df: pd.DataFrame, pairs: List[List[int]]) -> pd.DataFrame:
+    """Calculate required SMAs and add to dataframe."""
+    df = df.copy()
+    all_lengths = sorted({x for pair in pairs for x in pair})
+    for length in all_lengths:
+        col = f"SMA{length}"
+        if col not in df.columns:
+            df[col] = df["close"].rolling(length, min_periods=length).mean()
+    return df
+
+
+def _compute_cross_stats(
+    df: pd.DataFrame,
+    pairs: List[List[int]],
+    horizons: List[int],
+    up_thrs: List[float],
+    down_thrs: List[float],
+    cross_type: str,
+) -> List[Dict]:
+    """
+    Compute statistics for MA crosses.
+    Returns probability of reaching up/down targets after cross.
+    """
+    if df.empty or not pairs:
+        return []
+
+    results = []
+
+    # Reverse series for forward-looking calculations
+    rev_high = df["high"].iloc[::-1]
+    rev_low = df["low"].iloc[::-1]
+
+    for short_len, long_len in pairs:
+        s_col = f"SMA{short_len}"
+        l_col = f"SMA{long_len}"
+        pair_label = f"{short_len}/{long_len}"
+
+        if s_col not in df.columns or l_col not in df.columns:
+            continue
+
+        prev_s = df[s_col].shift(1)
+        prev_l = df[l_col].shift(1)
+        curr_s = df[s_col]
+        curr_l = df[l_col]
+
+        if cross_type == "golden":
+            # Golden cross: yesterday s <= l, today s > l
+            signal = (prev_s <= prev_l) & (curr_s > curr_l)
+        else:
+            # Dead cross: yesterday s >= l, today s < l
+            signal = (prev_s >= prev_l) & (curr_s < curr_l)
+
+        signal = signal.fillna(False)
+        if not signal.any():
+            continue
+
+        # Entry price is close of the bar where cross is confirmed
+        entry_prices = df.loc[signal, "close"]
+        signal_count = int(signal.sum())
+
+        for H in horizons:
+            # --- Up measurement (based on high) ---
+            roll_max = (
+                rev_high.rolling(H, min_periods=1)
+                .max()
+                .shift(1)
+                .iloc[::-1]
+            )
+            future_highs = roll_max.loc[signal]
+            valid_high = ~future_highs.isna()
+            if valid_high.any():
+                roi_up = (future_highs[valid_high] - entry_prices[valid_high]) / entry_prices[valid_high]
+                for thr in up_thrs:
+                    prob = float((roi_up >= thr).mean() * 100.0)
+                    results.append({
+                        "pair": pair_label,
+                        "horizon": int(H),
+                        "type": "up",
+                        "threshold_value": float(thr),
+                        "threshold_label": f"+{thr*100:.1f}%",
+                        "probability": prob,
+                        "signals": signal_count,
+                    })
+
+            # --- Down measurement (based on low) ---
+            roll_min = (
+                rev_low.rolling(H, min_periods=1)
+                .min()
+                .shift(1)
+                .iloc[::-1]
+            )
+            future_lows = roll_min.loc[signal]
+            valid_low = ~future_lows.isna()
+            if valid_low.any():
+                roi_down = (future_lows[valid_low] - entry_prices[valid_low]) / entry_prices[valid_low]
+                for thr in down_thrs:
+                    prob = float((roi_down <= -thr).mean() * 100.0)
+                    results.append({
+                        "pair": pair_label,
+                        "horizon": int(H),
+                        "type": "down",
+                        "threshold_value": float(thr),
+                        "threshold_label": f"-{thr*100:.1f}%",
+                        "probability": prob,
+                        "signals": signal_count,
+                    })
+
+    return results
+
+
+@app.post("/api/ma-cross")
+async def api_ma_cross(params: MaCrossParams):
+    """Calculate MA Cross statistics"""
+    try:
+        # Load data
+        df = None
+        if params.use_csv:
+            df, _ = load_csv_data(params.coin, params.interval)
+        
+        if df is None:
+            df = fetch_live_data(f"{params.coin}/USDT", params.interval, total_candles=3000)
+        
+        if df is None or df.empty:
+            return {"success": False, "error": "Failed to load data"}
+        
+        # Ensure required columns
+        needed = {"open", "high", "low", "close"}
+        if not needed.issubset(df.columns):
+            return {"success": False, "error": "Missing required columns (open, high, low, close)"}
+        
+        # Calculate SMAs
+        df = _calculate_smas(df, params.pairs)
+        
+        # Convert thresholds from percent to decimal
+        up_thrs = [v / 100.0 for v in params.up_thresholds]
+        down_thrs = [v / 100.0 for v in params.down_thresholds]
+        
+        # Compute cross statistics
+        results = _compute_cross_stats(
+            df=df,
+            pairs=params.pairs,
+            horizons=params.horizons,
+            up_thrs=up_thrs,
+            down_thrs=down_thrs,
+            cross_type=params.cross_type,
+        )
+        
+        # Get available pairs that have data
+        available_pairs = list(set(r["pair"] for r in results))
+        
+        return {
+            "success": True,
+            "data": results,
+            "cross_type": params.cross_type,
+            "available_pairs": available_pairs,
+            "horizons": params.horizons,
+        }
+    except Exception as e:
+        import traceback
+        return {"success": False, "error": str(e), "traceback": traceback.format_exc()}
 
 
 if __name__ == "__main__":

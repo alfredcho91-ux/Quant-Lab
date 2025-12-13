@@ -8,6 +8,7 @@ import {
   BarChart3,
   Activity,
   Globe,
+  TrendingUp,
 } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { getLabels } from '../store/labels';
@@ -18,6 +19,7 @@ const COINS: Coin[] = ['BTC', 'ETH', 'SOL', 'XRP'];
 
 const menuItems = [
   { path: '/backtest', icon: Rocket, labelKey: 'menu_backtest' as const },
+  { path: '/ma-cross', icon: TrendingUp, labelKey: 'menu_ma_cross' as const },
   { path: '/pattern', icon: BarChart3, labelKey: 'menu_pattern' as const },
   { path: '/scanner', icon: Activity, labelKey: 'menu_scanner' as const },
 ];

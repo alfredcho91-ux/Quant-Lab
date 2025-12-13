@@ -9,6 +9,8 @@ import type {
   BacktestResult,
   SRLevel,
   Preset,
+  MaCrossParams,
+  MaCrossResult,
 } from '../types';
 
 const api = axios.create({
@@ -192,6 +194,34 @@ export async function deletePreset(name: string): Promise<boolean> {
     return res.data.success;
   } catch {
     return false;
+  }
+}
+
+// MA Cross Statistics
+export async function runMaCross(params: MaCrossParams): Promise<MaCrossResult | null> {
+  try {
+    const res = await api.post<{
+      success: boolean;
+      data: MaCrossResult['data'];
+      cross_type: string;
+      available_pairs: string[];
+      horizons: number[];
+      error?: string;
+    }>('/ma-cross', params);
+    
+    if (res.data.success) {
+      return {
+        data: res.data.data,
+        cross_type: res.data.cross_type,
+        available_pairs: res.data.available_pairs,
+        horizons: res.data.horizons,
+      };
+    }
+    console.error('MA Cross error:', res.data.error);
+    return null;
+  } catch (err) {
+    console.error('MA Cross request failed:', err);
+    return null;
   }
 }
 
