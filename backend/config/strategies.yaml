@@ -1,0 +1,99 @@
+# config/strategies.yaml
+# Strategy explainers metadata
+
+strategies:
+  Connors:
+    ko:
+      concept: "아주 짧은 RSI(2)로 극단의 과매도/과매수 구간에서 반등(되돌림)을 노리는 전략."
+      long: "RSI(2) < {rsi2_os} & 가격 > EMA({ema_len}). 청산: TP/SL 또는 SMA({sma1_len}) 재돌파."
+      short: "RSI(2) > {rsi2_ob} & 가격 < EMA({ema_len}). 청산: TP/SL 또는 SMA({sma1_len}) 재하향."
+      regime: "횡보~약한 추세, 급등락 직후 기술적 반등/반납."
+    en:
+      concept: "Very short RSI(2) reversion to capture snapbacks after extreme moves."
+      long: "RSI(2) < {rsi2_os} & price > EMA({ema_len}). Exit: TP/SL or price crosses above SMA({sma1_len}) again."
+      short: "RSI(2) > {rsi2_ob} & price < EMA({ema_len}). Exit: TP/SL or price crosses below SMA({sma1_len}) again."
+      regime: "Range to mild trend; after panic drops/pumps."
+  
+  Sqz:
+    ko:
+      concept: "BB가 KC 안으로 들어가는 스퀴즈 후 재확장 시 추세 시작을 탄다."
+      long: "직전까지 스퀴즈 ON, 현재 해제 + 종가 BB 중단선 위."
+      short: "직전까지 스퀴즈 ON, 현재 해제 + 종가 BB 중단선 아래."
+      regime: "변동성 수축 직후."
+    en:
+      concept: "Volatility contraction (BB inside KC) followed by expansion = trend ignition."
+      long: "Squeeze was ON and just released; close > BB mid."
+      short: "Squeeze was ON and just released; close < BB mid."
+      regime: "Right after volatility squeeze."
+  
+  Turtle:
+    ko:
+      concept: "Donchian 고가/저가 돌파 추세 추종."
+      long: "종가가 Donchian High 상향 돌파 & EMA 위."
+      short: "종가가 Donchian Low 하향 돌파 & EMA 아래."
+      regime: "강한 불/베어 추세에 유리, 횡보 시 휩쏘 주의."
+    en:
+      concept: "Donchian breakout trend-following."
+      long: "Close breaks recent Donchian High & close > EMA."
+      short: "Close breaks recent Donchian Low & close < EMA."
+      regime: "Strong Bull/Bear trends; beware whipsaws in ranges."
+  
+  MR:
+    ko:
+      concept: "밴드 밖 오버슈팅 후 평균 회귀."
+      long: "종가 < BB 하단 & RSI(14) < {rsi_os} & EMA 위."
+      short: "종가 > BB 상단 & RSI(14) > {rsi_ob} & EMA 아래."
+      regime: "횡보 또는 과열 직후."
+    en:
+      concept: "Mean reversion after overshoot beyond the bands."
+      long: "Close < BB low & RSI(14) < {rsi_os} & close > EMA."
+      short: "Close > BB upper & RSI(14) > {rsi_ob} & close < EMA."
+      regime: "Sideways or right after volatility blow-off."
+  
+  RSI:
+    ko:
+      concept: "RSI(14) 단일 임계 기반 역추세 진입."
+      long: "RSI(14) < {rsi_os}."
+      short: "RSI(14) > {rsi_ob}."
+      regime: "박스권/횡보."
+    en:
+      concept: "Simple RSI(14) reversal using a single threshold."
+      long: "RSI(14) < {rsi_os}."
+      short: "RSI(14) > {rsi_ob}."
+      regime: "Ranges/boxes."
+  
+  MA:
+    ko:
+      concept: "SMA1/SMA2 골든·데드 크로스."
+      long: "SMA({sma1_len})가 SMA({sma2_len}) 상향 교차."
+      short: "SMA({sma1_len})가 SMA({sma2_len}) 하향 교차."
+      regime: "완만한 추세 발생/전환."
+    en:
+      concept: "SMA1/SMA2 golden/death cross."
+      long: "SMA({sma1_len}) crosses up SMA({sma2_len})."
+      short: "SMA({sma1_len}) crosses down SMA({sma2_len})."
+      regime: "Gentle emerging trends."
+  
+  BB:
+    ko:
+      concept: "볼밴 돌파를 모멘텀 시그널로 사용."
+      long: "상단 밴드 상향 돌파(이전 봉은 하단)."
+      short: "하단 밴드 하향 돌파(이전 봉은 상단)."
+      regime: "초기 모멘텀."
+    en:
+      concept: "Bollinger band breakout as momentum trigger."
+      long: "Close breaks the upper band (was below in prior bar)."
+      short: "Close breaks the lower band (was above in prior bar)."
+      regime: "Early momentum phases."
+  
+  Engulf:
+    ko:
+      concept: "장악형 캔들 반전 패턴."
+      long: "이전 음봉 + 현재 양봉, 현재 몸통이 이전 몸통 장악."
+      short: "이전 양봉 + 현재 음봉, 현재 몸통이 이전 몸통 장악."
+      regime: "전환 초입 단기 반전."
+    en:
+      concept: "Bullish/Bearish engulfing candlestick reversal."
+      long: "Prev red, current green; current body engulfs previous body."
+      short: "Prev green, current red; current body engulfs previous body."
+      regime: "Short-term reversals around turning points."

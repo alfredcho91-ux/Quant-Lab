@@ -10,6 +10,7 @@ import MetricCard from '../components/MetricCard';
 import ParamsPanel from '../components/ParamsPanel';
 import StrategyExplainer from '../components/StrategyExplainer';
 import TradesTable from '../components/TradesTable';
+import DataSourceToggle from '../components/DataSourceToggle';
 import type { BacktestResult, Strategy } from '../types';
 
 export default function BacktestPage() {
@@ -149,29 +150,7 @@ export default function BacktestPage() {
 
           {/* Data Source */}
           <div className="space-y-2">
-            <label className="text-xs text-dark-400 uppercase">{labels.data_src}</label>
-            <div className="flex gap-2">
-              <button
-                onClick={() => updateBacktestParams({ use_csv: false })}
-                className={`flex-1 py-2 px-3 rounded-lg text-sm transition-all ${
-                  !backtestParams.use_csv
-                    ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                    : 'bg-dark-700 text-dark-400 hover:bg-dark-600'
-                }`}
-              >
-                {labels.data_api}
-              </button>
-              <button
-                onClick={() => updateBacktestParams({ use_csv: true })}
-                className={`flex-1 py-2 px-3 rounded-lg text-sm transition-all ${
-                  backtestParams.use_csv
-                    ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                    : 'bg-dark-700 text-dark-400 hover:bg-dark-600'
-                }`}
-              >
-                {labels.data_csv}
-              </button>
-            </div>
+            <DataSourceToggle />
             {timeframes?.csv && timeframes.csv.length > 0 && (
               <p className="text-xs text-dark-500">
                 {labels.price_help}

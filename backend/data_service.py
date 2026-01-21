@@ -11,8 +11,12 @@ import re
 import ccxt
 import time
 import requests
+import logging
 from functools import lru_cache
 from datetime import datetime, timedelta
+
+# 로깅 설정
+logger = logging.getLogger(__name__)
 
 # ───────────────── Constants ─────────────────
 BINANCE_TFS = [
@@ -140,13 +144,22 @@ def fetch_live_data(symbol: str, timeframe: str, limit: int = 1000, total_candle
         df.reset_index(drop=True, inplace=True)
         return df
     except Exception as e:
-        print(f"API Error: {e}")
+        logger.error(f"API Error: {e}")
         return None
 
 
 def load_csv_data(coin_name: str, interval: str, base_dir: Path = BASE_DIR):
     """Load historical data from local CSV files"""
-    fp = base_dir / f"{coin_name}USDT-{interval}-merged.csv"
+    # coin_name에서 USDT 접미사 제거 (중복 방지)
+    coin_name = coin_name.replace("USDT", "").replace("usdt", "")
+    
+    # interval 매핑 (API 표기 → CSV 파일명 표기)
+    interval_map = {
+        "1M": "1mo",  # 월봉: API는 1M, CSV는 1mo
+    }
+    csv_interval = interval_map.get(interval, interval)
+    
+    fp = base_dir / f"{coin_name}USDT-{csv_interval}-merged.csv"
     
     if not fp.exists():
         return None, str(fp)

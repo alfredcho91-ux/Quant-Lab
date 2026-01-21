@@ -1,0 +1,35 @@
+name: C1 Extraction Tests
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'backend/strategy/**'
+      - 'backend/tests/**'
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - 'backend/strategy/**'
+      - 'backend/tests/**'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+    
+    - name: Install dependencies
+      run: |
+        cd backend
+        pip install -r requirements.txt
+    
+    - name: Run C1 extraction tests
+      run: |
+        cd backend
+        pytest tests/test_c1_extraction.py -v

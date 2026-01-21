@@ -1,6 +1,8 @@
 # core/indicators.py
 import numpy as np
 import pandas as pd
+from typing import List
+from typing import List
 
 
 def calculate_adx(df: pd.DataFrame, length: int = 14) -> pd.Series:
@@ -218,5 +220,137 @@ def prepare_strategy_data(
     df.attrs["MACD_FAST"] = macd_fast
     df.attrs["MACD_SLOW"] = macd_slow
     df.attrs["MACD_SIGNAL"] = macd_signal
+
+    return df
+
+
+def compute_rsi(series: pd.Series, length: int = 14) -> pd.Series:
+    """
+    RSI (Relative Strength Index) 계산 함수
+    
+    Args:
+        series: 가격 시리즈 (보통 close)
+        length: RSI 기간 (기본값: 14)
+    
+    Returns:
+        RSI 값 시리즈
+    """
+    delta = series.diff()
+    gain = delta.where(delta > 0, 0.0)
+    loss = -delta.where(delta < 0, 0.0)
+    avg_gain = gain.rolling(window=length, min_periods=length).mean()
+    avg_loss = loss.rolling(window=length, min_periods=length).mean()
+    rs = avg_gain / avg_loss.replace(0, np.nan)
+    rsi = 100 - (100 / (1 + rs))
+    return rsi
+
+
+def calculate_smas(df: pd.DataFrame, pairs: List[List[int]]) -> pd.DataFrame:
+    """
+    필요한 SMA들을 계산하여 DataFrame에 추가
+    
+    Args:
+        df: OHLCV DataFrame
+        pairs: SMA 길이 쌍 리스트 (예: [[5, 20], [20, 60]])
+    
+    Returns:
+        SMA 컬럼이 추가된 DataFrame
+    """
+    df = df.copy()
+    all_lengths = sorted({x for pair in pairs for x in pair})
+    for length in all_lengths:
+        col = f"SMA{length}"
+        if col not in df.columns:
+            df[col] = df["close"].rolling(length, min_periods=length).mean()
+    return df
+
+
+def add_bb_indicators(
+    df: pd.DataFrame,
+    bb_length: int = 20,
+    bb_std_mult: float = 2.0,
+    rsi_length: int = 14,
+    sma200_length: int = 200,
+) -> pd.DataFrame:
+    """
+    BB, RSI, SMA200 인디케이터를 계산하여 DataFrame에 추가
+    
+    Args:
+        df: OHLCV DataFrame
+        bb_length: 볼린저밴드 기간 (기본값: 20)
+        bb_std_mult: 볼린저밴드 표준편차 배수 (기본값: 2.0)
+        rsi_length: RSI 기간 (기본값: 14)
+        sma200_length: SMA200 기간 (기본값: 200)
+    
+    Returns:
+        BB, RSI, SMA200, 터치 플래그가 추가된 DataFrame
+    """
+    df = df.copy()
+    close = df["close"]
+    mid = close.rolling(window=bb_length, min_periods=bb_length).mean()
+    std = close.rolling(window=bb_length, min_periods=bb_length).std()
+    df["BB_mid"] = mid
+    df["BB_upper"] = mid + bb_std_mult * std
+    df["BB_lower"] = mid - bb_std_mult * std
+    df["RSI"] = compute_rsi(close, length=rsi_length)
+    df["SMA200"] = close.rolling(window=sma200_length, min_periods=sma200_length).mean()
+    
+    # Touch flags
+    low, high = df["low"], df["high"]
+    df["touch_lower"] = (low <= df["BB_lower"]) & (df["BB_lower"] <= high)
+    df["touch_mid"] = (low <= df["BB_mid"]) & (df["BB_mid"] <= high)
+    df["touch_upper"] = (low <= df["BB_upper"]) & (df["BB_upper"] <= high)
+    return df
+
+
+def add_combo_indicators(df: pd.DataFrame, sma_short: int, sma_long: int) -> pd.DataFrame:
+    """
+    Combo Filter를 위한 인디케이터들을 계산하여 DataFrame에 추가
+    (SMA, BB, RSI, 캔들 패턴 특성)
+    
+    Args:
+        df: OHLCV DataFrame
+        sma_short: 단기 SMA 기간
+        sma_long: 장기 SMA 기간
+    
+    Returns:
+        SMA, BB, RSI, 캔들 패턴 특성이 추가된 DataFrame
+    """
+    df = df.copy()
+    close = df["close"]
+    o, h, l, c = df["open"], df["high"], df["low"], df["close"]
+    
+    # SMA
+    df[f"SMA{sma_short}"] = close.rolling(window=sma_short, min_periods=sma_short).mean()
+    df[f"SMA{sma_long}"] = close.rolling(window=sma_long, min_periods=sma_long).mean()
+    
+    # BB
+    mid = close.rolling(window=20, min_periods=20).mean()
+    std = close.rolling(window=20, min_periods=20).std()
+    df["BB_mid"] = mid
+    df["BB_upper"] = mid + 2.0 * std
+    df["BB_lower"] = mid - 2.0 * std
+    df["RSI"] = compute_rsi(close, length=14)
+    
+    # Full candle features (matching candle_patterns.add_candle_features)
+    df["is_bull"] = c > o
+    df["is_bear"] = c < o
+    df["body"] = (c - o).abs()
+    df["range"] = h - l
+    
+    # Replace zeros to avoid division errors
+    df["body"] = df["body"].replace(0, 1e-8)
+    df["range"] = df["range"].replace(0, 1e-8)
+    
+    # Body top/bottom for wick calculations
+    df["body_top"] = np.where(df["is_bull"], c, o)
+    df["body_bottom"] = np.where(df["is_bull"], o, c)
+    
+    # Wicks
+    df["upper_wick"] = h - df["body_top"]
+    df["lower_wick"] = df["body_bottom"] - l
+    
+    # Body relative to range (important for patterns)
+    df["body_rel_range"] = df["body"] / df["range"]
 
     return df

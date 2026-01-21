@@ -1,0 +1,40 @@
+{
+  "pattern_definitions": {
+    "Bullish Engulfing": {
+      "direction": "bull"
+    },
+    "Bearish Engulfing": {
+      "direction": "bear"
+    },
+    "Hammer": {
+      "direction": "bull"
+    },
+    "Shooting Star": {
+      "direction": "bear"
+    },
+    "Doji": {
+      "direction": null
+    },
+    "Bullish Harami": {
+      "direction": "bull"
+    },
+    "Bearish Harami": {
+      "direction": "bear"
+    },
+    "Hanging Man": {
+      "direction": "bear"
+    },
+    "Morning Star": {
+      "direction": "bull"
+    },
+    "Evening Star": {
+      "direction": "bear"
+    },
+    "Three White Soldiers": {
+      "direction": "bull"
+    },
+    "Three Black Crows": {
+      "direction": "bear"
+    }
+  }
+}

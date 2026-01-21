@@ -4,11 +4,15 @@ import { useQuery } from '@tanstack/react-query';
 import {
   ChevronLeft,
   ChevronRight,
-  Rocket,
   BarChart3,
   Activity,
   Globe,
-  TrendingUp,
+  Target,
+  Layers,
+  Search,
+  BookOpen,
+  Radio,
+  Flame,
 } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { getLabels } from '../store/labels';
@@ -18,10 +22,20 @@ import type { Coin, Language } from '../types';
 const COINS: Coin[] = ['BTC', 'ETH', 'SOL', 'XRP'];
 
 const menuItems = [
-  { path: '/backtest', icon: Rocket, labelKey: 'menu_backtest' as const },
-  { path: '/ma-cross', icon: TrendingUp, labelKey: 'menu_ma_cross' as const },
+  // 주요 분석 페이지 (맨 위)
+  { path: '/streak-analysis', icon: Flame, labelKey: 'menu_streak_analysis' as const },
+  { path: '/bb-mid', icon: Target, labelKey: 'menu_bb_mid' as const },
+  { path: '/weekly-pattern', icon: BarChart3, labelKey: 'menu_weekly_pattern' as const },
+  // 기타 분석 페이지
+  { path: '/combo-filter', icon: Layers, labelKey: 'menu_combo_filter' as const },
+  { path: '/multi-tf-squeeze', icon: Activity, labelKey: 'menu_multi_tf_squeeze' as const },
   { path: '/pattern', icon: BarChart3, labelKey: 'menu_pattern' as const },
-  { path: '/scanner', icon: Activity, labelKey: 'menu_scanner' as const },
+  { path: '/pattern-scanner', icon: Search, labelKey: 'menu_pattern_scanner' as const },
+  { path: '/strategy-scanner', icon: Radio, labelKey: 'menu_strategy_scanner' as const },
+  // 백테스트 페이지 숨김
+  // { path: '/backtest', icon: Rocket, labelKey: 'menu_backtest' as const },
+  // { path: '/backtest-advanced', icon: FlaskConical, labelKey: 'menu_backtest_advanced' as const },
+  { path: '/journal', icon: BookOpen, labelKey: 'menu_journal' as const },
 ];
 
 export default function Sidebar() {
@@ -180,7 +194,7 @@ export default function Sidebar() {
       )}
 
       {/* Menu */}
-      <nav className="flex-1 p-2">
+      <nav className="flex-1 p-2 overflow-y-auto">
         <div className="space-y-1">
           {menuItems.map((item) => {
             const Icon = item.icon;

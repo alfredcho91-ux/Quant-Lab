@@ -15,7 +15,12 @@ def run_backtest(
     fee_exit_rate: float = 0.0005,
 ) -> pd.DataFrame:
     """
-    공통 백테스트 엔진 (8개 전략용)
+    공통 백테스트 엔진 (8개 전략용) - Look-ahead Bias 제거 버전
+
+    중요 변경사항:
+    - 시그널이 봉 T의 종가에서 발생하면, 실제 진입은 봉 T+1의 시가에서 수행
+    - 이는 실제 트레이딩 환경을 정확히 반영함
+    - 시그널 봉의 종가로 진입하는 것은 불가능 (종가는 봉이 끝나야 확정됨)
 
     df           : prepare_strategy_data()를 거친 OHLCV 데이터프레임
     signal_col   : 진입 시그널 컬럼 이름 (예: 'Sig_Connors_Long')
@@ -34,6 +39,7 @@ def run_backtest(
     if len(sig_idx) == 0:
         return pd.DataFrame()
 
+    opens = df["open"].values
     closes = df["close"].values
     highs = df["high"].values
     lows = df["low"].values
@@ -48,12 +54,22 @@ def run_backtest(
     n = len(df)
 
     for idx in sig_idx:
-        if idx + 1 >= n:
+        # 시그널 봉 T에서 발생 → 봉 T+1에서 진입
+        entry_bar_idx = idx + 1
+        
+        # 다음 봉이 존재해야 진입 가능
+        if entry_bar_idx >= n:
+            continue
+        
+        # 최소 2봉 이상 남아있어야 의미 있는 거래 가능
+        if entry_bar_idx + 1 >= n:
             continue
 
-        entry_price = closes[idx]
-        entry_time = times[idx]
-        entry_regime = regimes[idx]
+        # 진입가: 다음 봉(T+1)의 시가 사용 (실제 트레이딩과 동일)
+        entry_price = opens[entry_bar_idx]
+        entry_time = times[entry_bar_idx]  # 실제 진입 시점
+        signal_time = times[idx]  # 시그널 발생 시점 (참고용)
+        entry_regime = regimes[entry_bar_idx]
 
         # 방향에 따른 기본 TP/SL/청산가
         if direction == "Long":
@@ -67,11 +83,12 @@ def run_backtest(
 
         outcome = "TimeOut"
         raw = 0.0
-        exit_idx = min(idx + max_bars, n - 1)
+        exit_idx = min(entry_bar_idx + max_bars, n - 1)
         exit_price = closes[exit_idx]
 
-        for i in range(1, max_bars + 1):
-            ci = idx + i
+        # 진입 봉(entry_bar_idx)부터 max_bars 동안 확인
+        for i in range(0, max_bars + 1):
+            ci = entry_bar_idx + i
             if ci >= n:
                 break
 
