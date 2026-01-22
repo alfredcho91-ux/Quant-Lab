@@ -4,26 +4,39 @@ FastAPI Backend for WolGem's Quant Master React Application
 Provides REST API endpoints for market data, indicators, backtesting, etc.
 """
 
+import sys
+from pathlib import Path
+
+# Add project root to Python path (for importing core modules)
+# This ensures core/ can be imported even when running directly with uvicorn
+_project_root = Path(__file__).parent.parent
+if str(_project_root) not in sys.path:
+    sys.path.insert(0, str(_project_root))
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import ORJSONResponse
 from config.settings import CORS_ORIGINS
 
-# Import routers
-from routes.streak import router as streak_router
-from routes.market import router as market_router
-from routes.backtest import router as backtest_router
-from routes.scanner import router as scanner_router
-from routes.stats import router as stats_router
-from routes.preset import router as preset_router
-from routes.support_resistance import router as support_resistance_router
-from routes.strategy import router as strategy_router
-from routes.journal import router as journal_router
+# Import routers (from centralized routes/__init__.py)
+from routes import (
+    streak_router,
+    market_router,
+    backtest_router,
+    scanner_router,
+    stats_router,
+    preset_router,
+    support_resistance_router,
+    strategy_router,
+    journal_router,
+)
 from core.strategies import STRATS
 
 app = FastAPI(
     title="WolGem Quant Master API",
     description="Backend API for crypto trading analysis platform",
     version="1.0.0",
+    default_response_class=ORJSONResponse,  # orjson 사용으로 JSON 직렬화 성능 향상
 )
 
 # CORS middleware

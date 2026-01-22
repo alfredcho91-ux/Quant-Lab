@@ -3,13 +3,6 @@
 import pandas as pd
 import numpy as np
 from typing import Dict, Optional
-import sys
-from pathlib import Path
-
-# Add parent path for importing core modules
-project_root = Path(__file__).parent.parent.parent.parent
-if str(project_root) not in sys.path:
-    sys.path.insert(0, str(project_root))
 
 from core.indicators import compute_rsi
 
@@ -55,7 +48,6 @@ def add_bb_indicators(
 def _build_event_filter(
     df: pd.DataFrame,
     start_side: str,
-    rsi_range: tuple,
     regime: Optional[str] = None,
 ) -> pd.Series:
     """
@@ -64,7 +56,6 @@ def _build_event_filter(
     Args:
         df: BB 지표가 포함된 DataFrame
         start_side: "lower" 또는 "upper"
-        rsi_range: (rsi_min, rsi_max) 튜플
         regime: "above_sma200", "below_sma200", 또는 None
     
     Returns:
@@ -74,9 +65,6 @@ def _build_event_filter(
         cond = df["touch_lower"]
     else:
         cond = df["touch_upper"]
-    
-    rsi_min, rsi_max = rsi_range
-    cond = cond & df["RSI"].between(rsi_min, rsi_max)
     
     if regime == "above_sma200":
         cond = cond & (df["close"] > df["SMA200"])
@@ -90,7 +78,6 @@ def analyze_bb_mid_touch(
     df: pd.DataFrame,
     start_side: str,
     max_bars: int,
-    rsi_range: tuple,
     regime: Optional[str],
 ) -> Dict:
     """
@@ -100,14 +87,13 @@ def analyze_bb_mid_touch(
         df: BB 지표가 포함된 DataFrame
         start_side: "lower" 또는 "upper"
         max_bars: 최대 분석 기간
-        rsi_range: (rsi_min, rsi_max) 튜플
         regime: "above_sma200", "below_sma200", 또는 None
     
     Returns:
         통계 결과 딕셔너리
     """
     # Filter events
-    cond = _build_event_filter(df, start_side, rsi_range, regime)
+    cond = _build_event_filter(df, start_side, regime)
     
     # 연속 터치 중 최초 봉만 선택 (연속 터치 제외)
     touch_series = cond.astype(int)
@@ -141,7 +127,6 @@ def collect_event_returns(
     df: pd.DataFrame,
     start_side: str,
     max_bars: int,
-    rsi_range: tuple,
     regime: Optional[str],
 ) -> Dict:
     """
@@ -151,14 +136,13 @@ def collect_event_returns(
         df: BB 지표가 포함된 DataFrame
         start_side: "lower" 또는 "upper"
         max_bars: 최대 분석 기간
-        rsi_range: (rsi_min, rsi_max) 튜플
         regime: "above_sma200", "below_sma200", 또는 None
     
     Returns:
         MFE, MAE, End Return 리스트
     """
     # Filter events
-    cond = _build_event_filter(df, start_side, rsi_range, regime)
+    cond = _build_event_filter(df, start_side, regime)
     
     # 연속 터치 중 최초 봉만 선택 (연속 터치 제외)
     touch_series = cond.astype(int)
@@ -207,7 +191,6 @@ def quartile_reach_stats(
     df: pd.DataFrame,
     start_side: str,
     max_bars: int,
-    rsi_range: tuple,
     regime: Optional[str],
 ) -> Dict:
     """
@@ -217,14 +200,13 @@ def quartile_reach_stats(
         df: BB 지표가 포함된 DataFrame
         start_side: "lower" 또는 "upper"
         max_bars: 최대 분석 기간
-        rsi_range: (rsi_min, rsi_max) 튜플
         regime: "above_sma200", "below_sma200", 또는 None
     
     Returns:
         분위별 분포 딕셔너리
     """
     # Filter events
-    cond = _build_event_filter(df, start_side, rsi_range, regime)
+    cond = _build_event_filter(df, start_side, regime)
     
     # 연속 터치 중 최초 봉만 선택 (연속 터치 제외)
     touch_series = cond.astype(int)

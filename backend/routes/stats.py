@@ -4,11 +4,6 @@
 from fastapi import APIRouter
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
-import sys
-from pathlib import Path
-
-# Add parent path for importing core modules
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from utils.data_loader import load_data_for_analysis
 from utils.decorators import handle_api_errors
@@ -24,6 +19,7 @@ from strategy.combo_filter import analyze_combo_filter, add_combo_indicators
 from strategy.squeeze import analyze_multi_tf_squeeze
 from strategy.weekly_pattern import analyze_weekly_pattern, analyze_weekly_pattern_manual
 from strategy.weekly_pattern.backtest import run_weekly_pattern_backtest
+from strategy.hybrid import analyze_hybrid_strategy, run_hybrid_backtest, analyze_live_mode
 
 router = APIRouter(prefix="/api", tags=["stats"])
 
@@ -35,8 +31,6 @@ class BBMidParams(BaseModel):
     intervals: List[str] = ["1h", "4h"]
     start_side: str = "lower"
     max_bars: int = 7
-    rsi_min: float = 0  # 기본값: 필터 없음
-    rsi_max: float = 100  # 기본값: 필터 없음
     regime: Optional[str] = None
     use_csv: bool = False
 
@@ -78,7 +72,10 @@ class WeeklyPatternParams(BaseModel):
     direction: Optional[str] = None  # "down" (하락) 또는 "up" (상승), None이면 임계값으로 자동 판단
     deep_drop_threshold: float = -0.05  # 깊은 하락 임계값 (-5%)
     deep_rise_threshold: float = 0.05  # 깊은 상승 임계값 (+5%)
-    rsi_threshold: float = 40  # 과매도/과매수 임계값 (하락: RSI < threshold, 상승: RSI > 100-threshold)
+    rsi_min: float = 0  # RSI 최소값 (하락: RSI 범위, 상승: 100-rsi_max ~ 100-rsi_min)
+    rsi_max: float = 40  # RSI 최대값
+    start_day: int = 0  # 분석 시작 요일 (0=월요일, 1=화요일, ..., 6=일요일)
+    end_day: int = 1  # 분석 종료 요일 (0=월요일, 1=화요일, ..., 6=일요일)
 
 
 class WeeklyPatternManualParams(BaseModel):
@@ -96,7 +93,10 @@ class WeeklyPatternBacktestParams(BaseModel):
     direction: str = "down"  # "down" (하락) 또는 "up" (상승)
     deep_drop_threshold: float = -0.05  # 깊은 하락 임계값 (-5%)
     deep_rise_threshold: float = 0.05  # 깊은 상승 임계값 (+5%)
-    rsi_threshold: float = 40  # 과매도/과매수 임계값
+    rsi_min: float = 0  # RSI 최소값
+    rsi_max: float = 40  # RSI 최대값
+    start_day: int = 0  # 분석 시작 요일 (0=월요일, 1=화요일, ..., 6=일요일)
+    end_day: int = 1  # 분석 종료 요일 (0=월요일, 1=화요일, ..., 6=일요일)
     leverage: int = 1  # 레버리지
     fee_entry_rate: float = 0.0005  # 진입 수수료율
     fee_exit_rate: float = 0.0005  # 청산 수수료율
@@ -152,7 +152,6 @@ async def api_bb_mid(params: BBMidParams):
             df=df,
             start_side=params.start_side,
             max_bars=params.max_bars,
-            rsi_range=(params.rsi_min, params.rsi_max),
             regime=params.regime,
         )
         
@@ -163,14 +162,12 @@ async def api_bb_mid(params: BBMidParams):
                 df=df,
                 start_side=params.start_side,
                 max_bars=params.max_bars,
-                rsi_range=(params.rsi_min, params.rsi_max),
                 regime=params.regime,
             )
             quartile_stats = quartile_reach_stats(
                 df=df,
                 start_side=params.start_side,
                 max_bars=params.max_bars,
-                rsi_range=(params.rsi_min, params.rsi_max),
                 regime=params.regime,
             )
             
@@ -254,7 +251,7 @@ async def api_weekly_pattern(params: WeeklyPatternParams):
             else:
                 direction = "down"  # 기본값
         
-        logger.info(f"Weekly pattern analysis started: coin={params.coin}, direction={direction}, deep_drop={params.deep_drop_threshold}, deep_rise={params.deep_rise_threshold}, rsi={params.rsi_threshold}")
+        logger.info(f"Weekly pattern analysis started: coin={params.coin}, direction={direction}, deep_drop={params.deep_drop_threshold}, deep_rise={params.deep_rise_threshold}, rsi_min={params.rsi_min}, rsi_max={params.rsi_max}")
         
         # 항상 API로 2000개 불러오기
         df = _load_data_for_analysis(params.coin, params.interval, use_csv=False, total_candles=2000)
@@ -270,8 +267,11 @@ async def api_weekly_pattern(params: WeeklyPatternParams):
             direction=direction,
             deep_drop_threshold=params.deep_drop_threshold,
             deep_rise_threshold=params.deep_rise_threshold,
-            rsi_threshold=params.rsi_threshold,
-            use_csv=False
+            rsi_min=params.rsi_min,
+            rsi_max=params.rsi_max,
+            use_csv=False,
+            start_day=params.start_day,
+            end_day=params.end_day
         )
         
         logger.info(f"Analysis completed: success={result.get('success', False)}")
@@ -344,11 +344,107 @@ async def api_weekly_pattern_backtest(params: WeeklyPatternBacktestParams):
         direction=params.direction,
         deep_drop_threshold=params.deep_drop_threshold,
         deep_rise_threshold=params.deep_rise_threshold,
-        rsi_threshold=params.rsi_threshold,
+        rsi_min=params.rsi_min,
+        rsi_max=params.rsi_max,
         use_csv=False,
         leverage=params.leverage,
         fee_entry_rate=params.fee_entry_rate,
         fee_exit_rate=params.fee_exit_rate,
+        start_day=params.start_day,
+        end_day=params.end_day,
+    )
+    
+    return result
+
+
+class HybridAnalysisParams(BaseModel):
+    """하이브리드 전략 분석 파라미터"""
+    coin: str = "BTC"
+    interval: str = "1h"
+    strategies: Optional[List[str]] = None  # None이면 전체 전략 분석
+
+
+class HybridBacktestParams(BaseModel):
+    """하이브리드 전략 백테스팅 파라미터"""
+    coin: str = "BTC"
+    interval: str = "1h"
+    strategy: str = "EMA_ADX_Strong"  # EMA_ADX_Strong, MACD_RSI_Trend, Pure_Trend
+    tp: float = 2.0  # 익절 비율 (%)
+    sl: float = 1.0  # 손절 비율 (%)
+    max_hold: int = 5  # 최대 보유 기간 (봉 수)
+
+
+class HybridLiveModeParams(BaseModel):
+    """하이브리드 전략 라이브 모드 파라미터"""
+    coin: str = "BTC"
+    interval: str = "1h"
+    strategies: Optional[List[str]] = None  # None이면 전체 전략 분석
+
+
+@router.post("/hybrid-analysis")
+@handle_api_errors(include_traceback=True)
+async def api_hybrid_analysis(params: HybridAnalysisParams):
+    """
+    하이브리드 전략 분석
+    
+    여러 지표를 조합한 전략들의 시그널 발생 통계를 분석합니다.
+    """
+    df = _load_data_for_analysis(params.coin, params.interval, use_csv=False, total_candles=2000)
+    if df is None or df.empty:
+        return {"success": False, "error": "Failed to load data"}
+    
+    result = analyze_hybrid_strategy(
+        df=df,
+        coin=params.coin,
+        interval=params.interval,
+        strategies=params.strategies,
+    )
+    
+    return result
+
+
+@router.post("/hybrid-backtest")
+@handle_api_errors(include_traceback=True)
+async def api_hybrid_backtest(params: HybridBacktestParams):
+    """
+    하이브리드 전략 백테스팅
+    
+    TP/SL 기반의 현실적인 매매 시뮬레이션을 수행합니다.
+    """
+    df = _load_data_for_analysis(params.coin, params.interval, use_csv=False, total_candles=2000)
+    if df is None or df.empty:
+        return {"success": False, "error": "Failed to load data"}
+    
+    result = run_hybrid_backtest(
+        df=df,
+        coin=params.coin,
+        interval=params.interval,
+        strategy=params.strategy,
+        tp=params.tp,
+        sl=params.sl,
+        max_hold=params.max_hold,
+    )
+    
+    return result
+
+
+@router.post("/hybrid-live")
+@handle_api_errors(include_traceback=True)
+async def api_hybrid_live(params: HybridLiveModeParams):
+    """
+    하이브리드 전략 라이브 모드
+    
+    현재 시점에서 각 전략의 시그널 상태를 확인합니다.
+    """
+    df = _load_data_for_analysis(params.coin, params.interval, use_csv=False, total_candles=2000)
+    if df is None or df.empty:
+        return {"success": False, "error": "Failed to load data"}
+    
+    result = analyze_live_mode(
+        df=df,
+        coin=params.coin,
+        interval=params.interval,
+        strategies=params.strategies,
     )
     
     return result

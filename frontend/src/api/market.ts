@@ -45,9 +45,14 @@ export async function getOHLCV(
   try {
     const res = await api.get(`/ohlcv/${coin}/${interval}`, {
       params: { use_csv: useCsv, limit },
+      timeout: 30000,  // 30초 타임아웃 (개별 요청용)
     });
     return res.data.success ? res.data : null;
-  } catch {
+  } catch (err: any) {
+    console.error('getOHLCV error:', err?.message || err);
+    if (err?.code === 'ECONNABORTED') {
+      console.error('getOHLCV timeout - API가 응답하지 않습니다');
+    }
     return null;
   }
 }

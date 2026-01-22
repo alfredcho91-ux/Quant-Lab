@@ -28,9 +28,7 @@ export async function runStreakAnalysis(params: StreakAnalysisParams): Promise<S
       short_signal?: import('../types').ShortSignal | null;
       volatility_stats?: import('../types').VolatilityStats;
       rsi_by_interval?: Record<string, import('../types').IntervalProbability>;
-      disp_by_interval?: Record<string, import('../types').IntervalProbability>;
       high_prob_rsi_intervals?: Record<string, import('../types').IntervalProbability>;
-      high_prob_disp_intervals?: Record<string, import('../types').IntervalProbability>;
       complex_pattern_analysis?: import('../types').ComplexPatternAnalysis | null;
       ny_trading_guide?: import('../types').NYTradingGuide;
       analysis_mode?: {
@@ -76,9 +74,7 @@ export async function runStreakAnalysis(params: StreakAnalysisParams): Promise<S
         short_signal: res.data.short_signal,
         volatility_stats: res.data.volatility_stats,
         rsi_by_interval: res.data.rsi_by_interval,
-        disp_by_interval: res.data.disp_by_interval,
         high_prob_rsi_intervals: res.data.high_prob_rsi_intervals,
-        high_prob_disp_intervals: res.data.high_prob_disp_intervals,
         complex_pattern_analysis: res.data.complex_pattern_analysis,
         ny_trading_guide: res.data.ny_trading_guide,
         analysis_mode: res.data.analysis_mode,

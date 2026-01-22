@@ -5,8 +5,6 @@ export interface BBMidParams {
   intervals: string[];
   start_side: 'lower' | 'upper';
   max_bars: number;
-  rsi_min: number;
-  rsi_max: number;
   regime: string | null;
   use_csv: boolean;
 }

@@ -32,6 +32,18 @@ from strategy.squeeze import (
     find_squeeze_breakouts,
 )
 
+# Hybrid Strategy (하이브리드 전략)
+from strategy.hybrid import (
+    analyze_hybrid_strategy,
+    run_hybrid_backtest,
+)
+
+# Hybrid Strategy (하이브리드 전략)
+from strategy.hybrid import (
+    analyze_hybrid_strategy,
+    run_hybrid_backtest,
+)
+
 __all__ = [
     # Streak
     'analyze_streak_pattern',
@@ -53,4 +65,7 @@ __all__ = [
     'analyze_multi_tf_squeeze',
     'add_squeeze_indicators',
     'find_squeeze_breakouts',
+    # Hybrid
+    'analyze_hybrid_strategy',
+    'run_hybrid_backtest',
 ]

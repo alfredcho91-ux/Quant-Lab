@@ -22,5 +22,8 @@ export * from './streak';
 // 주간 패턴 분석
 export * from './weekly-pattern';
 
+// 하이브리드 전략 분석
+export * from './hybrid';
+
 // 매매 일지
 export * from './journal';

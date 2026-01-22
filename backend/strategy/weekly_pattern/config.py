@@ -10,7 +10,8 @@ from strategy.weekly_pattern.indicators import IndicatorConfig
 
 # 상수 정의
 DEFAULT_DEEP_DROP_THRESHOLD = -0.05
-DEFAULT_RSI_THRESHOLD = 40.0
+DEFAULT_RSI_MIN = 0.0
+DEFAULT_RSI_MAX = 40.0
 DEFAULT_RSI_PERIOD = 14
 DEFAULT_ATR_PERIOD = 14
 DEFAULT_VOL_PERIOD = 20
@@ -22,7 +23,8 @@ class FilterConfig:
     direction: str = "down"  # "down" 또는 "up"
     deep_drop_threshold: float = DEFAULT_DEEP_DROP_THRESHOLD
     deep_rise_threshold: float = 0.05  # 깊은 상승 임계값 (+5%)
-    rsi_threshold: float = DEFAULT_RSI_THRESHOLD
+    rsi_min: float = DEFAULT_RSI_MIN
+    rsi_max: float = DEFAULT_RSI_MAX
     
     def __post_init__(self):
         """유효성 검증"""
@@ -32,8 +34,12 @@ class FilterConfig:
             raise ValueError(f"깊은 하락 임계값은 음수여야 합니다: {self.deep_drop_threshold}")
         if self.direction == "up" and self.deep_rise_threshold <= 0:
             raise ValueError(f"깊은 상승 임계값은 양수여야 합니다: {self.deep_rise_threshold}")
-        if not (0 <= self.rsi_threshold <= 100):
-            raise ValueError(f"RSI 임계값은 0-100 사이여야 합니다: {self.rsi_threshold}")
+        if not (0 <= self.rsi_min <= 100):
+            raise ValueError(f"RSI 최소값은 0-100 사이여야 합니다: {self.rsi_min}")
+        if not (0 <= self.rsi_max <= 100):
+            raise ValueError(f"RSI 최대값은 0-100 사이여야 합니다: {self.rsi_max}")
+        if self.rsi_min > self.rsi_max:
+            raise ValueError(f"RSI 최소값은 최대값보다 작거나 같아야 합니다: {self.rsi_min} > {self.rsi_max}")
 
 
 @dataclass
@@ -41,7 +47,8 @@ class AnalysisConfig:
     """분석 설정 (모든 설정 통합)"""
     coin: str
     deep_drop_threshold: float = DEFAULT_DEEP_DROP_THRESHOLD
-    rsi_threshold: float = DEFAULT_RSI_THRESHOLD
+    rsi_min: float = DEFAULT_RSI_MIN
+    rsi_max: float = DEFAULT_RSI_MAX
     rsi_period: int = DEFAULT_RSI_PERIOD
     atr_period: int = DEFAULT_ATR_PERIOD
     vol_period: int = DEFAULT_VOL_PERIOD
@@ -70,5 +77,6 @@ class AnalysisConfig:
             direction=self.direction or 'down',
             deep_drop_threshold=self.deep_drop_threshold,
             deep_rise_threshold=self.deep_rise_threshold or 0.05,
-            rsi_threshold=self.rsi_threshold
+            rsi_min=self.rsi_min,
+            rsi_max=self.rsi_max
         )

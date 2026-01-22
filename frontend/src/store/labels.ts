@@ -18,6 +18,7 @@ export interface Labels {
   menu_pattern_scanner: string;
   menu_streak_analysis: string;
   menu_weekly_pattern: string;
+  menu_hybrid_analysis: string;
   title_backtest: string;
   title_pattern: string;
   title_journal: string;
@@ -82,6 +83,7 @@ const labels_ko: Labels = {
   menu_pattern_scanner: '🔍 패턴 스캐너',
   menu_streak_analysis: '🏹 연속 봉 분석',
   menu_weekly_pattern: '📅 주간 패턴 분석',
+  menu_hybrid_analysis: '⚡ 하이브리드 전략',
   title_backtest: '{coin} 8개 전략 백테스트',
   title_pattern: '📈 패턴/캔들 통계 연구실',
   title_journal: '📝 매매 일지',
@@ -146,6 +148,7 @@ const labels_en: Labels = {
   menu_pattern_scanner: '🔍 Pattern Scanner',
   menu_streak_analysis: '🏹 Candle Streak',
   menu_weekly_pattern: '📅 Weekly Pattern',
+  menu_hybrid_analysis: '⚡ Hybrid Strategy',
   title_backtest: '{coin} 8-Strategy Backtest',
   title_pattern: '📈 Pattern / Candle Statistics Lab',
   title_journal: '📝 Trading Journal',

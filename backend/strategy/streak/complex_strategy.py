@@ -18,12 +18,11 @@ from strategy.streak.common import (
     analyze_interval_statistics,
     trimmed_stats,
     calculate_intraday_distribution,
-    calculate_indicators,
+    get_or_calculate_indicators,
     safe_float,
     safe_round,
     sanitize_for_json,
     RSI_BINS,
-    DISP_BINS,
     RETRACEMENT_BINS,
     CONFIDENCE_LEVEL,
     RSI_OVERBOUGHT,
@@ -47,8 +46,8 @@ def run_complex_analysis(df: pd.DataFrame, context: AnalysisContext, from_cache:
         분석 결과 딕셔너리
     """
     try:
-        # 1. 기술적 지표 계산 (RSI, ATR, Disparity 등)
-        df = calculate_indicators(df)
+        # 1. 기술적 지표 계산 (RSI, ATR, Disparity 등) - 캐싱 적용
+        df = get_or_calculate_indicators(context.coin, context.interval, df)
         
         # 2. 패턴 매칭
         complex_pattern = context.complex_pattern
@@ -146,9 +145,7 @@ def run_complex_analysis(df: pd.DataFrame, context: AnalysisContext, from_cache:
             "short_signal": complex_pattern_analysis.get("short_signal"),
             "volatility_stats": complex_pattern_analysis.get("volatility_stats"),
             "rsi_by_interval": complex_pattern_analysis.get("rsi_by_interval", {}),
-            "disp_by_interval": complex_pattern_analysis.get("disp_by_interval", {}),
             "high_prob_rsi_intervals": complex_pattern_analysis.get("high_prob_rsi_intervals", {}),
-            "high_prob_disp_intervals": complex_pattern_analysis.get("high_prob_disp_intervals", {}),
             "complex_pattern_analysis": complex_pattern_analysis,
             "ny_trading_guide": complex_pattern_analysis.get("ny_trading_guide", {
                 "entry_window": "03:00 - 07:00 EST (NY Pre-market)",
@@ -428,8 +425,8 @@ def _calculate_complex_analysis(
     # Short Signal
     short_signal = _calculate_short_signal(df, complex_pattern, chart_data)
     
-    # RSI/Disparity/Retracement 구간 분석
-    rsi_by_interval, high_prob_rsi, disp_by_interval, high_prob_disp, retracement_by_interval, high_prob_retracement = _calculate_interval_analysis(
+    # RSI/Retracement 구간 분석
+    rsi_by_interval, high_prob_rsi, retracement_by_interval, high_prob_retracement = _calculate_interval_analysis(
         df, chart_data
     )
     
@@ -531,10 +528,8 @@ def _calculate_complex_analysis(
         "short_signal": short_signal,
         "volatility_stats": volatility_stats,
         "rsi_by_interval": rsi_by_interval,
-        "disp_by_interval": disp_by_interval,
         "retracement_by_interval": retracement_by_interval,
         "high_prob_rsi_intervals": high_prob_rsi,
-        "high_prob_disp_intervals": high_prob_disp,
         "high_prob_retracement_intervals": high_prob_retracement,
         "comparative_report": comparative_report
     }
@@ -689,13 +684,12 @@ def _calculate_short_signal(
 def _calculate_interval_analysis(
     df: pd.DataFrame,
     chart_data: List[Dict[str, Any]]
-) -> tuple[Dict[str, Dict[str, Any]], Dict[str, Dict[str, Any]], Dict[str, Dict[str, Any]], Dict[str, Dict[str, Any]], Dict[str, Dict[str, Any]], Dict[str, Dict[str, Any]]]:
-    """RSI/Disparity/Retracement 구간 분석"""
+) -> tuple[Dict[str, Dict[str, Any]], Dict[str, Dict[str, Any]], Dict[str, Dict[str, Any]], Dict[str, Dict[str, Any]]]:
+    """RSI/Retracement 구간 분석"""
     if len(chart_data) == 0:
-        return {}, {}, {}, {}, {}, {}
+        return {}, {}, {}, {}
     
     pattern_rsi_vals = []
-    pattern_disp_vals = []
     pattern_retracement_vals = []
     pattern_is_green_vals = []
     
@@ -715,14 +709,11 @@ def _calculate_interval_analysis(
             
             c1_idx = df.index[pos + 1]
             c1_row = df.loc[c1_idx]
-            pattern_row = df.loc[pattern_date_ts]
             
             pattern_rsi = safe_get_rsi(df, pattern_date_ts, DEFAULT_RSI)
-            pattern_disp = pattern_row.get('disparity', 100) if pd.notna(pattern_row.get('disparity')) else 100.0
             pattern_retracement = c.get('retracement', 50)  # chart_data에서 retracement 가져오기
             
             pattern_rsi_vals.append(pattern_rsi)
-            pattern_disp_vals.append(pattern_disp)
             pattern_retracement_vals.append(pattern_retracement)
             pattern_is_green_vals.append(1 if c1_row['close'] > c1_row['open'] else 0)
             
@@ -730,21 +721,13 @@ def _calculate_interval_analysis(
             continue
     
     if len(pattern_rsi_vals) == 0:
-        return {}, {}, {}, {}, {}, {}
+        return {}, {}, {}, {}
     
     # RSI 구간 분석
     rsi_by_interval, high_prob_rsi = analyze_interval_statistics(
         pd.Series(pattern_rsi_vals),
         pd.Series(pattern_is_green_vals),
         RSI_BINS,
-        CONFIDENCE_LEVEL
-    )
-    
-    # Disparity 구간 분석
-    disp_by_interval, high_prob_disp = analyze_interval_statistics(
-        pd.Series(pattern_disp_vals),
-        pd.Series(pattern_is_green_vals),
-        DISP_BINS,
         CONFIDENCE_LEVEL
     )
     
@@ -756,7 +739,7 @@ def _calculate_interval_analysis(
         CONFIDENCE_LEVEL
     )
     
-    return rsi_by_interval, high_prob_rsi, disp_by_interval, high_prob_disp, retracement_by_interval, high_prob_retracement
+    return rsi_by_interval, high_prob_rsi, retracement_by_interval, high_prob_retracement
 
 
 def _calculate_comparative_report(chart_data: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
@@ -783,13 +766,11 @@ def _calculate_comparative_report(chart_data: List[Dict[str, Any]]) -> Optional[
             "prev_rsi": safe_mean_metric(success_cases, 'rsi'),
             "prev_body_pct": None,
             "prev_vol_change": safe_mean_metric(success_cases, 'vol_ratio'),
-            "prev_disparity": None,
         },
         "failure": {
             "prev_rsi": safe_mean_metric(failure_cases, 'rsi'),
             "prev_body_pct": None,
             "prev_vol_change": safe_mean_metric(failure_cases, 'vol_ratio'),
-            "prev_disparity": None,
         },
     }
 

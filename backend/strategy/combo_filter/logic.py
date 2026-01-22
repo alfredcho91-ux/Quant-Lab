@@ -5,12 +5,6 @@ import pandas as pd
 import numpy as np
 from typing import Dict, Any, Optional
 
-import sys
-from pathlib import Path
-backend_path = str(Path(__file__).parent.parent.parent)
-if backend_path not in sys.path:
-    sys.path.insert(0, backend_path)
-
 from core.indicators import compute_rsi
 
 

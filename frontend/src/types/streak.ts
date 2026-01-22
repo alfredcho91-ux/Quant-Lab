@@ -15,7 +15,7 @@ export interface ComparativeMetrics {
   prev_rsi: number | null;
   prev_body_pct: number | null;
   prev_vol_change: number | null;
-  prev_disparity: number | null;
+  prev_disparity?: number | null; // Deprecated: 제거됨 (하위 호환성을 위해 선택적 유지)
 }
 
 export interface ComparativeReport {
@@ -118,6 +118,10 @@ export interface StreakAnalysisResult {
   c2_after_c1_red_ci?: ConfidenceInterval | null;
   c1_green_count: number;
   c1_red_count: number;
+  c1_green_rate?: number | null;
+  c1_red_rate?: number | null;
+  c1_green_rate_ci?: ConfidenceInterval | null;
+  c1_red_rate_ci?: ConfidenceInterval | null;
   comparative_report: ComparativeReport | null;
   short_signal?: ShortSignal | null;
   volatility_stats?: VolatilityStats;

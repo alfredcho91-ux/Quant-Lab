@@ -8,7 +8,7 @@ import pandas as pd
 from typing import Dict, Any, Optional
 import logging
 
-from strategy.streak.common import safe_float
+from strategy.streak.common import safe_float, CONFIDENCE_LEVEL, MIN_SAMPLE_SIZE_RELIABLE, MIN_SAMPLE_SIZE_MEDIUM
 from strategy.common import (
     calculate_sharpe_ratio_unified,
     calculate_max_drawdown_unified,
@@ -21,10 +21,9 @@ from strategy.weekly_pattern.config import FilterConfig
 
 logger = logging.getLogger(__name__)
 
-# 상수
-CONFIDENCE_LEVEL = 0.95
-MIN_SAMPLE_SIZE_RELIABLE = 30
-MIN_SAMPLE_SIZE_WARNING = 10
+# 상수 (common.py에서 import)
+# MIN_SAMPLE_SIZE_WARNING은 MIN_SAMPLE_SIZE_MEDIUM과 동일하므로 별칭 사용
+MIN_SAMPLE_SIZE_WARNING = MIN_SAMPLE_SIZE_MEDIUM
 
 
 def calculate_stats_for_subset(subset: pd.DataFrame) -> Optional[Dict[str, Any]]:
@@ -32,7 +31,7 @@ def calculate_stats_for_subset(subset: pd.DataFrame) -> Optional[Dict[str, Any]]
     필터링된 데이터셋에 대한 통계 계산
     
     Args:
-        subset: 분석할 DataFrame (ret_mid_late 컬럼 필요)
+        subset: 분석할 DataFrame (ret_after 또는 ret_mid_late 컬럼 필요)
     
     Returns:
         통계 결과 딕셔너리 또는 None
@@ -40,7 +39,9 @@ def calculate_stats_for_subset(subset: pd.DataFrame) -> Optional[Dict[str, Any]]
     if len(subset) == 0:
         return None
     
-    ret_series = subset['ret_mid_late'].dropna()
+    # 사용자 지정 기간의 다음 기간 수익률 사용 (ret_after), 없으면 하위 호환성을 위해 ret_mid_late 사용
+    ret_col = 'ret_after' if 'ret_after' in subset.columns else 'ret_mid_late'
+    ret_series = subset[ret_col].dropna()
     
     if len(ret_series) == 0:
         return None
@@ -110,7 +111,7 @@ def apply_filters_and_calculate_stats(
     필터 적용 및 통계 계산
     
     Args:
-        df_w: 주간 패턴 DataFrame
+        df_w: 주간 패턴 DataFrame (ret_period, ret_after, rsi_at_end 포함)
         filter_config: 필터 설정 객체
     
     Returns:
@@ -118,79 +119,92 @@ def apply_filters_and_calculate_stats(
     """
     results = {}
     
+    # 사용자 지정 기간 수익률 사용 (ret_period), 없으면 하위 호환성을 위해 ret_early 사용
+    ret_col = 'ret_period' if 'ret_period' in df_w.columns else 'ret_early'
+    rsi_col = 'rsi_at_end' if 'rsi_at_end' in df_w.columns else 'rsi_tue'
+    
     if filter_config.direction == "down":
         # 하락 케이스 분석
-        # [1] 전체 주 초반 하락 케이스 (Baseline)
-        early_down = df_w[df_w['ret_early'] < 0]
-        baseline_stats = calculate_stats_for_subset(early_down)
+        # [1] 전체 지정 기간 하락 케이스 (Baseline)
+        period_down = df_w[df_w[ret_col] < 0]
+        baseline_stats = calculate_stats_for_subset(period_down)
         if baseline_stats:
-            baseline_stats['title'] = "BASE: Early Down (Mon-Tue < 0)"
-            baseline_stats['description'] = "주 초반 하락 케이스 (기준선)"
+            baseline_stats['title'] = f"BASE: Period Down ({ret_col} < 0)"
+            baseline_stats['description'] = "지정 기간 하락 케이스 (기준선)"
             results['baseline'] = baseline_stats
         
         # [2] 깊은 하락 필터
-        deep_drop = early_down[early_down['ret_early'] <= filter_config.deep_drop_threshold]
+        deep_drop = period_down[period_down[ret_col] <= filter_config.deep_drop_threshold]
         deep_drop_stats = calculate_stats_for_subset(deep_drop)
         if deep_drop_stats:
-            deep_drop_stats['title'] = f"FILTER: Deep Drop (Mon-Tue <= {filter_config.deep_drop_threshold*100:.1f}%)"
-            deep_drop_stats['description'] = f"주 초반 {filter_config.deep_drop_threshold*100:.1f}% 이상 하락"
+            deep_drop_stats['title'] = f"FILTER: Deep Drop ({ret_col} <= {filter_config.deep_drop_threshold*100:.1f}%)"
+            deep_drop_stats['description'] = f"지정 기간 {filter_config.deep_drop_threshold*100:.1f}% 이상 하락"
             results['deep_drop'] = deep_drop_stats
         
-        # [3] 과매도 필터 (RSI < threshold)
-        oversold = early_down[early_down['rsi_tue'] <= filter_config.rsi_threshold]
+        # [3] 과매도 필터 (RSI 범위)
+        oversold = period_down[
+            (period_down[rsi_col] >= filter_config.rsi_min) & 
+            (period_down[rsi_col] <= filter_config.rsi_max)
+        ]
         oversold_stats = calculate_stats_for_subset(oversold)
         if oversold_stats:
-            oversold_stats['title'] = f"FILTER: Oversold (RSI <= {filter_config.rsi_threshold})"
-            oversold_stats['description'] = f"화요일 RSI {filter_config.rsi_threshold} 이하"
+            oversold_stats['title'] = f"FILTER: Oversold (RSI {filter_config.rsi_min:.1f}~{filter_config.rsi_max:.1f})"
+            oversold_stats['description'] = f"종료 요일 RSI {filter_config.rsi_min:.1f}~{filter_config.rsi_max:.1f} 범위"
             results['oversold'] = oversold_stats
         
         # [4] 복합 필터 (깊은 하락 + 과매도)
-        combined_filter = early_down[
-            (early_down['ret_early'] <= filter_config.deep_drop_threshold) & 
-            (early_down['rsi_tue'] <= filter_config.rsi_threshold)
+        combined_filter = period_down[
+            (period_down[ret_col] <= filter_config.deep_drop_threshold) & 
+            (period_down[rsi_col] >= filter_config.rsi_min) &
+            (period_down[rsi_col] <= filter_config.rsi_max)
         ]
         combined_stats = calculate_stats_for_subset(combined_filter)
         if combined_stats:
             combined_stats['title'] = f"FILTER: Deep Drop + Oversold"
-            combined_stats['description'] = f"주 초반 {filter_config.deep_drop_threshold*100:.1f}% 이상 하락 + RSI {filter_config.rsi_threshold} 이하"
+            combined_stats['description'] = f"지정 기간 {filter_config.deep_drop_threshold*100:.1f}% 이상 하락 + RSI {filter_config.rsi_min:.1f}~{filter_config.rsi_max:.1f} 범위"
             results['combined'] = combined_stats
     
     else:  # direction == "up"
         # 상승 케이스 분석
-        # [1] 전체 주 초반 상승 케이스 (Baseline)
-        early_up = df_w[df_w['ret_early'] > 0]
-        baseline_stats = calculate_stats_for_subset(early_up)
+        # [1] 전체 지정 기간 상승 케이스 (Baseline)
+        period_up = df_w[df_w[ret_col] > 0]
+        baseline_stats = calculate_stats_for_subset(period_up)
         if baseline_stats:
-            baseline_stats['title'] = "BASE: Early Up (Mon-Tue > 0)"
-            baseline_stats['description'] = "주 초반 상승 케이스 (기준선)"
+            baseline_stats['title'] = f"BASE: Period Up ({ret_col} > 0)"
+            baseline_stats['description'] = "지정 기간 상승 케이스 (기준선)"
             results['baseline'] = baseline_stats
         
         # [2] 깊은 상승 필터
-        deep_rise = early_up[early_up['ret_early'] >= filter_config.deep_rise_threshold]
+        deep_rise = period_up[period_up[ret_col] >= filter_config.deep_rise_threshold]
         deep_rise_stats = calculate_stats_for_subset(deep_rise)
         if deep_rise_stats:
-            deep_rise_stats['title'] = f"FILTER: Deep Rise (Mon-Tue >= {filter_config.deep_rise_threshold*100:.1f}%)"
-            deep_rise_stats['description'] = f"주 초반 {filter_config.deep_rise_threshold*100:.1f}% 이상 상승"
+            deep_rise_stats['title'] = f"FILTER: Deep Rise ({ret_col} >= {filter_config.deep_rise_threshold*100:.1f}%)"
+            deep_rise_stats['description'] = f"지정 기간 {filter_config.deep_rise_threshold*100:.1f}% 이상 상승"
             results['deep_rise'] = deep_rise_stats
         
-        # [3] 과매수 필터 (RSI > (100 - threshold))
-        overbought_threshold = 100 - filter_config.rsi_threshold
-        overbought = early_up[early_up['rsi_tue'] >= overbought_threshold]
+        # [3] 과매수 필터 (RSI 범위: 상승 케이스는 반대로 계산)
+        overbought_min = 100 - filter_config.rsi_max
+        overbought_max = 100 - filter_config.rsi_min
+        overbought = period_up[
+            (period_up[rsi_col] >= overbought_min) & 
+            (period_up[rsi_col] <= overbought_max)
+        ]
         overbought_stats = calculate_stats_for_subset(overbought)
         if overbought_stats:
-            overbought_stats['title'] = f"FILTER: Overbought (RSI >= {overbought_threshold})"
-            overbought_stats['description'] = f"화요일 RSI {overbought_threshold} 이상"
+            overbought_stats['title'] = f"FILTER: Overbought (RSI {overbought_min:.1f}~{overbought_max:.1f})"
+            overbought_stats['description'] = f"종료 요일 RSI {overbought_min:.1f}~{overbought_max:.1f} 범위"
             results['overbought'] = overbought_stats
         
         # [4] 복합 필터 (깊은 상승 + 과매수)
-        combined_filter = early_up[
-            (early_up['ret_early'] >= filter_config.deep_rise_threshold) & 
-            (early_up['rsi_tue'] >= overbought_threshold)
+        combined_filter = period_up[
+            (period_up[ret_col] >= filter_config.deep_rise_threshold) & 
+            (period_up[rsi_col] >= overbought_min) &
+            (period_up[rsi_col] <= overbought_max)
         ]
         combined_stats = calculate_stats_for_subset(combined_filter)
         if combined_stats:
             combined_stats['title'] = f"FILTER: Deep Rise + Overbought"
-            combined_stats['description'] = f"주 초반 {filter_config.deep_rise_threshold*100:.1f}% 이상 상승 + RSI {overbought_threshold} 이상"
+            combined_stats['description'] = f"지정 기간 {filter_config.deep_rise_threshold*100:.1f}% 이상 상승 + RSI {overbought_threshold} 이상"
             results['combined'] = combined_stats
     
     # None 값 제거

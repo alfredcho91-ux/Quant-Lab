@@ -2,7 +2,7 @@
 """Support/Resistance API 엔드포인트"""
 
 from fastapi import APIRouter
-from data_service import fetch_live_data
+from utils.data_service import fetch_live_data
 from core.support_resistance import (
     build_sr_levels_from_swings,
     compute_daily_pivots,

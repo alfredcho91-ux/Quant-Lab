@@ -16,7 +16,7 @@ my_quant_V2/
 
 ### 주요 파일
 - `main.py` - FastAPI 앱 진입점
-- `data_service.py` - 데이터 로딩 (Binance API, CSV)
+- `__init__.py` - 프로젝트 루트 경로 설정 (sys.path 통합 관리)
 
 ### 📂 backend/routes/
 API 엔드포인트 라우터들:
@@ -67,8 +67,9 @@ API 엔드포인트 라우터들:
 
 ### 📂 backend/utils/
 유틸리티 모듈:
+- `data_service.py` - 데이터 소스 접근 (Binance API, CSV 로딩)
+- `data_loader.py` - 공통 데이터 로딩 함수 (CSV 우선, API 폴백)
 - `cache.py` - DataCache 클래스 (TTL 기반 메모리 캐시)
-- `data_loader.py` - 공통 데이터 로딩 함수
 - `decorators.py` - API 에러 처리 데코레이터
 - `error_handler.py` - 에러 핸들러
 - `exceptions.py` - 커스텀 예외 클래스
@@ -79,7 +80,9 @@ API 엔드포인트 라우터들:
 - `request.py` - Pydantic 요청 모델 (StreakAnalysisParams, WeeklyPatternParams 등)
 
 ### 📂 backend/services/
-서비스 레이어 (일부 전략의 서비스 로직)
+서비스 레이어:
+- `statistics.py` - 백테스트 통계 계산 (Sharpe Ratio, Sortino Ratio, MDD, Monte Carlo)
+- `pattern_logic.py` - 패턴 감지 및 통계 계산
 
 ### 📂 backend/config/
 설정 파일:
@@ -223,6 +226,26 @@ npm run dev
 
 ## 📝 최근 주요 변경사항
 
+### 2026-01-21: 프로젝트 구조 개선
+1. **의존성 관리 개선**
+   - `backend/__init__.py` 생성: 프로젝트 루트 경로를 한 곳에서 관리
+   - 모든 파일에서 개별 `sys.path.insert` 제거 (19개 파일)
+   - 테스트 환경 안정성 향상
+
+2. **데이터 서비스 구조 개선**
+   - `data_service.py` → `utils/data_service.py`로 이동
+   - 의존성 역전 문제 해결 (utils → data_service)
+   - 모든 import 경로 업데이트 (7개 파일)
+
+3. **중복 코드 제거**
+   - `services/squeeze_service.py` 삭제 (195줄)
+   - `strategy/squeeze/logic.py`를 단일 소스로 사용
+
+4. **명명 개선**
+   - `services/backtest_logic.py` → `services/statistics.py` 리네임
+   - 파일 역할이 더 명확해짐 (통계 계산 모듈)
+
+### 이전 변경사항
 1. **주간 패턴 분석 리팩토링**
    - `logic.py` → `data_processing.py`, `indicators.py`, `statistics.py`, `config.py`, `validation.py`로 분리
    - `rel_vol` 계산 추가 (indicators.py)

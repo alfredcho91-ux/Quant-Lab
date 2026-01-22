@@ -7,15 +7,8 @@ Public API:
 - clear_cache: 캐시 초기화
 """
 
-import sys
-from pathlib import Path
 from typing import Dict, Any
 import logging
-
-# 상대 import를 위한 경로 설정
-backend_path = Path(__file__).parent.parent
-if str(backend_path) not in sys.path:
-    sys.path.insert(0, str(backend_path))
 
 logger = logging.getLogger(__name__)
 

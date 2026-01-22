@@ -10,21 +10,11 @@
 import pandas as pd
 import numpy as np
 from typing import Dict, Any, Optional, List, Tuple
-from dataclasses import dataclass, field
-from enum import Enum
-import sys
-from pathlib import Path
 import logging
 from scipy import stats as scipy_stats
-import os
-
-# Add parent path for importing core modules
-backend_path = Path(__file__).parent.parent.parent
-if str(backend_path) not in sys.path:
-    sys.path.insert(0, str(backend_path))
 
 from utils.data_loader import load_data_for_analysis
-from data_service import fetch_live_data, load_csv_data
+from utils.data_service import fetch_live_data, load_csv_data
 from strategy.streak.common import sanitize_for_json, safe_float
 from strategy.common import (
     calculate_sharpe_ratio_unified,
@@ -64,7 +54,8 @@ from strategy.weekly_pattern.config import (
     FilterConfig,
     AnalysisConfig,
     DEFAULT_DEEP_DROP_THRESHOLD,
-    DEFAULT_RSI_THRESHOLD,
+    DEFAULT_RSI_MIN,
+    DEFAULT_RSI_MAX,
     DEFAULT_RSI_PERIOD,
     DEFAULT_ATR_PERIOD,
     DEFAULT_VOL_PERIOD,
@@ -92,11 +83,14 @@ def analyze_weekly_pattern(
     direction: str = "down",
     deep_drop_threshold: float = DEFAULT_DEEP_DROP_THRESHOLD,
     deep_rise_threshold: float = 0.05,
-    rsi_threshold: float = DEFAULT_RSI_THRESHOLD,
+    rsi_min: float = DEFAULT_RSI_MIN,
+    rsi_max: float = DEFAULT_RSI_MAX,
     use_csv: bool = False,
     rsi_period: int = DEFAULT_RSI_PERIOD,
     atr_period: int = DEFAULT_ATR_PERIOD,
-    vol_period: int = DEFAULT_VOL_PERIOD
+    vol_period: int = DEFAULT_VOL_PERIOD,
+    start_day: int = 0,
+    end_day: int = 1
 ) -> Dict[str, Any]:
     """
     주간 패턴 분석 (월-화 vs 수-일) - 개선 버전
@@ -124,7 +118,8 @@ def analyze_weekly_pattern(
         config = AnalysisConfig(
             coin=coin,
             deep_drop_threshold=deep_drop_threshold,
-            rsi_threshold=rsi_threshold,
+            rsi_min=rsi_min,
+            rsi_max=rsi_max,
             rsi_period=rsi_period,
             atr_period=atr_period,
             vol_period=vol_period,
@@ -148,8 +143,8 @@ def analyze_weekly_pattern(
         indicator_config = config.indicator_config
         df_with_indicators = calculate_technical_indicators(df_prepared, indicator_config)
         
-        # 3. 주간 패턴 추출
-        df_w, warnings = extract_weekly_patterns(df_with_indicators)
+        # 3. 주간 패턴 추출 (사용자 지정 요일 범위)
+        df_w, warnings = extract_weekly_patterns(df_with_indicators, start_day=start_day, end_day=end_day)
         
         # 4. 필터별 성과 분석
         filter_config = config.filter_config
@@ -159,7 +154,8 @@ def analyze_weekly_pattern(
         try:
             filters_dict = {
                 "deep_drop_threshold": config.deep_drop_threshold,
-                "rsi_threshold": config.rsi_threshold,
+                "rsi_min": config.rsi_min,
+                "rsi_max": config.rsi_max,
                 "rsi_period": config.rsi_period,
                 "atr_period": config.atr_period,
                 "vol_period": config.vol_period

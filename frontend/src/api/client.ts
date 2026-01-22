@@ -25,6 +25,9 @@ export * from './streak';
 // 주간 패턴 분석
 export * from './weekly-pattern';
 
+// 하이브리드 전략 분석
+export * from './hybrid';
+
 // 공통 설정 (내부 사용)
 export { api } from './config';
 export type { ApiResponse } from './config';

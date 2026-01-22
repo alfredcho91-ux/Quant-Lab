@@ -3,7 +3,7 @@
 
 import pandas as pd
 from typing import Optional, Tuple
-from data_service import fetch_live_data, load_csv_data
+from utils.data_service import fetch_live_data, load_csv_data
 
 
 def load_data_for_analysis(

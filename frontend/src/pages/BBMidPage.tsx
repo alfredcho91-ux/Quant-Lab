@@ -18,8 +18,6 @@ export default function BBMidPage() {
     intervals: ['1h', '4h'],
     start_side: 'lower',
     max_bars: 7,
-    rsi_min: 0,
-    rsi_max: 100,
     regime: null, // 레짐 필터 비활성화 (null = 무시)
     use_csv: backtestParams.use_csv, // 전역 설정 사용
   });
@@ -50,7 +48,7 @@ export default function BBMidPage() {
 
       {/* Controls */}
       <div className="card p-6 space-y-4">
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {/* Side Selection */}
           <div>
             <label className="block text-sm text-dark-400 mb-1">
@@ -79,31 +77,6 @@ export default function BBMidPage() {
               onChange={(e) => setParams({ ...params, max_bars: parseInt(e.target.value) || 7 })}
               className="w-full bg-dark-800 border border-dark-600 rounded-lg px-3 py-2 text-sm"
             />
-          </div>
-
-          {/* RSI Range */}
-          <div className="col-span-2">
-            <label className="block text-sm text-dark-400 mb-1">
-              {isKo ? 'RSI 필터' : 'RSI Filter'}: {params.rsi_min} - {params.rsi_max}
-            </label>
-            <div className="flex gap-2">
-              <input
-                type="range"
-                min={0}
-                max={100}
-                value={params.rsi_min}
-                onChange={(e) => setParams({ ...params, rsi_min: parseInt(e.target.value) })}
-                className="flex-1"
-              />
-              <input
-                type="range"
-                min={0}
-                max={100}
-                value={params.rsi_max}
-                onChange={(e) => setParams({ ...params, rsi_max: parseInt(e.target.value) })}
-                className="flex-1"
-              />
-            </div>
           </div>
         </div>
 

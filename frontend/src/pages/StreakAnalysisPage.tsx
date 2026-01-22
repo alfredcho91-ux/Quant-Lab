@@ -1,7 +1,7 @@
 // Streak Analysis Page - 양봉/음봉 연속성 시뮬레이터
 import { usePageCommon } from '../hooks/usePageCommon';
 import { SkeletonAnalysis } from '../components/Skeleton';
-import { Zap, AlertTriangle } from 'lucide-react';
+import { Zap, AlertTriangle, TrendingDown } from 'lucide-react';
 import { useStreakAnalysisForm } from '../features/streak-analysis/hooks/useStreakAnalysisForm';
 import AnalysisControls from '../features/streak-analysis/components/AnalysisControls';
 import StatisticsSummary from '../features/streak-analysis/components/StatisticsSummary';
@@ -32,30 +32,64 @@ export default function StreakAnalysisPage() {
     params.direction === 'green' ? (isKo ? '상승' : 'Up') : (isKo ? '하락' : 'Down');
 
   const getStrategyAdvice = () => {
-    if (!result || result.continuation_rate === null) return null;
-    const rate = result.continuation_rate;
-    if (rate < 30) {
-      return {
-        type: 'reversal',
-        color: 'from-rose-500 to-pink-500',
-        bgColor: 'bg-rose-500/10 border-rose-500/30',
-        icon: <AlertTriangle className="w-6 h-6" />,
-        title: isKo ? '🔥 강력한 역추세(반전) 구간!' : '🔥 Strong Reversal Zone!',
-        desc: isKo
-          ? `${moveLabel}이 멈출 확률이 매우 높습니다. 반대 포지션을 고려하세요.`
-          : `High probability that ${moveLabel} trend will stop. Consider opposite position.`,
-      };
-    } else if (rate > 60) {
-      return {
-        type: 'trend',
-        color: 'from-emerald-500 to-green-500',
-        bgColor: 'bg-emerald-500/10 border-emerald-500/30',
-        icon: <Zap className="w-6 h-6" />,
-        title: isKo ? '🚀 추세 관성이 강한 구간!' : '🚀 Strong Trend Momentum!',
-        desc: isKo
-          ? `${moveLabel} 방향으로 홀딩이 유리합니다. 추세를 따라가세요.`
-          : `Holding in ${moveLabel} direction is favorable. Follow the trend.`,
-      };
+    if (!result) return null;
+    
+    // 실제 양봉 확률 사용 (direction에 따라 다르게 해석)
+    const greenRate = result.c1_green_rate ?? null;
+    if (greenRate === null) return null;
+    
+    // 음봉 패턴: 양봉 확률이 높으면 하락이 멈출 확률이 높음
+    // 양봉 패턴: 양봉 확률이 높으면 상승이 지속될 확률이 높음
+    if (params.direction === 'red') {
+      // 음봉 패턴: 양봉 확률이 높으면 하락이 멈출 확률이 높음
+      if (greenRate > 70) {
+        return {
+          type: 'reversal',
+          color: 'from-rose-500 to-pink-500',
+          bgColor: 'bg-rose-500/10 border-rose-500/30',
+          icon: <AlertTriangle className="w-6 h-6" />,
+          title: isKo ? '🔥 강력한 역추세(반전) 구간!' : '🔥 Strong Reversal Zone!',
+          desc: isKo
+            ? `하락이 멈출 확률이 매우 높습니다 (양봉 확률: ${greenRate.toFixed(1)}%). 반대 포지션을 고려하세요.`
+            : `High probability that down trend will stop (Green: ${greenRate.toFixed(1)}%). Consider opposite position.`,
+        };
+      } else if (greenRate < 30) {
+        return {
+          type: 'trend',
+          color: 'from-rose-500 to-red-500',
+          bgColor: 'bg-rose-500/10 border-rose-500/30',
+          icon: <TrendingDown className="w-6 h-6" />,
+          title: isKo ? '📉 하락 추세 지속!' : '📉 Down Trend Continues!',
+          desc: isKo
+            ? `하락 방향으로 홀딩이 유리합니다 (양봉 확률: ${greenRate.toFixed(1)}%). 추세를 따라가세요.`
+            : `Holding in down direction is favorable (Green: ${greenRate.toFixed(1)}%). Follow the trend.`,
+        };
+      }
+    } else {
+      // 양봉 패턴: 양봉 확률이 높으면 상승이 지속될 확률이 높음
+      if (greenRate > 70) {
+        return {
+          type: 'trend',
+          color: 'from-emerald-500 to-green-500',
+          bgColor: 'bg-emerald-500/10 border-emerald-500/30',
+          icon: <Zap className="w-6 h-6" />,
+          title: isKo ? '🚀 추세 관성이 강한 구간!' : '🚀 Strong Trend Momentum!',
+          desc: isKo
+            ? `상승 방향으로 홀딩이 유리합니다 (양봉 확률: ${greenRate.toFixed(1)}%). 추세를 따라가세요.`
+            : `Holding in up direction is favorable (Green: ${greenRate.toFixed(1)}%). Follow the trend.`,
+        };
+      } else if (greenRate < 30) {
+        return {
+          type: 'reversal',
+          color: 'from-rose-500 to-pink-500',
+          bgColor: 'bg-rose-500/10 border-rose-500/30',
+          icon: <AlertTriangle className="w-6 h-6" />,
+          title: isKo ? '🔥 강력한 역추세(반전) 구간!' : '🔥 Strong Reversal Zone!',
+          desc: isKo
+            ? `상승이 멈출 확률이 매우 높습니다 (양봉 확률: ${greenRate.toFixed(1)}%). 반대 포지션을 고려하세요.`
+            : `High probability that up trend will stop (Green: ${greenRate.toFixed(1)}%). Consider opposite position.`,
+        };
+      }
     }
     return null;
   };

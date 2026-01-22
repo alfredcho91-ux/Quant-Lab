@@ -16,12 +16,11 @@ from strategy.streak.common import (
     calculate_intraday_distribution,
     calculate_weekly_distribution,
     load_data,
-    calculate_indicators,
+    get_or_calculate_indicators,
     safe_float,
     safe_round,
     sanitize_for_json,
     RSI_BINS,
-    DISP_BINS,
     CONFIDENCE_LEVEL,
     RSI_OVERBOUGHT,
     DEBUG_MODE,
@@ -106,8 +105,8 @@ def run_simple_analysis(df: pd.DataFrame, context: AnalysisContext, from_cache: 
         if total_cases == 0:
             return _empty_simple_result(context, from_cache)
         
-        # 3. 기술적 지표 계산 (RSI, ATR, Disparity 등)
-        df = calculate_indicators(df)
+        # 3. 기술적 지표 계산 (RSI, ATR, Disparity 등) - 캐싱 적용
+        df = get_or_calculate_indicators(context.coin, context.interval, df)
         
         # 4. 메인 통계 계산 (C1 기준으로 정정)
         # target_cases(패턴 완성 시점)의 다음 봉(C1)이 양봉/음봉인지 체크
@@ -182,6 +181,12 @@ def run_simple_analysis(df: pd.DataFrame, context: AnalysisContext, from_cache: 
         c1_green_count = len(c1_green_cases)
         c1_red_count = len(c1_red_cases)
         
+        # C1 양봉/음봉 확률 계산 (실제 확률)
+        c1_green_rate = (c1_green_count / total_cases * 100) if total_cases > 0 else 0
+        c1_red_rate = (c1_red_count / total_cases * 100) if total_cases > 0 else 0
+        c1_green_rate_ci = wilson_confidence_interval(c1_green_count, total_cases) if total_cases > 0 else None
+        c1_red_rate_ci = wilson_confidence_interval(c1_red_count, total_cases) if total_cases > 0 else None
+        
         c2_after_c1_green_rate = None
         c2_after_c1_red_rate = None
         c2_after_c1_green_ci = None
@@ -218,7 +223,6 @@ def run_simple_analysis(df: pd.DataFrame, context: AnalysisContext, from_cache: 
         
         # 6. 변동성 통계
         target_cases['rsi'] = df.loc[target_cases.index, 'rsi']
-        target_cases['disparity'] = df.loc[target_cases.index, 'disparity']
         target_cases['atr_pct'] = df.loc[target_cases.index, 'atr_pct']
         
         target_cases['max_dip'] = (target_cases['open'] - target_cases['low']) / target_cases['open'] * 100
@@ -269,23 +273,17 @@ def run_simple_analysis(df: pd.DataFrame, context: AnalysisContext, from_cache: 
         if context.direction == "green":
             short_signal = _calculate_short_signal(df, n, avg_rise)
         
-        # 8. RSI/Disparity 구간별 분석
+        # 8. RSI 구간별 분석
         # ✅ 수정: 패턴 완성 시점의 전일 지표를 기준으로, 다음 봉(C1)이 양봉인지 분석
         target_cases['prev_rsi'] = df['rsi'].shift(1).loc[target_cases.index]
-        # next_is_green: 패턴 완성 후 다음 봉(C1)이 양봉인지 여부
-        target_cases['next_is_green'] = df.loc[target_cases.index, 'next_is_green']
+        # next_is_green: 패턴 완성 후 다음 봉(C1)이 양봉인지 여부 (boolean으로 변환)
+        next_is_green_series = df.loc[target_cases.index, 'next_is_green']
+        # NaN을 False로 처리하고 boolean으로 변환
+        target_cases['next_is_green'] = next_is_green_series.fillna(False).astype(bool)
         rsi_by_interval, high_prob_rsi = analyze_interval_statistics(
             target_cases['prev_rsi'],
             target_cases['next_is_green'],
             RSI_BINS,
-            CONFIDENCE_LEVEL
-        )
-        
-        target_cases['prev_disparity'] = df['disparity'].shift(1).loc[target_cases.index]
-        disp_by_interval, high_prob_disp = analyze_interval_statistics(
-            target_cases['prev_disparity'],
-            target_cases['next_is_green'],
-            DISP_BINS,
             CONFIDENCE_LEVEL
         )
         
@@ -395,13 +393,15 @@ def run_simple_analysis(df: pd.DataFrame, context: AnalysisContext, from_cache: 
             "c2_after_c1_red_ci": c2_after_c1_red_ci,
             "c1_green_count": c1_green_count,
             "c1_red_count": c1_red_count,
+            "c1_green_rate": safe_round(c1_green_rate, 2),
+            "c1_red_rate": safe_round(c1_red_rate, 2),
+            "c1_green_rate_ci": c1_green_rate_ci,
+            "c1_red_rate_ci": c1_red_rate_ci,
             "comparative_report": comparative_report,
             "short_signal": short_signal,
             "volatility_stats": volatility_stats,
             "rsi_by_interval": rsi_by_interval,
-            "disp_by_interval": disp_by_interval,
             "high_prob_rsi_intervals": high_prob_rsi,
-            "high_prob_disp_intervals": high_prob_disp,
             "complex_pattern_analysis": None,
             "ny_trading_guide": ny_trading_guide,
             "analysis_mode": {
@@ -476,13 +476,11 @@ def _calculate_comparative_report(df: pd.DataFrame, n: int, direction: str) -> O
             "prev_rsi": round(safe_mean(success_cases['rsi'].shift(1)), 2) if len(success_cases) > 0 and safe_mean(success_cases['rsi'].shift(1)) else None,
             "prev_body_pct": round(safe_mean(success_cases['body_pct'].shift(1)), 2) if len(success_cases) > 0 and safe_mean(success_cases['body_pct'].shift(1)) else None,
             "prev_vol_change": round(safe_mean(success_cases['vol_change'].shift(1)), 2) if len(success_cases) > 0 and safe_mean(success_cases['vol_change'].shift(1)) else None,
-            "prev_disparity": round(safe_mean(success_cases['disparity'].shift(1)), 2) if len(success_cases) > 0 and safe_mean(success_cases['disparity'].shift(1)) else None,
         },
         "failure": {
             "prev_rsi": round(safe_mean(failure_cases['rsi'].shift(1)), 2) if len(failure_cases) > 0 and safe_mean(failure_cases['rsi'].shift(1)) else None,
             "prev_body_pct": round(safe_mean(failure_cases['body_pct'].shift(1)), 2) if len(failure_cases) > 0 and safe_mean(failure_cases['body_pct'].shift(1)) else None,
             "prev_vol_change": round(safe_mean(failure_cases['vol_change'].shift(1)), 2) if len(failure_cases) > 0 and safe_mean(failure_cases['vol_change'].shift(1)) else None,
-            "prev_disparity": round(safe_mean(failure_cases['disparity'].shift(1)), 2) if len(failure_cases) > 0 and safe_mean(failure_cases['disparity'].shift(1)) else None,
         },
     }
 

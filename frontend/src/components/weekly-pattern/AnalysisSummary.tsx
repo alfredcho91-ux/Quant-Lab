@@ -36,7 +36,11 @@ export function AnalysisSummary({ result, isKo }: AnalysisSummaryProps) {
           <div className="text-sm text-dark-400">
             {isKo ? 'RSI 임계값' : 'RSI Threshold'}
           </div>
-          <div className="text-2xl font-bold mt-1">{result.filters.rsi_threshold}</div>
+          <div className="text-2xl font-bold mt-1">
+            {result.filters.rsi_min !== undefined && result.filters.rsi_max !== undefined
+              ? `${result.filters.rsi_min}~${result.filters.rsi_max}`
+              : result.filters.rsi_threshold ?? 'N/A'}
+          </div>
         </div>
         <div>
           <div className="text-sm text-dark-400">

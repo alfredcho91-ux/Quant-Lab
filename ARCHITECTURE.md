@@ -11,6 +11,7 @@
 - [모듈 의존성](#-모듈-의존성)
 - [주요 모듈 설명](#-주요-모듈-설명)
 - [차기 구현 과제](#-차기-구현-과제)
+- [📚 관련 문서](#-관련-문서)
 
 ---
 
@@ -54,7 +55,7 @@
 │                    ┌─────▼─────┐                              │
 │                    │  routes/   │  (API Layer - 얇은 레이어)   │
 │                    │  streak.py │  /api/streak-analysis        │
-│                    │  stats.py  │  /api/bb-mid, /api/combo-filter │
+│                    │  stats.py  │  /api/bb-mid, /api/combo-filter, /api/hybrid-* │
 │                    │  backtest.py│ /api/backtest*              │
 │                    │  market.py │  /api/market/*               │
 │                    │  scanner.py│  /api/scanner                 │
@@ -71,9 +72,12 @@
 │      │   ├─ complex_strategy.py               │               │
 │      │   └─ common.py                         │               │
 │      │                                        │               │
-│      │ bb_mid/      │      │ logic.py        │               │
-│      │ combo_filter/│      │ backtest.py     │               │
-│      │ squeeze/     │      │ (주간 패턴 분석) │               │
+│      │ hybrid/      │      │ logic.py        │               │
+│      │   ├─ logic.py│      │ backtest.py     │               │
+│      │   └─ backtest.py│   │ (주간 패턴 분석) │               │
+│      │ bb_mid/      │      │                 │               │
+│      │ combo_filter/│      │                 │               │
+│      │ squeeze/     │      │                 │               │
 │      │              │      └────────┬────────┘               │
 │      └─────┬───────┘                │                        │
 │            │                        │                        │
@@ -89,6 +93,7 @@
 │                          │                                    │
 │                    ┌─────▼─────┐                              │
 │                    │  utils/   │                              │
+│                    │  data_service.py (Binance API, CSV)      │
 │                    │  data_loader.py (CSV/API 통합)          │
 │                    │  exceptions.py (에러 처리)               │
 │                    │  decorators.py (API 데코레이터)           │
@@ -96,7 +101,8 @@
 │                          │                                    │
 │                    ┌─────▼─────┐                              │
 │                    │  core/    │  (공유 비즈니스 로직)        │
-│                    │  indicators.py (RSI, ADX, MA, BB 등)    │
+│                    │  indicators.py (RSI, ADX, MA, BB, MACD 등) │
+│                    │    - compute_live_indicators() (하이브리드 전략 등에서 재사용) │
 │                    │  backtest.py (백테스트 엔진)             │
 │                    │  strategies.py (8개 전략 정의)          │
 │                    │  support_resistance.py                   │
@@ -104,7 +110,7 @@
 │                    └─────┬─────┘                              │
 │                          │                                    │
 │                    ┌─────▼─────┐                              │
-│                    │  data_service.py                         │
+│                    │  utils/data_service.py                   │
 │                    │  (Binance API, CSV 로딩)                │
 │                    └───────────┘                              │
 └────────────────────────────────────────────────────────────────┘
@@ -1743,7 +1749,7 @@ read_file
 │                    └─────┬─────┘                         │
 │                          │                               │
 │                    ┌─────▼─────┐                         │
-│                    │data_service│                         │
+│                    │utils/data_service│                    │
 │                    │ (Binance API)                        │
 │                    │ (CSV Loader)                         │
 │                    └───────────┘                         │
@@ -1816,7 +1822,7 @@ read_file
            └─ run_complex_analysis(context)
                ├─ 패턴 매칭 (다중 캔들)
                ├─ 패턴 품질 점수 계산
-               ├─ RSI/이격도 구간별 승률 분석
+               ├─ RSI 구간별 승률 분석
                ├─ Bonferroni 보정
                └─ 시간대별 분석 (1d/3d)
    │
@@ -1943,7 +1949,6 @@ read_file
 │
 ├─ 5. 지표 계산
 │   ├─ RSI 계산
-│   ├─ 이격도 계산: D = (C - MA20) / MA20 * 100
 │   └─ 전일 지표 추출
 │
 ├─ 6. 패턴 품질 점수 계산 (Signal Score)
@@ -1960,9 +1965,8 @@ read_file
 │   └─ 신뢰도 판단: High (>= 80), Medium (>= 60), Low (< 60)
 │   └─ 위치: common.py - calculate_signal_score()
 │
-├─ 7. RSI/이격도 구간별 승률 분석
+├─ 7. RSI 구간별 승률 분석
 │   ├─ RSI: 8개 구간 [0,30,40,50,60,70,80,100]
-│   ├─ 이격도: 7개 구간
 │   ├─ 각 구간별 다음 봉 양봉 확률
 │   ├─ Wilson Score Interval 계산
 │   ├─ Binomial P-value 계산
@@ -1970,8 +1974,7 @@ read_file
 │
 ├─ 8. Bonferroni 보정
 │   ├─ α_adjusted = α / n_comparisons
-│   ├─ RSI: α_adjusted = 0.05 / 8 = 0.00625
-│   └─ 이격도: α_adjusted = 0.05 / 7 ≈ 0.00714
+│   └─ RSI: α_adjusted = 0.05 / 8 = 0.00625
 │
 ├─ 9. 시간대별 분석 (Simple Mode와 동일)
 │   ├─ C1이 양봉인 날짜만 필터링
@@ -2052,7 +2055,7 @@ read_file
 │ analysis()       │      │ analysis()           │
 │                  │      │                      │
 │ - 패턴 탐지      │      │ - 패턴 매칭          │
-│ - C1/C2 확률     │      │ - RSI/이격도 분석    │
+│ - C1/C2 확률     │      │ - RSI 구간 분석      │
 │ - 비교 분석      │      │ - Bonferroni 보정    │
 │                  │      │ - 차트 데이터        │
 └────────┬─────────┘      └──────────┬───────────┘
@@ -2160,7 +2163,7 @@ read_file
   - 요청 검증 (Pydantic 모델)
   - 파라미터 변환 (dict)
   - Controller 호출
-- **의존성**: `models.request`, `strategy.streak_core`
+- **의존성**: `models.request`, `strategy.streak_core`, `utils.data_service`
 
 #### 2. `strategy/streak_core.py` (Controller)
 - **역할**: 분석 진입점, 위임 패턴 적용
@@ -2185,7 +2188,7 @@ read_file
 - **책임**:
   - 다중 캔들 패턴 매칭
   - 패턴 품질 점수 계산
-  - RSI/이격도 구간별 승률 분석
+  - RSI 구간별 승률 분석
   - Bonferroni 보정
   - 차트 데이터 시각화
 - **의존성**: `strategy.streak.common`
@@ -2198,7 +2201,7 @@ read_file
   - 데이터 로드/준비 함수
   - 패턴 매칭 유틸리티
   - 시간대별 분석 (Intraday Distribution)
-- **의존성**: `data_service`, `strategy.streak.statistics`
+- **의존성**: `utils.data_service`, `strategy.streak.statistics`
 
 #### 4-2. `strategy/streak/statistics.py` (통계 함수 모듈)
 - **역할**: 통계 계산 함수 모듈 (단일 소스)
@@ -2227,21 +2230,24 @@ read_file
   - Multi-TF Squeeze 분석 API (`/api/multi-tf-squeeze`)
   - 주간 패턴 분석 API (`/api/weekly-pattern`) - 하락/상승 자동 판단
   - 주간 패턴 백테스트 API (`/api/weekly-pattern-backtest`)
-- **의존성**: `core.indicators`, `data_service`, `strategy.weekly_pattern`
+  - 하이브리드 전략 분석 API (`/api/hybrid-analysis`)
+  - 하이브리드 전략 백테스트 API (`/api/hybrid-backtest`)
+  - 하이브리드 전략 라이브 모드 API (`/api/hybrid-live`) - 완성된 전 봉 기준
+- **의존성**: `core.indicators`, `utils.data_service`, `strategy.weekly_pattern`, `strategy.hybrid`
 
 #### 6. `routes/backtest.py` (Backtest API)
 - **역할**: 백테스트 API 엔드포인트
 - **책임**:
   - 기본 백테스트 API (`/api/backtest`)
   - 고급 백테스트 API (`/api/backtest-advanced`) - Walk-Forward, Monte Carlo
-- **의존성**: `core.backtest`, `core.strategies`, `data_service`
+- **의존성**: `core.backtest`, `core.strategies`, `utils.data_service`
 
 #### 7. `routes/scanner.py` (Scanner API)
 - **역할**: 패턴 및 전략 스캐너 API
 - **책임**:
   - 패턴 스캐너 API (`/api/pattern-scanner`)
   - 전략 스캐너 API (`/api/scanner`)
-- **의존성**: `services.pattern_logic`, `core.strategies`, `data_service`
+- **의존성**: `services.pattern_logic`, `core.strategies`, `utils.data_service`
 
 #### 8. `routes/market.py` (Market Data API)
 - **역할**: 시장 데이터 및 지지/저항 API
@@ -2251,7 +2257,7 @@ read_file
   - 타임프레임 조회 API (`/api/timeframes/{coin}`)
   - OHLCV 데이터 API (`/api/ohlcv/{coin}/{interval}`)
   - 지지/저항 레벨 API (`/api/support-resistance/{coin}/{interval}`)
-- **의존성**: `data_service`, `core.support_resistance`
+- **의존성**: `utils.data_service`, `core.support_resistance`
 
 #### 9. `routes/strategies.py` (Strategies API)
 - **역할**: 전략 정보 및 프리셋 관리 API
@@ -2260,6 +2266,22 @@ read_file
   - 전략 설명 API (`/api/strategy-info/{strategy_id}`)
   - 프리셋 관리 API (`/api/presets`)
 - **의존성**: `core.strategies`, `core.presets`
+
+#### 10. `strategy/hybrid/` (하이브리드 전략 모듈)
+- **역할**: EMA, MACD, RSI, ADX 조합 전략 분석
+- **책임**:
+  - 하이브리드 전략 분석 (`analyze_hybrid_strategy()`)
+  - 하이브리드 전략 백테스팅 (`run_hybrid_backtest()`)
+  - 하이브리드 전략 라이브 모드 (`analyze_live_mode()`) - 완성된 전 봉 기준
+  - 전략 시그널 생성 (`generate_strategy_signals()`)
+- **전략 종류**:
+  - `EMA_ADX_Strong`: EMA20 > EMA50 & ADX > 25
+  - `MACD_RSI_Trend`: MACD > 0 & RSI > 55 & Close > SMA200
+  - `Pure_Trend`: Close > SMA200
+- **의존성**: `core.indicators` (compute_live_indicators), `strategy.common` (calculate_profit_factor)
+- **특징**:
+  - 라이브 모드 지표 계산 함수를 `core/indicators.py`로 분리하여 다른 전략에서도 재사용 가능
+  - 완성된 전 봉 기준으로 계산 (진행 중인 봉 제외)
 
 #### 10. `routes/journal.py` (Trading Journal API)
 - **역할**: 매매 일지 API
@@ -2278,17 +2300,29 @@ read_file
   - 표준 에러 응답 스키마 준수
 - **의존성**: `fastapi`, `logging`
 
-#### 12. `utils/data_loader.py` (Common Data Loader)
-- **역할**: 공통 데이터 로딩 유틸리티
+#### 12. `utils/data_service.py` (Data Layer)
+- **역할**: 데이터 소스 접근 (저수준)
+- **책임**:
+  - `fetch_live_data()`: Binance API 호출 (CCXT 사용)
+  - `load_csv_data()`: CSV 파일 로드
+  - `get_market_prices()`: 시장 가격 조회
+  - `get_fear_and_greed_index()`: Fear & Greed Index 조회
+  - `discover_timeframes()`: 사용 가능한 타임프레임 조회
+  - 데이터 캐싱 (메모리 기반 TTL)
+- **의존성**: `ccxt`, `pandas`, `requests`
+- **위치**: `backend/utils/data_service.py` (2026-01-21 이동)
+
+#### 13. `utils/data_loader.py` (Common Data Loader)
+- **역할**: 공통 데이터 로딩 유틸리티 (고수준)
 - **책임**:
   - CSV/API 데이터 로딩 통합
-  - `load_data_for_analysis()`: 단일 타임프레임 데이터 로딩
+  - `load_data_for_analysis()`: 단일 타임프레임 데이터 로딩 (CSV 우선, API 폴백)
   - `load_data_for_multi_intervals()`: 여러 타임프레임 데이터 로딩
   - 일관된 에러 처리 (ValueError 발생)
 - **효과**: 모든 라우터에서 중복되던 데이터 로딩 로직 통합 (~50줄 제거)
-- **의존성**: `data_service`
+- **의존성**: `utils.data_service`
 
-#### 13. `utils/decorators.py` (API Decorators)
+#### 14. `utils/decorators.py` (API Decorators)
 - **역할**: 공통 API 데코레이터
 - **책임**:
   - `handle_api_errors()`: 공통 에러 처리 데코레이터
@@ -2298,7 +2332,15 @@ read_file
 - **효과**: 에러 처리 보일러플레이트 코드 제거
 - **의존성**: `functools`, `traceback`, `sys`
 
-#### 15. `main.py` (FastAPI Application)
+#### 15. `backend/__init__.py` (Package Initialization)
+- **역할**: 백엔드 패키지 초기화 및 경로 설정
+- **책임**:
+  - 프로젝트 루트를 `sys.path`에 추가 (한 곳에서 통합 관리)
+  - `core/` 모듈 import 가능하도록 경로 설정
+- **효과**: 모든 파일에서 개별 `sys.path.insert` 제거 (19개 파일)
+- **의존성**: 없음
+
+#### 16. `main.py` (FastAPI Application)
 - **역할**: FastAPI 앱 초기화 및 라우터 등록
 - **책임**:
   - FastAPI 앱 생성
@@ -2308,16 +2350,22 @@ read_file
 - **크기**: 약 350줄 (리팩토링 전 2,231줄에서 약 84% 감소, 일부 엔드포인트는 아직 main.py에 남아있음)
 - **의존성**: `routes.*`, `utils.exceptions`, `core.*`
 
-#### 16. `core/indicators.py` (Technical Indicators)
-- **역할**: 기술적 지표 계산 함수
+#### 17. `core/indicators.py` (Technical Indicators)
+- **역할**: 기술적 지표 계산 함수 (공유 모듈)
 - **책임**:
   - `calculate_smas()`: 이동평균선 계산
   - `compute_rsi()`: RSI 계산
   - `prepare_strategy_data()`: 전략 데이터 준비 (RSI, ADX, MA, BB, KC 등)
   - `calculate_adx()`: ADX 계산
+  - `compute_live_indicators()`: 실시간 지표 계산 (EMA, MACD, RSI, ADX 등)
+    - 하이브리드 전략 및 다른 전략에서 재사용 가능
+    - Wilder's Smoothing 적용
+  - `get_latest_indicator_values()`: 최신 봉의 지표 값 추출 (라이브 모드용)
+  - `add_bb_indicators()`: 볼린저밴드 지표 추가
+  - `add_combo_indicators()`: 콤보 필터 지표 추가
 - **의존성**: `pandas`, `numpy`
 
-#### 17. `core/backtest.py` (Backtest Engine)
+#### 18. `core/backtest.py` (Backtest Engine)
 - **역할**: 백테스트 엔진
 - **책임**:
   - `run_backtest()`: 백테스트 실행
@@ -2325,7 +2373,7 @@ read_file
   - TP/SL, 레버리지, 수수료 계산
 - **의존성**: `pandas`, `numpy`
 
-#### 18. `core/strategies.py` (Strategy Definitions)
+#### 19. `core/strategies.py` (Strategy Definitions)
 - **역할**: 8개 전략 정의
 - **책임**:
   - 전략 목록 관리 (STRATS)
@@ -2333,7 +2381,7 @@ read_file
 - **주요 전략**: Connors, Squeeze, Turtle, Mean Reversion, RSI Reversal, MA Cross, BB Breakout, Engulfing
 - **의존성**: 없음 (순수 데이터)
 
-#### 19. `strategy/common.py` (Utilities)
+#### 20. `strategy/common.py` (Utilities)
 - **역할**: 공통 유틸리티 및 데이터 처리
 - **책임**:
   - `AnalysisContext`: 컨텍스트 객체
@@ -2344,18 +2392,15 @@ read_file
   - `calculate_signal_score()`: 패턴 품질 점수 계산 (최대 100점)
   - `calculate_intraday_distribution()`: 시간대별 분석 (EST/EDT 변환)
   - `analyze_interval_statistics()`: 구간별 통계 (Bonferroni 보정)
-- **의존성**: `data_service`, `pytz`
+- **의존성**: `utils.data_service`, `pytz`
 
-#### 20. `data_service.py` (Data Layer)
-- **역할**: 데이터 소스 접근
+#### 21. `services/statistics.py` (Backtest Statistics)
+- **역할**: 백테스트 통계 계산 모듈
 - **책임**:
-  - `fetch_live_data()`: Binance API 호출 (CCXT 사용)
-  - `load_csv_data()`: CSV 파일 로드
-  - `get_market_prices()`: 시장 가격 조회
-  - `get_fear_and_greed_index()`: Fear & Greed Index 조회
-  - `discover_timeframes()`: 사용 가능한 타임프레임 조회
-  - 데이터 캐싱 (메모리 기반)
-- **의존성**: `ccxt`, `pandas`, `requests`
+  - `calculate_advanced_stats()`: 고급 통계 계산 (Sharpe Ratio, Sortino Ratio, MDD, Profit Factor, t-test)
+  - `run_monte_carlo()`: Monte Carlo 시뮬레이션 (거래 순서 셔플)
+- **의존성**: `strategy.common`, `scipy`
+- **이전 이름**: `services/backtest_logic.py` (2026-01-21 리네임)
 
 ### 프론트엔드 모듈
 
@@ -2501,8 +2546,8 @@ Controller (strategy/streak_core.py)
   │
   ├─ load_data(context)
   │   └─ utils.data_loader.load_data_for_analysis()  # 공통 데이터 로딩 함수
-  │       ├─ use_csv=True → data_service.load_csv_data()
-  │       └─ use_csv=False → data_service.fetch_live_data()
+  │       ├─ use_csv=True → utils.data_service.load_csv_data()
+  │       └─ use_csv=False → utils.data_service.fetch_live_data()
   │
   ├─ prepare_dataframe(df)
   │   ├─ 컬럼 정규화
@@ -2589,7 +2634,7 @@ Frontend Response
 ## 📊 성능 최적화
 
 ### 1. 데이터 캐싱
-- **위치**: `data_service.py`
+- **위치**: `utils/data_service.py`
 - **방법**: LRU + TTL 캐시 (thread-safe)
 - **효과**: 동일 파라미터 재요청 시 즉시 반환
 
@@ -2825,16 +2870,15 @@ LOG_FORMAT=json  # json, text
   - **위치**: `backend/strategy/common.py` - `calculate_signal_score()`
   - **금지**: 점수 계산 로직, 임계값, 가중치 변경 금지
   - **이유**: 패턴 신호의 객관적 평가 기준 제공
-- **RSI/이격도 구간별 승률 분석 (신뢰구간 포함)**:
+- **RSI 구간별 승률 분석 (신뢰구간 포함)**:
   - **Wilson Score Interval**: 위 심플 모드 공식 동일 적용
   - **제약**: 샘플 수(N) < 10일 경우 'Low Reliability'로 표시
 - **Bonferroni 다중 비교 보정**:
   - **공식**: $\alpha_{adjusted} = \frac{\alpha}{n_{comparisons}}$
     - $\alpha = 0.05$ (원래 유의수준)
-    - $n_{comparisons}$: 비교 횟수 (RSI 8구간 = 8, 이격도 7구간 = 7)
+    - $n_{comparisons}$: 비교 횟수 (RSI 8구간 = 8)
   - **적용**: 
     - RSI 구간 분석: 8개 구간 → $\alpha_{adjusted} = 0.05/8 = 0.00625$
-    - 이격도 구간 분석: 7개 구간 → $\alpha_{adjusted} = 0.05/7 \approx 0.00714$
   - **위치**: `backend/strategy/common.py` - `analyze_interval_statistics()`
   - **이유**: 다중 비교 시 False Positive 방지 필수
 - 뉴욕 시간대별 저점/고점 발생 확률 (1d/3d 타임프레임)
@@ -2871,11 +2915,53 @@ LOG_FORMAT=json  # json, text
 - 청산: 일요일 종가
 - 필터: 깊은 하락/상승 + 과매도/과매수 조건
 
+### 하이브리드 전략 (Hybrid Strategy)
+
+**주요 특징:**
+- **다중 지표 조합**: EMA, MACD, RSI, ADX 등을 조합한 전략 분석
+- **라이브 모드**: 완성된 전 봉 기준으로 현재 시점의 시그널 상태 확인
+- **공통 지표 함수**: `core/indicators.py`의 `compute_live_indicators()`를 다른 전략에서도 재사용 가능
+
+**전략 종류:**
+- **EMA_ADX_Strong**: EMA20 > EMA50 & ADX > 25
+- **MACD_RSI_Trend**: MACD > 0 & RSI > 55 & Close > SMA200
+- **Pure_Trend**: Close > SMA200
+
+**분석 기능:**
+- 전략 분석: 각 전략의 시그널 발생 통계 분석
+- 백테스팅: TP/SL 기반의 현실적인 매매 시뮬레이션
+- 라이브 모드: 완성된 전 봉 기준으로 각 전략의 시그널 상태 확인
+
+**주요 지표:**
+- EMA20, EMA50, SMA200
+- MACD Histogram
+- RSI (Wilder's 방식)
+- ADX (정교한 방식)
+
+**백테스팅 전략:**
+- 진입: 시그널 발생 시점
+- 청산: TP/SL 도달 또는 최대 보유 기간 도달
+- 통계: 승률, Profit Factor, TP/SL 적중률, 평균 보유 기간
+
+**위치:**
+- `backend/strategy/hybrid/logic.py`: 전략 분석 및 라이브 모드 로직
+- `backend/strategy/hybrid/backtest.py`: 백테스팅 로직
+- `backend/routes/stats.py`: API 엔드포인트 (`/api/hybrid-analysis`, `/api/hybrid-backtest`, `/api/hybrid-live`)
+- `core/indicators.py`: 공통 지표 계산 함수 (`compute_live_indicators()`, `get_latest_indicator_values()`)
+- `frontend/src/pages/HybridAnalysisPage.tsx`: UI 페이지
+
 **위치:**
 - `backend/strategy/weekly_pattern/logic.py`: 분석 로직
 - `backend/strategy/weekly_pattern/backtest.py`: 백테스팅 로직
 - `backend/routes/stats.py`: API 엔드포인트
 - `frontend/src/pages/WeeklyPatternPage.tsx`: UI 페이지
+
+**위치 (하이브리드 전략):**
+- `backend/strategy/hybrid/logic.py`: 전략 분석 및 라이브 모드 로직
+- `backend/strategy/hybrid/backtest.py`: 백테스팅 로직
+- `backend/routes/stats.py`: API 엔드포인트 (`/api/hybrid-analysis`, `/api/hybrid-backtest`, `/api/hybrid-live`)
+- `core/indicators.py`: 공통 지표 계산 함수 (`compute_live_indicators()`, `get_latest_indicator_values()`)
+- `frontend/src/pages/HybridAnalysisPage.tsx`: UI 페이지
 
 ### MA 크로스 통계
 
@@ -2908,7 +2994,7 @@ LOG_FORMAT=json  # json, text
 - **구현 위치**: `backend/strategy/common.py` - `wilson_confidence_interval()` 함수
 - **사용처**: 
   - 연속 봉패턴 분석의 C1/C2 예측 확률
-  - RSI/이격도 구간별 승률 분석
+  - RSI 구간별 승률 분석
   - 복합 패턴 분석의 신뢰구간 계산
 
 ### 2. 시간대별 분석 (Intraday Distribution)
@@ -2981,14 +3067,6 @@ valid_date_count로 확률 정규화
 
 ### 6. 수학적 정의
 
-#### 이격도 (Disparity)
-- **공식**: $D = \frac{C - MA_{20}}{MA_{20}} \times 100$
-  - $C$: 현재 종가
-  - $MA_{20}$: 20일 이동평균선
-- **의미**: 현재 가격이 이동평균선으로부터 얼마나 이격되어 있는지 백분율로 표현
-- **구현 위치**: `backend/strategy/complex_strategy.py` - `_calculate_indicators()`
-- **사용처**: RSI와 함께 구간별 승률 분석에 사용
-
 #### RSI 구간 분석
 - **방법**: 
   1. 전일 RSI를 8개 구간으로 분할: `[0, 30, 40, 50, 60, 70, 80, 100]`
@@ -3003,11 +3081,10 @@ valid_date_count로 확률 정규화
 #### Bonferroni 보정 (Bonferroni Correction)
 - **공식**: $\alpha_{adjusted} = \frac{\alpha}{n_{comparisons}}$
   - $\alpha$: 원래 유의수준 (0.05)
-  - $n_{comparisons}$: 비교 횟수 (예: RSI 8구간 = 8, 이격도 7구간 = 7)
+  - $n_{comparisons}$: 비교 횟수 (예: RSI 8구간 = 8)
 - **목적**: 다중 비교 시 1종 오류 증가 방지 (False Positive 방지)
 - **적용**: 
   - RSI 구간 분석: 8개 구간 → $\alpha_{adjusted} = 0.05/8 = 0.00625$
-  - 이격도 구간 분석: 7개 구간 → $\alpha_{adjusted} = 0.05/7 \approx 0.00714$
 - **구현 위치**: `backend/strategy/common.py` - `analyze_interval_statistics()`
 - **⚠️ 중요**: 보정 없이는 다중 비교로 인해 우연히 유의한 결과가 나타날 수 있음
 
@@ -3086,12 +3163,12 @@ valid_date_count로 확률 정규화
   - 미래 참조 오류 방지 검증
   - Simple/Complex Mode 통합 테스트
 - **실행 방법**: `pytest tests/test_c1_extraction.py -v`
-- **CI/CD 통합**: `.github/workflows/test.yml` (strategy 파일 변경 시 자동 실행)
+- **CI/CD 통합**: `.github/workflows/test.yml` (선택사항, GitHub 사용 시)
 - **효과**: 리팩토링 시 회귀 방지, 핵심 제약 조건 보호
 - **완료 사항**:
   - ✅ pytest 설치 및 설정
-  - ✅ 10개 테스트 케이스 모두 통과
-  - ✅ CI/CD 워크플로우 생성
+  - ✅ 21개 테스트 케이스 모두 통과 (C1 추출 + 통계 로직)
+  - ✅ Core Guard 스크립트 생성 (`scripts/check_core_imports.py`)
   - ✅ 문서 업데이트
 
 ### 4. C1 분석 일관성 버그 수정 ✅ **완료** (2025-01-17)
@@ -3175,13 +3252,17 @@ valid_date_count로 확률 정규화
 
 ---
 
-## 📝 참고 문서
+## 📚 관련 문서
 
+### 핵심 문서
 - [README.md](./README.md) - 프로젝트 개요 및 주요 기능
 - [INSTALL.md](./INSTALL.md) - 설치 및 배포 가이드
 - [README.md - 핵심 제약 조건](./README.md#-핵심-제약-조건-ai-리팩토링-필수-확인사항) - 코드 수정 시 필수 확인사항
-- [STREAK_ANALYSIS_FLOW.md](./STREAK_ANALYSIS_FLOW.md) - 연속 봉 분석 상세 문서 (Simple Mode)
-- [COMPLEX_MODE_FLOW.md](./COMPLEX_MODE_FLOW.md) - Complex Mode 상세 문서
+
+### 상세 플로우 문서
+- [STREAK_ANALYSIS_FLOW.md](./STREAK_ANALYSIS_FLOW.md) - 연속 봉 분석 상세 플로우 (Simple Mode)
+- [COMPLEX_MODE_FLOW.md](./COMPLEX_MODE_FLOW.md) - 복합 모드 상세 플로우
+- [PAGE_BACKEND_MAPPING.md](./PAGE_BACKEND_MAPPING.md) - 페이지별 백엔드 코드 매핑
 
 ---
 

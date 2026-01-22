@@ -13,6 +13,7 @@ import {
   BookOpen,
   Radio,
   Flame,
+  Zap,
 } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { getLabels } from '../store/labels';
@@ -26,6 +27,7 @@ const menuItems = [
   { path: '/streak-analysis', icon: Flame, labelKey: 'menu_streak_analysis' as const },
   { path: '/bb-mid', icon: Target, labelKey: 'menu_bb_mid' as const },
   { path: '/weekly-pattern', icon: BarChart3, labelKey: 'menu_weekly_pattern' as const },
+  { path: '/hybrid-analysis', icon: Zap, labelKey: 'menu_hybrid_analysis' as const },
   // 기타 분석 페이지
   { path: '/combo-filter', icon: Layers, labelKey: 'menu_combo_filter' as const },
   { path: '/multi-tf-squeeze', icon: Activity, labelKey: 'menu_multi_tf_squeeze' as const },

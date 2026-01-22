@@ -2,7 +2,6 @@
 import numpy as np
 import pandas as pd
 from typing import List
-from typing import List
 
 
 def calculate_adx(df: pd.DataFrame, length: int = 14) -> pd.Series:
@@ -354,3 +353,97 @@ def add_combo_indicators(df: pd.DataFrame, sma_short: int, sma_long: int) -> pd.
     df["body_rel_range"] = df["body"] / df["range"]
 
     return df
+
+
+def compute_live_indicators(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    실시간 지표 계산 (고정밀 지표 계산)
+    
+    하이브리드 전략 및 다른 전략에서 공통으로 사용할 수 있는 지표 계산 함수.
+    Wilder's Smoothing을 적용한 고정밀 지표 계산 (EMA, MACD, RSI, ADX 등).
+    
+    일반 분석, 백테스팅, 라이브 모드 모두에서 사용 가능합니다.
+    
+    Args:
+        df: OHLCV DataFrame
+    
+    Returns:
+        지표가 추가된 DataFrame
+    """
+    d = df.copy()
+    
+    # 이평선
+    d['ema20'] = d['close'].ewm(span=20, adjust=False).mean()
+    d['ema50'] = d['close'].ewm(span=50, adjust=False).mean()
+    d['sma200'] = d['close'].rolling(200).mean()
+    
+    # MACD
+    ema12 = d['close'].ewm(span=12, adjust=False).mean()
+    ema26 = d['close'].ewm(span=26, adjust=False).mean()
+    macd_line = ema12 - ema26
+    d['macd_hist'] = macd_line - macd_line.ewm(span=9, adjust=False).mean()
+    
+    # RSI (Wilder's 방식)
+    delta = d['close'].diff()
+    gain = delta.where(delta > 0, 0)
+    loss = -delta.where(delta < 0, 0)
+    avg_gain = gain.ewm(alpha=1/14, min_periods=14).mean()
+    avg_loss = loss.ewm(alpha=1/14, min_periods=14).mean()
+    d['rsi'] = 100 - (100 / (1 + (avg_gain / (avg_loss + 1e-10))))
+    
+    # ADX (정교한 방식)
+    high_diff = d['high'].diff()
+    low_diff = d['low'].diff()
+    plus_dm = np.where((high_diff > -low_diff) & (high_diff > 0), high_diff, 0)
+    minus_dm = np.where((-low_diff > high_diff) & (low_diff < 0), -low_diff, 0)
+    
+    tr = pd.concat([
+        d['high'] - d['low'],
+        abs(d['high'] - d['close'].shift(1)),
+        abs(d['low'] - d['close'].shift(1))
+    ], axis=1).max(axis=1)
+    
+    atr = tr.ewm(alpha=1/14, min_periods=14).mean()
+    plus_di = 100 * (pd.Series(plus_dm, index=d.index).ewm(alpha=1/14, min_periods=14).mean() / atr)
+    minus_di = 100 * (pd.Series(minus_dm, index=d.index).ewm(alpha=1/14, min_periods=14).mean() / atr)
+    dx = 100 * abs(plus_di - minus_di) / (plus_di + minus_di + 1e-10)
+    d['adx'] = dx.ewm(alpha=1/14, min_periods=14).mean()
+    
+    return d
+
+
+def get_latest_indicator_values(df: pd.DataFrame, use_previous_candle: bool = True) -> dict:
+    """
+    완성된 봉의 지표 값만 추출 (라이브 모드용)
+    
+    다른 전략에서도 재사용 가능한 공통 함수입니다.
+    
+    Args:
+        df: 지표가 포함된 DataFrame
+        use_previous_candle: True면 전 봉(완성된 봉) 사용, False면 최신 봉 사용
+    
+    Returns:
+        완성된 봉의 지표 값 딕셔너리
+    """
+    if len(df) == 0:
+        return {}
+    
+    # 완성된 전 봉 사용 (기본값)
+    if use_previous_candle and len(df) >= 2:
+        candle_idx = -2
+    else:
+        candle_idx = -1
+    
+    latest = df.iloc[candle_idx]
+    timestamp = df.index[candle_idx]
+    
+    return {
+        'timestamp': timestamp,
+        'close': float(latest['close']) if not pd.isna(latest['close']) else None,
+        'ema20': float(latest['ema20']) if 'ema20' in latest and not pd.isna(latest['ema20']) else None,
+        'ema50': float(latest['ema50']) if 'ema50' in latest and not pd.isna(latest['ema50']) else None,
+        'sma200': float(latest['sma200']) if 'sma200' in latest and not pd.isna(latest['sma200']) else None,
+        'macd_hist': float(latest['macd_hist']) if 'macd_hist' in latest and not pd.isna(latest['macd_hist']) else None,
+        'rsi': float(latest['rsi']) if 'rsi' in latest and not pd.isna(latest['rsi']) else None,
+        'adx': float(latest['adx']) if 'adx' in latest and not pd.isna(latest['adx']) else None,
+    }

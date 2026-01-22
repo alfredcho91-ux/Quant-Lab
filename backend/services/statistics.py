@@ -1,17 +1,10 @@
-# services/backtest_logic.py
-"""백테스트 비즈니스 로직 - FastAPI 독립적"""
+# services/statistics.py
+"""백테스트 통계 계산 모듈 - Sharpe Ratio, Sortino Ratio, MDD, Monte Carlo 등"""
 
 import pandas as pd
 import numpy as np
 from typing import Dict, Any
 from scipy import stats
-import sys
-from pathlib import Path
-
-# strategy 모듈 import를 위한 경로 설정
-backend_path = Path(__file__).parent.parent
-if str(backend_path) not in sys.path:
-    sys.path.insert(0, str(backend_path))
 
 from strategy.common import (
     calculate_sharpe_ratio_unified,

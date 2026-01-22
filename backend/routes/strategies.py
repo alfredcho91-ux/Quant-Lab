@@ -4,10 +4,6 @@
 from fastapi import APIRouter
 from pydantic import BaseModel
 from typing import Dict, Any
-import sys
-from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from core.strategies import STRATS
 from core.presets import load_presets, save_presets

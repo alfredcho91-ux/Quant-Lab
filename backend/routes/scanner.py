@@ -2,11 +2,6 @@
 """스캐너 API 엔드포인트"""
 
 from fastapi import APIRouter
-import sys
-from pathlib import Path
-
-# Add parent path for importing core modules
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from models.request import PatternScanParams, ScannerParams
 from services.pattern_logic import detect_patterns, compute_pattern_stats

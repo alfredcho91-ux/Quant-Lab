@@ -11,6 +11,7 @@ import JournalPage from './pages/JournalPage';
 import StrategyScannerPage from './pages/StrategyScannerPage';
 import StreakAnalysisPage from './pages/StreakAnalysisPage';
 import WeeklyPatternPage from './pages/WeeklyPatternPage';
+import HybridAnalysisPage from './pages/HybridAnalysisPage';
 
 function App() {
   return (
@@ -29,6 +30,7 @@ function App() {
           <Route path="strategy-scanner" element={<StrategyScannerPage />} />
           <Route path="streak-analysis" element={<StreakAnalysisPage />} />
           <Route path="weekly-pattern" element={<WeeklyPatternPage />} />
+          <Route path="hybrid-analysis" element={<HybridAnalysisPage />} />
           <Route path="journal" element={<JournalPage />} />
           <Route path="*" element={<Navigate to="/streak-analysis" replace />} />
         </Route>

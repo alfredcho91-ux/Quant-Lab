@@ -8,7 +8,7 @@ import os
 import logging
 import traceback
 from fastapi import Request, HTTPException
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, ORJSONResponse
 from fastapi.exceptions import RequestValidationError
 
 logger = logging.getLogger(__name__)
@@ -50,7 +50,7 @@ def register_exception_handlers(app):
             response["details"] = errors
         
         logger.warning(f"Validation error: {error_message}")
-        return JSONResponse(status_code=200, content=response)
+        return ORJSONResponse(status_code=200, content=response)
     
     
     @app.exception_handler(HTTPException)
@@ -66,7 +66,7 @@ def register_exception_handlers(app):
         }
         
         logger.warning(f"HTTP exception: {exc.status_code} - {exc.detail}")
-        return JSONResponse(status_code=200, content=response)
+        return ORJSONResponse(status_code=200, content=response)
     
     
     @app.exception_handler(Exception)
@@ -93,4 +93,4 @@ def register_exception_handlers(app):
         # 에러 로깅
         logger.error(f"Unhandled exception: {error_message}", exc_info=True)
         
-        return JSONResponse(status_code=200, content=response)
+        return ORJSONResponse(status_code=200, content=response)

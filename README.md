@@ -81,17 +81,10 @@
 #### Bonferroni 보정
 - **공식**: $\alpha_{adjusted} = \frac{\alpha}{n_{comparisons}}$
   - $\alpha = 0.05$ (원래 유의수준)
-  - $n_{comparisons}$: 비교 횟수 (RSI 8구간 = 8, 이격도 7구간 = 7)
+  - $n_{comparisons}$: 비교 횟수 (RSI 8구간 = 8)
 - **위치**: `backend/strategy/common.py` - `analyze_interval_statistics()`
 - **금지**: 보정 로직 제거 금지, 보정 없이 $\alpha = 0.05$만 사용 금지
 - **이유**: 다중 비교 시 False Positive 방지 필수
-
-#### 이격도 (Disparity)
-- **공식**: $D = \frac{C - MA_{20}}{MA_{20}} \times 100$
-  - $C$: 현재 종가
-  - $MA_{20}$: 20일 이동평균선
-- **위치**: `backend/strategy/complex_strategy.py` - `_calculate_indicators()`
-- **금지**: 공식 변경 금지
 
 ### 🕐 EST 시간대 변환 (절대 변경 금지)
 - **위치**: `backend/strategy/common.py` - `calculate_intraday_distribution()`
@@ -147,6 +140,7 @@ React + FastAPI 기반의 암호화폐 트레이딩 분석 플랫폼입니다.
 | **📉 볼밴 중단 회귀** | 볼밴 터치 후 중단선 회귀 확률 | start_side, max_bars, RSI range | 15m, 30m, 1h, 2h, 4h, 8h, 12h, 1d, 3d, 1w |
 | **🔍 패턴/캔들 통계** | 캔들 패턴 탐지 및 수익률 분석 | pattern type, horizon, TP% | 모든 타임프레임 |
 | **📡 전략 스캐너** | 실시간 8개 전략 시그널 모니터링 | strategy_id, direction | 모든 타임프레임 |
+| **🔬 하이브리드 전략** | EMA, MACD, RSI, ADX 조합 전략 분석 및 백테스팅 | strategy, tp, sl, max_hold | 1h, 2h, 4h, 1d |
 | **🌐 시장 정보** | 실시간 가격, Fear & Greed Index | coin, interval | 실시간 |
 | **📓 매매 일지** | 트레이드 기록 및 통계 분석 | entry/exit, PnL, emotion | - |
 
@@ -155,7 +149,7 @@ React + FastAPI 기반의 암호화폐 트레이딩 분석 플랫폼입니다.
 | 모드 | 패턴 | 분석 대상 | 주요 지표 | 특수 기능 |
 |------|------|-----------|-----------|-----------|
 | **심플 모드** | N연속 양봉/음봉 | C1 (진입일) | C1/C2 확률, 전일 지표 비교 | 뉴욕 시간대별 저점/고점 확률 (1d/3d) |
-| **복합 모드** | 다중 캔들 (예: 5양-2음) | C1 (진입일) | RSI/이격도 구간별 승률, Bonferroni 보정 | 차트 데이터 시각화, 패턴 품질 점수 |
+| **복합 모드** | 다중 캔들 (예: 5양-2음) | C1 (진입일) | RSI 구간별 승률, Bonferroni 보정 | 차트 데이터 시각화, 패턴 품질 점수 |
 
 ### 주간 패턴 분석 상세
 
@@ -175,6 +169,21 @@ React + FastAPI 기반의 암호화폐 트레이딩 분석 플랫폼입니다.
 3. RSI 임계값 입력 (기본값: 40)
 4. "분석 실행" 클릭 → 분석 및 백테스팅 자동 실행
 
+### 하이브리드 전략 상세
+
+| 기능 | 설명 | 전략 종류 | 주요 지표 |
+|------|------|----------|-----------|
+| **전략 분석** | 여러 지표를 조합한 전략들의 시그널 발생 통계 분석 | EMA_ADX_Strong, MACD_RSI_Trend, Pure_Trend | EMA, MACD, RSI, ADX, SMA200 |
+| **백테스팅** | TP/SL 기반의 현실적인 매매 시뮬레이션 | 선택한 전략 | 승률, Profit Factor, TP/SL 적중률 |
+| **라이브 모드** | 완성된 전 봉 기준으로 현재 시점의 각 전략 시그널 상태 확인 | 전체 전략 | 실시간 지표 값 및 조건 충족 여부 |
+
+**주요 특징:**
+- **EMA_ADX_Strong**: EMA20 > EMA50 & ADX > 25
+- **MACD_RSI_Trend**: MACD > 0 & RSI > 55 & Close > SMA200
+- **Pure_Trend**: Close > SMA200
+- **라이브 모드**: 진행 중인 봉이 아닌 완성된 전 봉 기준으로 계산
+- **공통 지표 함수**: `core/indicators.py`의 `compute_live_indicators()`를 다른 전략에서도 재사용 가능
+
 ### 백테스트 전략 목록
 
 | ID | 전략명 | 유형 | 주요 지표 |
@@ -184,9 +193,8 @@ React + FastAPI 기반의 암호화폐 트레이딩 분석 플랫폼입니다.
 | A3 | Turtle | 추세 | Donchian |
 | A4 | Mean Reversion | 역추세 | BB, RSI |
 | B1 | RSI Reversal | 역추세 | RSI |
-| B2 | MA Cross | 추세 | MA1, MA2, MA3 |
-| B3 | BB Breakout | 돌파 | BB |
-| B4 | Engulfing | 패턴 | 캔들 패턴 |
+| B2 | BB Breakout | 돌파 | BB |
+| B3 | Engulfing | 패턴 | 캔들 패턴 |
 
 ## 🏗️ 프로젝트 구조
 
@@ -216,9 +224,9 @@ Frontend (React + TypeScript) → HTTP REST API → Backend (FastAPI)
                                               │
                     ┌─────────────────────────┼─────────────────────────┐
                     │                         │                         │
-            streak/                  weekly_pattern/            ma_cross/
-            ├─ simple_strategy.py   ├─ logic.py                bb_mid/
-            ├─ complex_strategy.py   └─ backtest.py            combo_filter/
+            streak/                  weekly_pattern/            bb_mid/
+            ├─ simple_strategy.py   ├─ logic.py                combo_filter/
+            ├─ complex_strategy.py   └─ backtest.py            squeeze/
             └─ common.py                                        squeeze/
                                               │
                                     core/ (공유 비즈니스 로직)
@@ -228,7 +236,7 @@ Frontend (React + TypeScript) → HTTP REST API → Backend (FastAPI)
             indicators.py              backtest.py              strategies.py
             support_resistance.py      candle_patterns.py        ...
                                               │
-                                    data_service.py (Data Layer)
+                                    utils/data_service.py (Data Layer)
                                     (Binance API, CSV)
 ```
 
@@ -269,7 +277,8 @@ Frontend (React + TypeScript) → HTTP REST API → Backend (FastAPI)
 - `routes/`: 얇은 API 레이어 (요청 검증, 파라미터 변환)
 - `strategy/`: 비즈니스 로직 (분석 알고리즘)
 - `core/`: 공유 비즈니스 로직 (지표 계산, 백테스트 엔진)
-- `utils/`: 공통 유틸리티 (데이터 로딩, 에러 처리)
+- `utils/`: 공통 유틸리티 (데이터 소스 접근, 데이터 로딩, 에러 처리)
+- `services/`: 서비스 레이어 (통계 계산, 패턴 로직)
 
 **데이터 소스:**
 - Binance API (CCXT 라이브러리)
@@ -282,20 +291,23 @@ Frontend (React + TypeScript) → HTTP REST API → Backend (FastAPI)
 my_quant_V2/
 ├── backend/                 # FastAPI 백엔드
 │   ├── main.py             # 메인 앱 (Router 등록 및 CORS 설정)
-│   ├── data_service.py     # 데이터 서비스 (Binance API, CSV)
+│   ├── __init__.py         # 패키지 초기화 (경로 설정 통합 관리)
 │   ├── routes/             # 분리된 API 라우터 (모듈화된 엔드포인트)
 │   │   ├── backtest.py    # 백테스트 API (/api/backtest*, /api/backtest-advanced)
 │   │   ├── journal.py     # 매매 일지 API (/api/journal)
 │   │   ├── market.py      # 시장 데이터 API (/api/market/*, /api/support-resistance/*)
 │   │   ├── scanner.py     # 스캐너 API (/api/scanner, /api/pattern-scanner)
-│   │   ├── stats.py       # 통계 분석 API (/api/ma-cross, /api/bb-mid, /api/combo-filter, /api/multi-tf-squeeze)
+│   │   ├── stats.py       # 통계 분석 API (/api/bb-mid, /api/combo-filter, /api/multi-tf-squeeze)
 │   │   ├── strategies.py   # 전략 정보 API (/api/strategies, /api/strategy-info/*, /api/presets)
 │   │   └── streak.py      # 연속 봉패턴 분석 API (/api/streak-analysis)
 │   ├── utils/              # 유틸리티 모듈
+│   │   ├── data_service.py # 데이터 소스 접근 (Binance API, CSV)
+│   │   ├── data_loader.py  # 공통 데이터 로딩 함수 (CSV 우선, API 폴백)
 │   │   ├── exceptions.py  # 전역 예외 처리기 (표준 에러 응답 스키마)
-│   │   ├── data_loader.py # 공통 데이터 로딩 함수 (CSV/API 통합)
 │   │   └── decorators.py  # 공통 API 에러 처리 데코레이터
-│   ├── services/           # 비즈니스 로직 (현재 미사용, 향후 확장용)
+│   ├── services/           # 서비스 레이어
+│   │   ├── statistics.py  # 백테스트 통계 계산 (Sharpe, Sortino, MDD, Monte Carlo)
+│   │   └── pattern_logic.py # 패턴 감지 및 통계 계산
 │   ├── strategy/           # 전략 모듈 (비즈니스 로직)
 │   │   ├── common.py       # 공통 통계 함수 (re-export from streak/common)
 │   │   ├── streak/         # 연속 봉패턴 분석 전략
@@ -308,8 +320,9 @@ my_quant_V2/
 │   │   │   ├── backtest.py # 주간 패턴 백테스팅 로직
 │   │   │   ├── indicators.py # 기술적 지표 계산
 │   │   │   └── validation.py # 데이터 검증
-│   │   ├── ma_cross/       # MA 크로스 통계
-│   │   │   └── logic.py
+│   │   ├── hybrid/         # 하이브리드 전략 (EMA, MACD, RSI, ADX)
+│   │   │   ├── logic.py    # 전략 분석 및 라이브 모드 로직
+│   │   │   └── backtest.py # 백테스팅 로직
 │   │   ├── bb_mid/         # 볼밴 중단 회귀 통계
 │   │   │   └── logic.py
 │   │   ├── combo_filter/   # 콤보 필터 통계
@@ -370,7 +383,9 @@ my_quant_V2/
 │   └── .eslintrc.cjs      # ESLint 설정
 │
 ├── core/                    # 핵심 비즈니스 로직 (공유 모듈)
-│   ├── indicators.py       # 기술적 지표 계산 (RSI, ADX, MA, BB 등)
+│   ├── indicators.py       # 기술적 지표 계산 (RSI, ADX, MA, BB, MACD 등)
+│   │                        # - compute_live_indicators(): 실시간 지표 계산 (하이브리드 전략 등에서 재사용)
+│   │                        # - get_latest_indicator_values(): 최신 봉 지표 값 추출
 │   ├── backtest.py         # 백테스트 엔진
 │   ├── strategies.py       # 전략 정의 (8개 전략)
 │   ├── support_resistance.py # 지지/저항 계산
@@ -508,10 +523,12 @@ my_quant_V2/
 | POST | `/api/streak-analysis` | 연속 봉패턴 분석 | StreakAnalysisParams → StreakAnalysisResult |
 | POST | `/api/weekly-pattern` | 주간 패턴 분석 | WeeklyPatternParams → WeeklyPatternResult |
 | POST | `/api/weekly-pattern-backtest` | 주간 패턴 백테스트 | WeeklyPatternBacktestParams → WeeklyPatternBacktestResult |
-| POST | `/api/ma-cross` | MA 크로스 통계 | MaCrossParams → MaCrossResult |
 | POST | `/api/bb-mid` | 볼밴 중단 회귀 통계 | BBMidParams → BBMidResult |
 | POST | `/api/combo-filter` | 콤보 필터 통계 | ComboFilterParams → ComboFilterResult |
 | POST | `/api/multi-tf-squeeze` | 멀티 타임프레임 스퀴즈 분석 | MultiTFSqueezeParams → MultiTFSqueezeResult |
+| POST | `/api/hybrid-analysis` | 하이브리드 전략 분석 | HybridAnalysisParams → HybridAnalysisResult |
+| POST | `/api/hybrid-backtest` | 하이브리드 전략 백테스팅 | HybridBacktestParams → HybridBacktestResult |
+| POST | `/api/hybrid-live` | 하이브리드 전략 라이브 모드 | HybridLiveModeParams → HybridLiveModeResult |
 | GET | `/api/support-resistance/{coin}/{interval}` | 지지/저항 레벨 | JSON |
 | POST | `/api/scanner` | 전략 스캐너 | ScannerParams → ScannerResult |
 | POST | `/api/pattern-scanner` | 패턴 스캐너 | PatternScanParams → PatternScanResult |
@@ -700,6 +717,37 @@ pytest tests/test_c1_extraction.py -v
 - 미래 참조 오류 방지 검증
 - Simple Mode와 Complex Mode 통합 테스트
 
+### 통계 로직 단위 테스트
+
+핵심 통계 함수들의 정확성을 검증하는 테스트입니다.
+
+**실행 방법**:
+```bash
+cd backend
+source venv/bin/activate
+pytest tests/test_statistics.py -v
+```
+
+**테스트 항목**:
+- `wilson_confidence_interval()`: Wilson Score 신뢰구간 계산 (7개 테스트)
+- `bonferroni_correction()`: Bonferroni 다중 비교 보정 (4개 테스트)
+- `calculate_binomial_pvalue()`: 이항검정 p-value 계산 (4개 테스트)
+- `analyze_interval_statistics()`: 구간별 통계 분석 (3개 테스트)
+- `calculate_intraday_distribution()`: 시간대별 분포 계산 (3개 테스트)
+
+**총 21개 테스트 케이스**
+
+### Core Guard 검증
+
+`core/` 디렉토리가 `backend/`를 import하지 않는지 검증하는 스크립트입니다.
+
+**실행 방법**:
+```bash
+python3 scripts/check_core_imports.py
+```
+
+**목적**: `core/` 디렉토리는 독립 라이브러리로 유지되어야 하며, `backend/` 또는 `frontend/`를 import하면 안 됩니다.
+
 **중요**: 리팩토링 전/후 반드시 모든 테스트가 통과해야 합니다.
 
 ## 📝 개발 노트
@@ -710,7 +758,10 @@ pytest tests/test_c1_extraction.py -v
 - 캐싱 전략은 TTL 기반으로 구현됨
 - **전역 설정 통합**: TP/SL, use_csv 설정은 Zustand의 `backtestParams`를 통해 전역 관리되며, 한 페이지에서 변경 시 모든 페이지에 자동 동기화됨
 - **코드 최적화**: 공통 데이터 로딩 함수(`utils/data_loader.py`), 공통 Hook(`hooks/usePageCommon.ts`, `hooks/useAnalysisMutation.ts`)을 통한 중복 코드 제거 (~150줄 감소)
-- **테스트 코드**: C1 날짜 추출 검증 테스트 구현 완료 (`tests/test_c1_extraction.py`) - 리팩토링 시 회귀 방지
+- **테스트 코드**: 
+  - C1 날짜 추출 검증 테스트 (`tests/test_c1_extraction.py`) - 리팩토링 시 회귀 방지
+  - 통계 로직 단위 테스트 (`tests/test_statistics.py`) - 21개 테스트 케이스
+  - Core Guard 스크립트 (`scripts/check_core_imports.py`) - 아키텍처 무결성 검증
 - **백엔드 중복 제거 (2026-01)**: 
   - 미사용 파일 삭제: `strategy/simple_strategy.py` (507줄), `strategy/weekly_pattern/logic_improved.py` (435줄), `strategy/complex_strategy.py` (747줄)
   - `strategy/common.py` 중복 제거: 718줄 → 295줄 (60% 감소)
@@ -722,6 +773,13 @@ pytest tests/test_c1_extraction.py -v
   - 버그 수정: 구간별 승률 분석에서 잘못된 타겟 시리즈 사용 문제 수정 (Simple Mode)
   - 복합 분석 개선: C1 양봉/음봉 확률이 최상위 레벨에 표시되도록 수정
   - 기능 제거: MA Cross 통계 기능 완전 제거 (Combo Filter로 대체 가능)
+- **하이브리드 전략 추가 (2026-01)**:
+  - 하이브리드 전략 분석 기능 추가 (EMA, MACD, RSI, ADX 조합)
+  - 하이브리드 전략 백테스팅 기능 추가 (TP/SL 기반 현실적 시뮬레이션)
+  - 하이브리드 전략 라이브 모드 추가 (완성된 전 봉 기준 시그널 확인)
+  - 라이브 모드 지표 계산 함수를 `core/indicators.py`로 이동 (다른 전략에서도 재사용 가능)
+  - 프론트엔드 하이브리드 전략 페이지 추가 (라이브 모드 UI 포함)
+  - 중복 코드 제거: `_prepare_indicators_and_signals()` 공통 함수 추가
 
 ## 🤝 기여
 

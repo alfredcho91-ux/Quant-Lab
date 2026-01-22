@@ -2,14 +2,9 @@
 """백테스트 API 엔드포인트"""
 
 from fastapi import APIRouter
-import sys
-from pathlib import Path
-
-# Add parent path for importing core modules
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from models.request import BacktestParams, AdvancedBacktestParams
-from services.backtest_logic import calculate_advanced_stats, run_monte_carlo
+from services.statistics import calculate_advanced_stats, run_monte_carlo
 from utils.data_loader import load_data_for_analysis
 from utils.decorators import handle_api_errors
 from core.indicators import prepare_strategy_data

@@ -8,13 +8,6 @@ import numpy as np
 from typing import Dict, Any, List, Optional
 from scipy import stats as scipy_stats
 import logging
-import sys
-from pathlib import Path
-
-# 부모 경로 추가
-backend_path = Path(__file__).parent.parent.parent
-if str(backend_path) not in sys.path:
-    sys.path.insert(0, str(backend_path))
 
 # 순환 참조 방지: safe_float를 직접 정의
 def safe_float(val) -> Optional[float]:
@@ -33,12 +26,13 @@ def safe_float(val) -> Optional[float]:
 
 # data_service import
 try:
-    from data_service import load_csv_data as _load_csv_data, fetch_live_data as _fetch_live_data
+    from utils.data_service import load_csv_data as _load_csv_data, fetch_live_data as _fetch_live_data
 except ImportError:
     # fallback
     import importlib.util
+    from pathlib import Path
     backend_path = Path(__file__).parent.parent.parent
-    spec = importlib.util.spec_from_file_location("data_service", backend_path / "data_service.py")
+    spec = importlib.util.spec_from_file_location("data_service", backend_path / "utils" / "data_service.py")
     data_service = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(data_service)
     _load_csv_data = data_service.load_csv_data
@@ -52,7 +46,8 @@ def _get_normalize_datetime_index():
 
 logger = logging.getLogger(__name__)
 
-# 상수
+# 상수 (common.py에서 import 가능하지만 순환 참조 방지를 위해 여기서 정의)
+# Note: CONFIDENCE_LEVEL은 common.py에도 있지만, 이 모듈은 common.py를 import하지 않음
 CONFIDENCE_LEVEL = 0.95
 WEEKDAY_NAMES_EN = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 

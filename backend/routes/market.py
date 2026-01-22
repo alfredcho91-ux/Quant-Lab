@@ -2,13 +2,9 @@
 """시장 데이터 API 엔드포인트"""
 
 from fastapi import APIRouter
-import sys
-from pathlib import Path
 import pandas as pd
 
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
-
-from data_service import get_market_prices, get_fear_and_greed_index, discover_timeframes
+from utils.data_service import get_market_prices, get_fear_and_greed_index, discover_timeframes, fetch_live_data
 from utils.data_loader import load_data_for_analysis
 from utils.decorators import handle_api_errors
 from core.support_resistance import (

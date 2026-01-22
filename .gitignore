@@ -10,3 +10,5 @@ binance_klines/
 myenv/ # 가상환경 폴더 있으면
 __pycache__/
 .DS_Store
+.cache/  # diskcache 영속 캐시 디렉토리
+.cache/

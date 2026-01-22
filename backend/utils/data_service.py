@@ -1,4 +1,4 @@
-# core_react/backend/data_service.py
+# utils/data_service.py
 """
 Data service functions for fetching market data
 This is a standalone version without Streamlit dependencies
@@ -25,7 +25,7 @@ BINANCE_TFS = [
     "12h", "1d", "3d", "1w", "1M"
 ]
 
-BASE_DIR = Path(__file__).parent.parent / "binance_klines"
+BASE_DIR = Path(__file__).parent.parent.parent / "binance_klines"
 
 
 def _tf_weight(tf: str) -> int:

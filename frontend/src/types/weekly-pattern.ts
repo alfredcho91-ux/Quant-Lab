@@ -6,7 +6,10 @@ export interface WeeklyPatternParams {
   direction?: 'down' | 'up';
   deep_drop_threshold: number;
   deep_rise_threshold: number;
-  rsi_threshold: number;
+  rsi_min: number;
+  rsi_max: number;
+  start_day?: number;  // 분석 시작 요일 (0=월요일, 1=화요일, ..., 6=일요일)
+  end_day?: number;  // 분석 종료 요일 (0=월요일, 1=화요일, ..., 6=일요일)
 }
 
 export interface WeeklyPatternManualParams {
@@ -57,7 +60,9 @@ export interface WeeklyPatternResult {
   warnings?: string[];
   filters: {
     deep_drop_threshold: number;
-    rsi_threshold: number;
+    rsi_min?: number;
+    rsi_max?: number;
+    rsi_threshold?: number;  // 하위 호환성
     rsi_period?: number;
     atr_period?: number;
     vol_period?: number;
@@ -79,7 +84,10 @@ export interface WeeklyPatternBacktestParams {
   direction: 'down' | 'up';
   deep_drop_threshold: number;
   deep_rise_threshold: number;
-  rsi_threshold: number;
+  rsi_min: number;
+  rsi_max: number;
+  start_day?: number;  // 분석 시작 요일 (0=월요일, 1=화요일, ..., 6=일요일)
+  end_day?: number;  // 분석 종료 요일 (0=월요일, 1=화요일, ..., 6=일요일)
   leverage?: number;
   fee_entry_rate?: number;
   fee_exit_rate?: number;
@@ -105,7 +113,9 @@ export interface WeeklyPatternBacktestResult {
   filtered_weeks: number;
   filters: {
     deep_drop_threshold: number;
-    rsi_threshold: number;
+    rsi_min?: number;
+    rsi_max?: number;
+    rsi_threshold?: number;  // 하위 호환성
   };
   trades: WeeklyPatternBacktestTrade[];
   summary: {

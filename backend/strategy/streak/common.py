@@ -4,26 +4,19 @@
 
 import pandas as pd
 import numpy as np
-import sys
 import os
 import logging
-from pathlib import Path
 from scipy import stats as scipy_stats
 from typing import Dict, Any, Optional, Tuple, List
 import hashlib
 import json
-
-# 현재 파일의 부모 디렉토리 (backend)를 sys.path에 추가
-backend_path = str(Path(__file__).parent.parent.parent)
-if backend_path not in sys.path:
-    sys.path.insert(0, backend_path)
 
 # 로깅 설정
 logger = logging.getLogger(__name__)
 DEBUG_MODE = os.getenv('DEBUG_STREAK_ANALYSIS', 'False').lower() in ('true', '1', 'yes')
 
 # data_service import (중복 제거)
-from data_service import fetch_live_data, load_csv_data
+from utils.data_service import fetch_live_data, load_csv_data
 
 # ========== 상수 정의 ==========
 DEFAULT_RSI = 50.0
@@ -143,12 +136,21 @@ __all__ = ['AnalysisContext', 'VALID_INTERVALS', 'WEEKDAY_NAMES_KO', 'WEEKDAY_NA
 # ========== 데이터 캐싱 ==========
 # DataCache는 utils.cache로 분리 (재사용성 향상)
 from utils.cache import DataCache
+from pathlib import Path
 
-# 전역 캐시 인스턴스 (TTL 5분)
-data_cache = DataCache(ttl_minutes=5)
+# 캐시 디렉토리 설정 (각 캐시는 별도 디렉토리 사용)
+project_root = Path(__file__).parent.parent.parent
+cache_base = project_root / ".cache"
 
-# 분석 결과 캐시 인스턴스 (TTL 10분 - 분석 결과는 더 오래 캐싱)
-analysis_cache = DataCache(ttl_minutes=10)
+# 전역 캐시 인스턴스 (TTL 5분) - 데이터 캐시용 별도 디렉토리
+data_cache = DataCache(ttl_minutes=5, cache_dir=str(cache_base / "data"))
+
+# 분석 결과 캐시 인스턴스 (TTL 10분) - 분석 캐시용 별도 디렉토리
+analysis_cache = DataCache(ttl_minutes=10, cache_dir=str(cache_base / "analysis"))
+
+# 지표 계산 캐시 인스턴스 (TTL 30분) - 지표 계산 결과 캐싱 (coin + interval 기준)
+# 파라미터(n_streak 등)와 무관하므로 더 긴 TTL 사용
+indicators_cache = DataCache(ttl_minutes=30, cache_dir=str(cache_base / "indicators"))
 
 
 def normalize_datetime_index(df: pd.DataFrame) -> pd.DataFrame:
@@ -304,6 +306,40 @@ def calculate_indicators(df: pd.DataFrame) -> pd.DataFrame:
     df['disparity'] = (df['close'] / df['ma20']) * 100
     
     return df
+
+
+def get_or_calculate_indicators(coin: str, interval: str, df: pd.DataFrame) -> pd.DataFrame:
+    """
+    지표 계산 결과를 캐싱하여 재사용
+    
+    지표 값은 coin + interval에만 의존하므로, 파라미터(n_streak 등) 변경 시에도
+    지표 재계산 없이 캐시된 결과를 재사용할 수 있습니다.
+    
+    Args:
+        coin: 코인 심볼 (예: 'BTC')
+        interval: 타임프레임 (예: '1d', '4h')
+        df: 원본 DataFrame (지표 계산 전)
+    
+    Returns:
+        지표가 계산된 DataFrame
+    """
+    cache_key = f"indicators_{coin}_{interval}"
+    
+    # 캐시 확인
+    cached = indicators_cache.get(cache_key)
+    if cached is not None:
+        logger.debug(f"Indicators cache hit: {cache_key}")
+        return cached
+    
+    # 캐시 미스 - 지표 계산
+    logger.debug(f"Indicators cache miss: {cache_key}, calculating...")
+    df_with_indicators = calculate_indicators(df)
+    
+    # 캐시 저장
+    indicators_cache.set(cache_key, df_with_indicators)
+    logger.debug(f"Indicators cached: {cache_key}")
+    
+    return df_with_indicators
 
 
 def normalize_single_index(idx: Any, df_index: pd.Index) -> Optional[Tuple[Any, int]]:
@@ -528,26 +564,29 @@ def generate_analysis_cache_key(context: 'AnalysisContext') -> str:
 
 
 def get_cache_stats() -> Dict[str, Any]:
-    """캐시 상태 확인 (데이터 캐시 + 분석 결과 캐시)"""
+    """캐시 상태 확인 (데이터 캐시 + 분석 결과 캐시 + 지표 캐시)"""
     data_stats = data_cache.stats()
     analysis_stats = analysis_cache.stats()
+    indicators_stats = indicators_cache.stats()
     
     return {
         "data_cache": data_stats,
         "analysis_cache": analysis_stats,
-        "total_cached_items": data_stats["cached_items"] + analysis_stats["cached_items"],
+        "indicators_cache": indicators_stats,
+        "total_cached_items": data_stats["cached_items"] + analysis_stats["cached_items"] + indicators_stats["cached_items"],
         "total_hit_rate": round(
-            (data_stats["hits"] + analysis_stats["hits"]) / 
-            max(data_stats["total_requests"] + analysis_stats["total_requests"], 1) * 100,
+            (data_stats["hits"] + analysis_stats["hits"] + indicators_stats["hits"]) / 
+            max(data_stats["total_requests"] + analysis_stats["total_requests"] + indicators_stats["total_requests"], 1) * 100,
             2
         )
     }
 
 
 def clear_cache() -> Dict[str, Any]:
-    """캐시 초기화 (데이터 캐시 + 분석 결과 캐시)"""
+    """캐시 초기화 (데이터 캐시 + 분석 결과 캐시 + 지표 캐시)"""
     data_cache.clear()
     analysis_cache.clear()
+    indicators_cache.clear()
     return {"success": True, "message": "All caches cleared"}
 
 
@@ -615,9 +654,12 @@ def analyze_interval_statistics(
     num_bins = len(bins) - 1
     data_bin = pd.cut(data_series, bins=bins)
     
+    # target_series를 boolean으로 변환 (NaN은 False로 처리)
+    target_bool = target_series.fillna(False).astype(bool)
+    
     analysis = pd.DataFrame({
         'bin': data_bin,
-        'target': target_series
+        'target': target_bool
     }).groupby('bin', observed=False)['target'].agg(['sum', 'count'])
     
     for interval, row in analysis.iterrows():
@@ -697,48 +739,110 @@ def analyze_pullback_quality(
     rise_len: int = 5, 
     drop_len: int = 2
 ) -> List[Dict[str, Any]]:
-    """조정 구간의 품질 분석 (되돌림, 거래량)"""
+    """
+    조정 구간의 품질 분석 (되돌림, 거래량)
+    
+    패턴이 양봉으로 시작하는 경우 (예: [1,1,1,-1,-1]):
+    - rise_segment: 상승 구간 (양봉들)
+    - drop_segment: 조정 구간 (음봉들)
+    - 되돌림 비율 = (상승 최고가 - 조정 종료가) / (상승 최고가 - 상승 시작가) * 100
+    
+    패턴이 음봉으로 시작하는 경우 (예: [-1,-1,-1,1]):
+    - drop_segment: 하락 구간 (음봉들)
+    - rise_segment: 반등 구간 (양봉들)
+    - 반등 비율 = (반등 종료가 - 하락 최저가) / (하락 시작가 - 하락 최저가) * 100
+    """
     results = []
     
     for idx in pattern_indices:
         try:
             pos_idx = df.index.get_loc(idx)
+            pattern_len = rise_len + drop_len
             
             # 범위 체크
-            start_pos = pos_idx - (rise_len + drop_len) + 1
+            start_pos = pos_idx - pattern_len + 1
             if start_pos < 0:
                 continue
             
-            # 상승 구간 데이터
-            rise_segment = df.iloc[start_pos : pos_idx - drop_len + 1]
-            # 조정 구간 데이터 (drop_len개의 음봉, pos_idx까지 포함)
-            drop_segment = df.iloc[pos_idx - drop_len + 1 : pos_idx + 1]
+            # 패턴 전체 구간
+            pattern_segment = df.iloc[start_pos : pos_idx + 1]
             
-            if len(rise_segment) == 0 or len(drop_segment) == 0:
+            if len(pattern_segment) == 0:
                 continue
             
-            # 되돌림 비율 계산
-            # 상승 구간: 첫 양봉의 open ~ 상승 구간 최고 high
-            # 조정 구간: 상승 최고 high ~ 마지막 음봉의 close
-            rise_start_price = rise_segment['open'].iloc[0]
-            rise_high = rise_segment['high'].max()
-            drop_end_price = drop_segment['close'].iloc[-1]
+            # 패턴의 첫 봉 방향 확인 (양봉으로 시작하는지 음봉으로 시작하는지)
+            first_candle = pattern_segment.iloc[0]
+            is_first_green = first_candle['close'] > first_candle['open']
             
-            rise_range = rise_high - rise_start_price
-            drop_range = rise_high - drop_end_price
-            
-            # 되돌림 비율 = 하락 폭 / 상승 폭 * 100
-            # 단, 100% 이상인 경우 (조정 종료가가 상승 시작가 아래)는 100%로 제한
-            retracement = (drop_range / rise_range * 100) if rise_range > 0 else 0
-            retracement = min(retracement, 100.0)  # 최대 100%로 제한
-            
-            # 거래량 강도 비율 계산
-            if 'volume' not in rise_segment.columns or 'volume' not in drop_segment.columns:
-                vol_ratio = 1.0
+            if is_first_green:
+                # 양봉으로 시작하는 패턴 (예: [1,1,1,-1,-1])
+                # 상승 구간: 처음부터 rise_len개
+                # 조정 구간: 나머지 drop_len개
+                if rise_len > 0 and drop_len > 0:
+                    rise_segment = pattern_segment.iloc[:rise_len]
+                    drop_segment = pattern_segment.iloc[rise_len:]
+                    
+                    if len(rise_segment) == 0 or len(drop_segment) == 0:
+                        continue
+                    
+                    # 되돌림 비율 계산
+                    rise_start_price = rise_segment['open'].iloc[0]
+                    rise_high = rise_segment['high'].max()
+                    drop_end_price = drop_segment['close'].iloc[-1]
+                    
+                    rise_range = rise_high - rise_start_price
+                    drop_range = rise_high - drop_end_price
+                    
+                    # 되돌림 비율 = 하락 폭 / 상승 폭 * 100
+                    retracement = (drop_range / rise_range * 100) if rise_range > 0 else 0
+                    retracement = min(retracement, 100.0)  # 최대 100%로 제한
+                    
+                    # 거래량 비율
+                    if 'volume' in rise_segment.columns and 'volume' in drop_segment.columns:
+                        vol_rise = rise_segment['volume'].mean()
+                        vol_drop = drop_segment['volume'].mean()
+                        vol_ratio = (vol_drop / vol_rise) if vol_rise > 0 else 1.0
+                    else:
+                        vol_ratio = 1.0
+                else:
+                    # rise_len 또는 drop_len이 0인 경우 (단일 방향 패턴)
+                    retracement = 0.0
+                    vol_ratio = 1.0
             else:
-                vol_rise = rise_segment['volume'].mean()
-                vol_drop = drop_segment['volume'].mean()
-                vol_ratio = (vol_drop / vol_rise) if vol_rise > 0 else 1.0
+                # 음봉으로 시작하는 패턴 (예: [-1,-1,-1,1])
+                # 하락 구간: 처음부터 drop_len개
+                # 반등 구간: 나머지 rise_len개
+                if drop_len > 0 and rise_len > 0:
+                    drop_segment = pattern_segment.iloc[:drop_len]
+                    rise_segment = pattern_segment.iloc[drop_len:]
+                    
+                    if len(rise_segment) == 0 or len(drop_segment) == 0:
+                        continue
+                    
+                    # 반등 비율 계산 (하락 후 반등 강도)
+                    drop_start_price = drop_segment['open'].iloc[0]
+                    drop_low = drop_segment['low'].min()
+                    rise_end_price = rise_segment['close'].iloc[-1]
+                    
+                    drop_range = drop_start_price - drop_low
+                    rise_range = rise_end_price - drop_low
+                    
+                    # 반등 비율 = 반등 폭 / 하락 폭 * 100
+                    # (하락 최저가 기준으로 얼마나 반등했는지)
+                    retracement = (rise_range / drop_range * 100) if drop_range > 0 else 0
+                    retracement = min(retracement, 200.0)  # 200%까지 허용 (완전 반등 + 추가 상승)
+                    
+                    # 거래량 비율 (하락 구간 대비 반등 구간)
+                    if 'volume' in drop_segment.columns and 'volume' in rise_segment.columns:
+                        vol_drop = drop_segment['volume'].mean()
+                        vol_rise = rise_segment['volume'].mean()
+                        vol_ratio = (vol_rise / vol_drop) if vol_drop > 0 else 1.0
+                    else:
+                        vol_ratio = 1.0
+                else:
+                    # drop_len 또는 rise_len이 0인 경우 (단일 방향 패턴)
+                    retracement = 0.0
+                    vol_ratio = 1.0
             
             results.append({
                 'index': idx,
