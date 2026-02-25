@@ -1,15 +1,25 @@
 # config/settings.py
 """Application settings and configuration"""
 
+import os
 from pathlib import Path
 from typing import List
 
 # CORS settings
-CORS_ORIGINS: List[str] = [
+_DEFAULT_CORS_ORIGINS = [
     "http://localhost:5173",
     "http://localhost:3000",
-    "*"
 ]
+
+_cors_origins_env = os.getenv("CORS_ORIGINS", "")
+CORS_ORIGINS: List[str] = (
+    [origin.strip() for origin in _cors_origins_env.split(",") if origin.strip()]
+    if _cors_origins_env
+    else _DEFAULT_CORS_ORIGINS
+)
+
+# Analysis timezone (DST-aware in streak distribution via pytz)
+ANALYSIS_TIMEZONE = os.getenv("ANALYSIS_TIMEZONE", "America/New_York")
 
 # Journal settings
 JOURNAL_DIR = Path("journal")
@@ -25,3 +35,6 @@ TIMEFRAME_TO_MINUTES = {
     "1m": 1, "3m": 3, "5m": 5, "15m": 15, "30m": 30, "1h": 60,
     "2h": 120, "4h": 240, "6h": 360, "8h": 480, "12h": 720, "1d": 1440,
 }
+
+# AI Settings
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
