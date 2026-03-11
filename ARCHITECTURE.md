@@ -24,6 +24,7 @@
 │                    Frontend (React + TypeScript)             │
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐     │
 │  │   Pages/     │  │  Components/ │  │   Store/     │     │
+│  │ AIStrategyLab │  │  MetricCard  │  │  (상태관리)  │     │
 │  │ StreakAnalysis│→│  Chart.tsx   │  │  Zustand     │     │
 │  │ WeeklyPattern │  │  MetricCard  │  │  (상태관리)  │     │
 │  │ BBMidPage     │  │  Sidebar.tsx │  │  (TP/SL)     │     │
@@ -54,6 +55,7 @@
 │                          │                                    │
 │                    ┌─────▼─────┐                              │
 │                    │  routes/   │  (API Layer - 얇은 레이어)   │
+│                    │  ai_lab.py │  /api/ai/research            │
 │                    │  streak.py │  /api/streak-analysis        │
 │                    │  stats.py  │  /api/bb-mid, /api/combo-filter, /api/hybrid-* │
 │                    │  backtest.py│ /api/backtest*              │
@@ -67,7 +69,11 @@
 │              │                       │                        │
 │      ┌───────▼──────┐      ┌─────────▼────────┐               │
 │      │ strategy/    │      │ strategy/        │               │
-│      │ streak/      │      │ weekly_pattern/ │               │
+│      │ ai_lab/      │      │ weekly_pattern/ │               │
+│      │   ├─ service.py│      │ logic.py        │               │
+│      │   ├─ parser.py │      │ backtest.py     │               │
+│      │   └─ analyzer.py│     │ (주간 패턴 분석) │               │
+│      │ streak/      │      │                 │               │
 │      │   ├─ simple_strategy.py                │               │
 │      │   ├─ complex_strategy.py               │               │
 │      │   └─ common.py                         │               │
