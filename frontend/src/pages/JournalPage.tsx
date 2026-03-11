@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getJournal, addJournalEntry, deleteJournalEntry } from '../api/client';
-import { useStore } from '../store/useStore';
+import { useLanguage, useSelectedCoin } from '../store/useStore';
 import type { JournalEntry } from '../types';
 import { PlusCircle, Trash2, X } from 'lucide-react';
 
@@ -11,7 +11,8 @@ const EMOTIONS = ['Calm', 'Anxious', 'Greedy', 'Fearful', 'Confident', 'FOMO'];
 const DIRECTIONS = ['Long', 'Short'];
 
 export default function JournalPage() {
-  const { language, selectedCoin } = useStore();
+  const language = useLanguage();
+  const selectedCoin = useSelectedCoin();
   const isKo = language === 'ko';
   const queryClient = useQueryClient();
 
@@ -91,7 +92,7 @@ export default function JournalPage() {
           <div className="text-sm text-dark-400">{isKo ? '총 거래' : 'Total Trades'}</div>
         </div>
         <div className="card p-4 text-center">
-          <div className="text-2xl font-bold text-emerald-400">{winRate.toFixed(1)}%</div>
+          <div className="text-2xl font-bold text-primary-400">{winRate.toFixed(1)}%</div>
           <div className="text-sm text-dark-400">{isKo ? '승률' : 'Win Rate'}</div>
         </div>
         <div className="card p-4 text-center">
@@ -371,4 +372,3 @@ export default function JournalPage() {
     </div>
   );
 }
-

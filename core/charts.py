@@ -1,8 +1,11 @@
 # core/charts.py
 from typing import Optional
+import logging
 import pandas as pd
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
+
+logger = logging.getLogger(__name__)
 
 def plot_price_with_indicators(
     df: pd.DataFrame,
@@ -60,13 +63,13 @@ def plot_price_with_indicators(
         col=1,
     )
 
-    # EMA + MA들
-    if "EMA_main" in plot_df.columns:
+    # Main SMA + MA들
+    if "SMA_main" in plot_df.columns:
         fig.add_trace(
             go.Scatter(
                 x=plot_df["open_dt"],
-                y=plot_df["EMA_main"],
-                name=f"EMA {df.attrs.get('EMA_LEN', 200)}",
+                y=plot_df["SMA_main"],
+                name=f"SMA {df.attrs.get('SMA_MAIN_LEN', 200)}",
                 line=dict(color="yellow", width=1.2),
             ),
             row=1,
@@ -267,15 +270,6 @@ def plot_price_with_indicators(
                 f"RSI(14): {last['RSI']:.1f} (OB {rsi_ob_attr} / OS {int(rsi_os_attr)})"
             )
 
-        # 🔹 RSI(2) 텍스트 잠깐 OFF (코드는 남겨둠)
-        SHOW_RSI2_PANEL = False
-        if SHOW_RSI2_PANEL and "RSI_2" in df.columns:
-            rsi2_ob_attr = df.attrs.get("RSI2_OB", 80)
-            rsi2_os_attr = df.attrs.get("RSI2_OS", 100 - rsi2_ob_attr)
-            info_lines.append(
-                f"RSI(2): {last['RSI_2']:.1f} (OB {rsi2_ob_attr} / OS {int(rsi2_os_attr)})"
-            )
-
         # ADX
         if "ADX" in df.columns:
             info_lines.append(f"ADX: {last['ADX']:.1f}")
@@ -307,8 +301,8 @@ def plot_price_with_indicators(
                 borderwidth=0.5,
                 borderpad=3,
             )
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.debug("Failed to render chart info annotation: %s", exc, exc_info=True)
 
     fig.update_layout(
         template="plotly_dark",

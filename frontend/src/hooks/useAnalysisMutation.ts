@@ -5,28 +5,41 @@
  */
 
 import { useMutation } from '@tanstack/react-query';
-import { useStore } from '../store/useStore';
+import {
+  useBacktestParams,
+  useSelectedCoin,
+  useSelectedInterval,
+} from '../store/useStore';
 
 interface UseAnalysisMutationOptions<TParams, TResult> {
   mutationFn: (params: TParams) => Promise<TResult>;
   onSuccess?: (data: TResult) => void;
+  onError?: (error: unknown) => void;
 }
 
 /**
  * 분석 API 호출을 위한 공통 Mutation Hook
  * 
- * @param options - mutation 함수와 성공 콜백
+ * @param options - mutation 함수와 성공/에러 콜백
  * @returns mutation 객체와 handleRun 함수
  */
 export function useAnalysisMutation<TParams extends { coin?: string; use_csv?: boolean }, TResult>(
   options: UseAnalysisMutationOptions<TParams, TResult>
 ) {
-  const { selectedCoin, backtestParams } = useStore();
-  const { mutationFn, onSuccess } = options;
+  const selectedCoin = useSelectedCoin();
+  const selectedInterval = useSelectedInterval();
+  const backtestParams = useBacktestParams();
+  const { mutationFn, onSuccess, onError } = options;
 
   const mutation = useMutation({
     mutationFn,
     onSuccess,
+    onError: (error) => {
+      console.error('❌ Mutation error:', error);
+      if (onError) {
+        onError(error);
+      }
+    },
   });
 
   /**
@@ -34,11 +47,13 @@ export function useAnalysisMutation<TParams extends { coin?: string; use_csv?: b
    * 자동으로 coin과 use_csv를 전역 설정으로 동기화
    */
   const handleRun = (params: TParams) => {
-    mutation.mutate({
+    const next = {
       ...params,
       coin: selectedCoin,
       use_csv: backtestParams.use_csv,
-    } as TParams);
+    } as Record<string, unknown>;
+    if ('interval' in next) next.interval = next.interval ?? selectedInterval;
+    mutation.mutate(next as TParams);
   };
 
   return {

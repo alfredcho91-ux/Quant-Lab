@@ -1,6 +1,6 @@
-"""Business logic services (FastAPI-independent)"""
+"""Shared service package.
 
-# Streak analysis는 strategy 패키지로 이동됨
-# from strategy import analyze_streak_pattern, get_cache_stats, clear_cache
+This package intentionally avoids eager imports to prevent circular
+dependencies with domain modules.
+"""
 
-__all__ = []

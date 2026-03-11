@@ -162,7 +162,7 @@ def prepare_1h_4h_data(
     μ 전략용으로 1h, 4h 데이터를 준비:
       - coin: 'BTC', 'ETH', 'XRP', 'SOL' 등
       - 1h: 캔들 수익률, RSI(14)
-      - 4h: EMA(200) (간단히 ewm으로 계산)
+      - 4h: SMA(200)
       - 4h 지표를 1h 타임프레임에 merge_asof로 매핑
       - [start_date, end_date] 구간으로 잘라서 사용
     """
@@ -176,12 +176,12 @@ def prepare_1h_4h_data(
     df_1h["ret_candle"] = (df_1h["close"] - df_1h["open"]) / df_1h["open"] * 100.0
     df_1h["rsi_14"] = mu_rsi(df_1h["close"], period=14)
 
-    # 4h: EMA(200)
+    # 4h: SMA(200)
     df_4h = df_4h.sort_values("date").reset_index(drop=True)
-    df_4h["ema_200"] = df_4h["close"].ewm(span=200, adjust=False).mean()
+    df_4h["sma_200"] = df_4h["close"].rolling(200).mean()
 
     # 4h → 1h로 매핑 (가장 최근 4h 값을 1h에 붙임)
-    df_4h_slim = df_4h[["date", "close", "ema_200"]].copy()
+    df_4h_slim = df_4h[["date", "close", "sma_200"]].copy()
     df_merged = pd.merge_asof(
         df_1h.sort_values("date"),
         df_4h_slim.sort_values("date"),
@@ -264,11 +264,11 @@ def backtest_long_strategy(
         price_low = row["low"]
         price_close = row["close"]
 
-        ema_200_4h = row["ema_200"]
+        sma_200_4h = row["sma_200"]
         price_4h = row["close_4h"] if "close_4h" in df.columns else row["close"]
 
-        # 상위 추세 필터: 상승 추세 (4h 가격 > EMA200)
-        uptrend = (not pd.isna(ema_200_4h)) and (price_4h > ema_200_4h)
+        # 상위 추세 필터: 상승 추세 (4h 가격 > SMA200)
+        uptrend = (not pd.isna(sma_200_4h)) and (price_4h > sma_200_4h)
 
         # 포지션 없음 → 진입 조건 체크
         if position is None:

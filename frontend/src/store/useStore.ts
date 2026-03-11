@@ -3,10 +3,16 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { Language, Coin, MenuPage, BacktestParams } from '../types';
 
+const INTERVALS = ['15m', '1h', '2h', '4h', '1d', '3d', '1w', '1M'] as const;
+export type Interval = (typeof INTERVALS)[number];
+export type BackgroundTheme = 'default' | 'white' | 'black';
+
 interface AppState {
   // UI State
   language: Language;
+  backgroundTheme: BackgroundTheme;
   selectedCoin: Coin;
+  selectedInterval: Interval;
   currentPage: MenuPage;
   sidebarCollapsed: boolean;
   
@@ -15,7 +21,9 @@ interface AppState {
   
   // Actions
   setLanguage: (lang: Language) => void;
+  setBackgroundTheme: (theme: BackgroundTheme) => void;
   setSelectedCoin: (coin: Coin) => void;
+  setSelectedInterval: (interval: Interval) => void;
   setCurrentPage: (page: MenuPage) => void;
   toggleSidebar: () => void;
   updateBacktestParams: (params: Partial<BacktestParams>) => void;
@@ -34,8 +42,7 @@ const defaultBacktestParams: BacktestParams = {
   entry_fee_pct: 0.04,
   exit_fee_pct: 0.04,
   rsi_ob: 70,
-  rsi2_ob: 80,
-  ema_len: 200,
+  sma_main_len: 200,
   sma1_len: 20,
   sma2_len: 60,
   adx_thr: 25,
@@ -57,18 +64,27 @@ export const useStore = create<AppState>()(
     (set) => ({
       // Initial state
       language: 'ko',
+      backgroundTheme: 'default',
       selectedCoin: 'BTC',
+      selectedInterval: '4h',
       currentPage: 'backtest',
       sidebarCollapsed: false,
       backtestParams: defaultBacktestParams,
       
       // Actions
       setLanguage: (lang) => set({ language: lang }),
+      setBackgroundTheme: (theme) => set({ backgroundTheme: theme }),
       
       setSelectedCoin: (coin) =>
         set((state) => ({
           selectedCoin: coin,
           backtestParams: { ...state.backtestParams, coin },
+        })),
+      
+      setSelectedInterval: (interval) =>
+        set((state) => ({
+          selectedInterval: interval,
+          backtestParams: { ...state.backtestParams, interval },
         })),
       
       setCurrentPage: (page) => set({ currentPage: page }),
@@ -90,16 +106,47 @@ export const useStore = create<AppState>()(
       name: 'wolgem-quant-storage',
       partialize: (state) => ({
         language: state.language,
+        backgroundTheme: state.backgroundTheme,
         selectedCoin: state.selectedCoin,
+        selectedInterval: state.selectedInterval,
         backtestParams: state.backtestParams,
       }),
+      merge: (persistedState, currentState) => {
+        const incoming = (persistedState as Partial<AppState>) ?? {};
+        const persistedParams =
+          (incoming.backtestParams as Partial<BacktestParams> & { ema_len?: number }) ?? {};
+        const normalizedParams: BacktestParams = {
+          ...defaultBacktestParams,
+          ...persistedParams,
+          sma_main_len:
+            persistedParams.sma_main_len ??
+            persistedParams.ema_len ??
+            defaultBacktestParams.sma_main_len,
+        };
+
+        return {
+          ...currentState,
+          ...incoming,
+          backtestParams: normalizedParams,
+        };
+      },
     }
   )
 );
 
 // Selectors
 export const useLanguage = () => useStore((state) => state.language);
+export const useBackgroundTheme = () => useStore((state) => state.backgroundTheme);
 export const useSelectedCoin = () => useStore((state) => state.selectedCoin);
 export const useCurrentPage = () => useStore((state) => state.currentPage);
+export const useSelectedInterval = () => useStore((state) => state.selectedInterval);
+export const useSidebarCollapsed = () => useStore((state) => state.sidebarCollapsed);
 export const useBacktestParams = () => useStore((state) => state.backtestParams);
-
+export const useSetLanguage = () => useStore((state) => state.setLanguage);
+export const useSetBackgroundTheme = () => useStore((state) => state.setBackgroundTheme);
+export const useSetSelectedCoin = () => useStore((state) => state.setSelectedCoin);
+export const useSetSelectedInterval = () => useStore((state) => state.setSelectedInterval);
+export const useSetCurrentPage = () => useStore((state) => state.setCurrentPage);
+export const useToggleSidebar = () => useStore((state) => state.toggleSidebar);
+export const useUpdateBacktestParams = () => useStore((state) => state.updateBacktestParams);
+export const useResetBacktestParams = () => useStore((state) => state.resetBacktestParams);

@@ -1,4 +1,4 @@
-// Type definitions for WolGem Quant Master
+// Type definitions for Quant Master
 // 모든 타입을 기능별 모듈에서 re-export
 
 // 공통 타입
@@ -18,9 +18,6 @@ export * from './stats';
 
 // 연속 봉패턴 분석
 export * from './streak';
-
-// 주간 패턴 분석
-export * from './weekly-pattern';
 
 // 하이브리드 전략 분석
 export * from './hybrid';

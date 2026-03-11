@@ -48,9 +48,10 @@ export async function getOHLCV(
       timeout: 30000,  // 30초 타임아웃 (개별 요청용)
     });
     return res.data.success ? res.data : null;
-  } catch (err: any) {
-    console.error('getOHLCV error:', err?.message || err);
-    if (err?.code === 'ECONNABORTED') {
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error('getOHLCV error:', message);
+    if (err && typeof err === 'object' && 'code' in err && err.code === 'ECONNABORTED') {
       console.error('getOHLCV timeout - API가 응답하지 않습니다');
     }
     return null;

@@ -6,8 +6,6 @@
     "direction": "Long",
     "params": {
       "rsi_ob": 70,
-      "rsi2_ob": 80,
-      "ema_len": 200,
       "sma1_len": 20,
       "sma2_len": 60,
       "adx_thr": 25,
@@ -17,7 +15,8 @@
       "max_bars": 48,
       "leverage": 10,
       "entry_fee_pct": 0.04,
-      "exit_fee_pct": 0.04
+      "exit_fee_pct": 0.04,
+      "sma_main_len": 200
     }
   },
   "김기명의 칼": {
@@ -27,8 +26,6 @@
     "direction": "Long",
     "params": {
       "rsi_ob": 70,
-      "rsi2_ob": 80,
-      "ema_len": 200,
       "sma1_len": 20,
       "sma2_len": 60,
       "adx_thr": 25,
@@ -38,7 +35,8 @@
       "max_bars": 48,
       "leverage": 10,
       "entry_fee_pct": 0.04,
-      "exit_fee_pct": 0.04
+      "exit_fee_pct": 0.04,
+      "sma_main_len": 200
     }
   },
   "김덕배": {
@@ -48,8 +46,6 @@
     "direction": "Long",
     "params": {
       "rsi_ob": 55,
-      "rsi2_ob": 20,
-      "ema_len": 200,
       "sma1_len": 20,
       "sma2_len": 60,
       "adx_thr": 25,
@@ -59,7 +55,8 @@
       "max_bars": 48,
       "leverage": 10,
       "entry_fee_pct": 0.04,
-      "exit_fee_pct": 0.04
+      "exit_fee_pct": 0.04,
+      "sma_main_len": 200
     }
   },
   "BTC_2h_Connors_Long": {
@@ -69,8 +66,6 @@
     "direction": "Long",
     "params": {
       "rsi_ob": 55,
-      "rsi2_ob": 26,
-      "ema_len": 199,
       "sma1_len": 20,
       "sma2_len": 60,
       "adx_thr": 25,
@@ -80,7 +75,8 @@
       "max_bars": 41,
       "leverage": 10,
       "entry_fee_pct": 0.04,
-      "exit_fee_pct": 0.04
+      "exit_fee_pct": 0.04,
+      "sma_main_len": 199
     }
   },
   "ETH_1h_Connors_Long": {
@@ -96,8 +92,6 @@
       "entry_fee_pct": 0.04,
       "exit_fee_pct": 0.04,
       "rsi_ob": 70,
-      "rsi2_ob": 80,
-      "ema_len": 200,
       "sma1_len": 20,
       "sma2_len": 60,
       "adx_thr": 25,
@@ -110,7 +104,8 @@
       "atr_length": 20,
       "kc_mult": 1.5,
       "vol_ma_len": 20,
-      "vol_spike_k": 2.0
+      "vol_spike_k": 2.0,
+      "sma_main_len": 200
     }
   }
 }

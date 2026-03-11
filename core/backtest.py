@@ -2,6 +2,75 @@ import numpy as np
 import pandas as pd
 
 
+def _validate_backtest_inputs(
+    df: pd.DataFrame,
+    signal_col: str,
+    direction: str,
+    strategy_type: str,
+    tp_pct: float,
+    sl_pct: float,
+    max_bars: int,
+    leverage: int,
+    fee_entry_rate: float,
+    fee_exit_rate: float,
+) -> pd.DataFrame:
+    """Validate and normalize backtest inputs for graceful failure."""
+    if df is None or df.empty:
+        raise ValueError("Backtest input dataframe is empty")
+
+    required_columns = ["open", "high", "low", "close", "open_dt", signal_col]
+    missing_columns = [col for col in required_columns if col not in df.columns]
+    if missing_columns:
+        raise ValueError(f"Backtest input is missing required columns: {missing_columns}")
+
+    if direction not in {"Long", "Short"}:
+        raise ValueError(f"Invalid direction: {direction}. Expected 'Long' or 'Short'")
+
+    if strategy_type not in {"Fixed", "Connors", "Squeeze"}:
+        raise ValueError(
+            f"Invalid strategy_type: {strategy_type}. Expected one of ['Fixed', 'Connors', 'Squeeze']"
+        )
+
+    if leverage <= 0:
+        raise ValueError(f"Leverage must be > 0, got {leverage}")
+    if max_bars <= 0:
+        raise ValueError(f"max_bars must be > 0, got {max_bars}")
+    if tp_pct < 0 or sl_pct < 0:
+        raise ValueError(f"tp_pct/sl_pct must be >= 0, got tp_pct={tp_pct}, sl_pct={sl_pct}")
+    if fee_entry_rate < 0 or fee_exit_rate < 0:
+        raise ValueError(
+            f"fee_entry_rate/fee_exit_rate must be >= 0, got entry={fee_entry_rate}, exit={fee_exit_rate}"
+        )
+
+    normalized = df.copy()
+
+    open_dt = pd.to_datetime(normalized["open_dt"], errors="coerce")
+    if open_dt.isna().any():
+        invalid_count = int(open_dt.isna().sum())
+        raise ValueError(f"Invalid open_dt values detected: {invalid_count} rows")
+    normalized["open_dt"] = open_dt
+
+    ohlc = normalized[["open", "high", "low", "close"]].apply(pd.to_numeric, errors="coerce")
+    invalid_numeric_mask = ~np.isfinite(ohlc.to_numpy())
+    if invalid_numeric_mask.any():
+        invalid_count = int(invalid_numeric_mask.sum())
+        raise ValueError(f"Invalid OHLC values detected (NaN/inf/non-numeric): {invalid_count} cells")
+
+    invalid_ohlc = (
+        (ohlc["high"] < ohlc["low"])
+        | (ohlc["high"] < ohlc["open"])
+        | (ohlc["high"] < ohlc["close"])
+        | (ohlc["low"] > ohlc["open"])
+        | (ohlc["low"] > ohlc["close"])
+    )
+    if invalid_ohlc.any():
+        invalid_count = int(invalid_ohlc.sum())
+        raise ValueError(f"Invalid OHLC relationships detected: {invalid_count} rows")
+
+    normalized[["open", "high", "low", "close"]] = ohlc
+    return normalized
+
+
 def run_backtest(
     df: pd.DataFrame,
     signal_col: str,
@@ -32,8 +101,18 @@ def run_backtest(
     leverage     : 선물 레버리지
     fee_entry_rate, fee_exit_rate : 편도 수수료율 (예: 0.0005 = 0.05%)
     """
-
-    df = df.copy()
+    df = _validate_backtest_inputs(
+        df=df,
+        signal_col=signal_col,
+        direction=direction,
+        strategy_type=strategy_type,
+        tp_pct=tp_pct,
+        sl_pct=sl_pct,
+        max_bars=max_bars,
+        leverage=leverage,
+        fee_entry_rate=fee_entry_rate,
+        fee_exit_rate=fee_exit_rate,
+    )
     mask = df[signal_col].fillna(False).astype(bool)
     sig_idx = df.index[mask]
     if len(sig_idx) == 0:

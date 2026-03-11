@@ -17,8 +17,11 @@ export interface Labels {
   menu_scanner: string;
   menu_pattern_scanner: string;
   menu_streak_analysis: string;
-  menu_weekly_pattern: string;
+  menu_trend_judgment: string;
+  menu_ai_backtest_lab: string;
+  menu_ai_backtest_builder: string;
   menu_hybrid_analysis: string;
+  menu_weekly_pattern: string;
   title_backtest: string;
   title_pattern: string;
   title_journal: string;
@@ -33,8 +36,7 @@ export interface Labels {
   exit_fee: string;
   params: string;
   rsi14_ob: string;
-  rsi2_ob: string;
-  ema_len: string;
+  sma_main_len: string;
   sma1_len: string;
   sma2_len: string;
   adx_thr: string;
@@ -64,10 +66,12 @@ export interface Labels {
   run_backtest: string;
   loading: string;
   fear_greed: string;
+  trading_principles_title: string;
+  trading_principles: string[];
 }
 
 const labels_ko: Labels = {
-  sidebar_title: '💎 월젬의 퀀트 마스터',
+  sidebar_title: '💎 퀀트 마스터',
   sidebar_caption: '8 Strategies • RSI Single Knobs • Chart on Top',
   coin_select: '코인 선택',
   menu_title: '메뉴',
@@ -82,8 +86,11 @@ const labels_ko: Labels = {
   menu_scanner: '📊 전략 스캐너',
   menu_pattern_scanner: '🔍 패턴 스캐너',
   menu_streak_analysis: '🏹 연속 봉 분석',
-  menu_weekly_pattern: '📅 주간 패턴 분석',
+  menu_trend_judgment: '📊 추세판단',
+  menu_ai_backtest_lab: '🤖 AI 백테스트 랩',
+  menu_ai_backtest_builder: '🛠️ AI 전략 빌더',
   menu_hybrid_analysis: '⚡ 하이브리드 전략',
+  menu_weekly_pattern: '📅 주간 패턴 분석',
   title_backtest: '{coin} 8개 전략 백테스트',
   title_pattern: '📈 패턴/캔들 통계 연구실',
   title_journal: '📝 매매 일지',
@@ -98,8 +105,7 @@ const labels_ko: Labels = {
   exit_fee: '청산 수수료(%)',
   params: '🎛️ 파라미터',
   rsi14_ob: 'RSI(14) 과매수',
-  rsi2_ob: 'RSI(2) 과매수',
-  ema_len: 'EMA 길이',
+  sma_main_len: '메인 SMA 길이',
   sma1_len: 'MA1 길이',
   sma2_len: 'MA2 길이',
   adx_thr: 'ADX 임계값',
@@ -129,10 +135,19 @@ const labels_ko: Labels = {
   run_backtest: '백테스트 실행',
   loading: '로딩 중...',
   fear_greed: '공포/탐욕 지수',
+  trading_principles_title: '트레이딩 원칙',
+  trading_principles: [
+    '추세대로 친다 (쿠엉 등 참조).',
+    '배율은 추세/역추세/자리 조건에 따라 다르게 적용한다.',
+    '진입 타이밍은 큰 봉 마감 전후(4h/1d/1w)와 퀀트 베이스를 함께 본다.',
+    '타점은 트레이딩 원칙대로만 실행한다.',
+    '추세 합류 매매는 가능하되, 스토캐스틱과 위치(20이평 위/아래)를 반드시 확인한다.',
+    '애매하면 안 탄다. 못 버티는 포지션은 진입하지 않는다.',
+  ],
 };
 
 const labels_en: Labels = {
-  sidebar_title: '💎 WolGems Quant Master',
+  sidebar_title: '💎 Quant Master',
   sidebar_caption: '8 Strategies • RSI Single Knobs • Chart on Top',
   coin_select: 'Select Coin',
   menu_title: 'Menu',
@@ -147,8 +162,11 @@ const labels_en: Labels = {
   menu_scanner: '📊 Strategy Scanner',
   menu_pattern_scanner: '🔍 Pattern Scanner',
   menu_streak_analysis: '🏹 Candle Streak',
-  menu_weekly_pattern: '📅 Weekly Pattern',
+  menu_trend_judgment: '📊 Trend Judgment',
+  menu_ai_backtest_lab: '🤖 AI Backtest Lab',
+  menu_ai_backtest_builder: '🛠️ AI Strategy Builder',
   menu_hybrid_analysis: '⚡ Hybrid Strategy',
+  menu_weekly_pattern: '📅 Weekly Pattern',
   title_backtest: '{coin} 8-Strategy Backtest',
   title_pattern: '📈 Pattern / Candle Statistics Lab',
   title_journal: '📝 Trading Journal',
@@ -163,8 +181,7 @@ const labels_en: Labels = {
   exit_fee: 'Exit Fee (%)',
   params: '🎛️ Parameters',
   rsi14_ob: 'RSI(14) Overbought',
-  rsi2_ob: 'RSI(2) Overbought',
-  ema_len: 'EMA Length',
+  sma_main_len: 'Main SMA Length',
   sma1_len: 'MA1 Length',
   sma2_len: 'MA2 Length',
   adx_thr: 'ADX Threshold',
@@ -194,9 +211,17 @@ const labels_en: Labels = {
   run_backtest: 'Run Backtest',
   loading: 'Loading...',
   fear_greed: 'Fear & Greed Index',
+  trading_principles_title: 'Trading Principles',
+  trading_principles: [
+    'Trade with the trend (reference: Kuung, etc.).',
+    'Adjust leverage by context: trend, counter-trend, and key price zone.',
+    'Time entries around large-candle close (4h/1d/1w) with quant confirmation.',
+    'Execute entries only according to your trading playbook.',
+    'Trend-following entries are allowed, but confirm Stochastic and 20-MA position first.',
+    'If ambiguous, skip. Do not enter positions you cannot hold.',
+  ],
 };
 
 export function getLabels(lang: Language): Labels {
   return lang === 'ko' ? labels_ko : labels_en;
 }
-

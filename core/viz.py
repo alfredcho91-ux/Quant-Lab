@@ -47,13 +47,14 @@ def plot_trades_on_chart(df: pd.DataFrame, trades: pd.DataFrame, strategy_name: 
         )
     )
 
-    # 2) EMA 200 같이 장기 추세선 있으면 같이 그림
-    if "EMA_200" in plot_df.columns:
+    # 2) SMA 200 같이 장기 추세선 있으면 같이 그림 (legacy EMA_200 fallback 지원)
+    ma_col = "SMA_200" if "SMA_200" in plot_df.columns else ("EMA_200" if "EMA_200" in plot_df.columns else None)
+    if ma_col is not None:
         fig.add_trace(
             go.Scatter(
                 x=plot_df["open_dt"],
-                y=plot_df["EMA_200"],
-                name="EMA 200",
+                y=plot_df[ma_col],
+                name="SMA 200",
                 line=dict(color="orange", width=1),
             )
         )
@@ -144,4 +145,3 @@ def plot_equity_curve(trades: pd.DataFrame, title: str = "Equity Curve") -> go.F
     fig.update_layout(template="plotly_dark", height=400)
 
     return fig
-

@@ -37,7 +37,7 @@ class AnalysisContext:
     complex_pattern: Optional[List[int]] = None
     rsi_threshold: float = RSI_THRESHOLD_DEFAULT
     min_total_body_pct: Optional[float] = None  # N개 연속 봉의 몸통 총합 최소값
-    timezone_offset: int = -5
+    timezone_offset: Optional[int] = None
     
     @classmethod
     def from_params(cls, params: Dict[str, Any]) -> 'AnalysisContext':
@@ -68,7 +68,7 @@ class AnalysisContext:
             complex_pattern=params.get('complex_pattern'),
             rsi_threshold=params.get('rsi_threshold', RSI_THRESHOLD_DEFAULT),
             min_total_body_pct=params.get('min_total_body_pct'),
-            timezone_offset=params.get('timezone_offset', -5),
+            timezone_offset=params.get('timezone_offset'),
         )
     
     def determine_mode(self) -> str:

@@ -39,6 +39,8 @@ def load_data_for_analysis(
     
     # API에서 로딩
     if df is None or df.empty:
+        if interval == "1w":
+            total_candles = min(total_candles, 300)  # 주봉: 최근 300개 통일
         df = fetch_live_data(f"{coin}/USDT", interval, total_candles=total_candles)
         source = "api"
     

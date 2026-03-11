@@ -4,14 +4,14 @@
 strategies:
   Connors:
     ko:
-      concept: "아주 짧은 RSI(2)로 극단의 과매도/과매수 구간에서 반등(되돌림)을 노리는 전략."
-      long: "RSI(2) < {rsi2_os} & 가격 > EMA({ema_len}). 청산: TP/SL 또는 SMA({sma1_len}) 재돌파."
-      short: "RSI(2) > {rsi2_ob} & 가격 < EMA({ema_len}). 청산: TP/SL 또는 SMA({sma1_len}) 재하향."
+      concept: "RSI(14)로 극단의 과매도/과매수 구간에서 반등(되돌림)을 노리는 전략."
+      long: "RSI(14) < {rsi_os} & 가격 > SMA({sma_main_len}). 청산: TP/SL 또는 SMA({sma1_len}) 재돌파."
+      short: "RSI(14) > {rsi_ob} & 가격 < SMA({sma_main_len}). 청산: TP/SL 또는 SMA({sma1_len}) 재하향."
       regime: "횡보~약한 추세, 급등락 직후 기술적 반등/반납."
     en:
-      concept: "Very short RSI(2) reversion to capture snapbacks after extreme moves."
-      long: "RSI(2) < {rsi2_os} & price > EMA({ema_len}). Exit: TP/SL or price crosses above SMA({sma1_len}) again."
-      short: "RSI(2) > {rsi2_ob} & price < EMA({ema_len}). Exit: TP/SL or price crosses below SMA({sma1_len}) again."
+      concept: "RSI(14) reversion to capture snapbacks after extreme moves."
+      long: "RSI(14) < {rsi_os} & price > SMA({sma_main_len}). Exit: TP/SL or price crosses above SMA({sma1_len}) again."
+      short: "RSI(14) > {rsi_ob} & price < SMA({sma_main_len}). Exit: TP/SL or price crosses below SMA({sma1_len}) again."
       regime: "Range to mild trend; after panic drops/pumps."
   
   Sqz:
@@ -29,25 +29,25 @@ strategies:
   Turtle:
     ko:
       concept: "Donchian 고가/저가 돌파 추세 추종."
-      long: "종가가 Donchian High 상향 돌파 & EMA 위."
-      short: "종가가 Donchian Low 하향 돌파 & EMA 아래."
+      long: "종가가 Donchian High 상향 돌파 & SMA 위."
+      short: "종가가 Donchian Low 하향 돌파 & SMA 아래."
       regime: "강한 불/베어 추세에 유리, 횡보 시 휩쏘 주의."
     en:
       concept: "Donchian breakout trend-following."
-      long: "Close breaks recent Donchian High & close > EMA."
-      short: "Close breaks recent Donchian Low & close < EMA."
+      long: "Close breaks recent Donchian High & close > SMA."
+      short: "Close breaks recent Donchian Low & close < SMA."
       regime: "Strong Bull/Bear trends; beware whipsaws in ranges."
   
   MR:
     ko:
       concept: "밴드 밖 오버슈팅 후 평균 회귀."
-      long: "종가 < BB 하단 & RSI(14) < {rsi_os} & EMA 위."
-      short: "종가 > BB 상단 & RSI(14) > {rsi_ob} & EMA 아래."
+      long: "종가 < BB 하단 & RSI(14) < {rsi_os} & SMA 위."
+      short: "종가 > BB 상단 & RSI(14) > {rsi_ob} & SMA 아래."
       regime: "횡보 또는 과열 직후."
     en:
       concept: "Mean reversion after overshoot beyond the bands."
-      long: "Close < BB low & RSI(14) < {rsi_os} & close > EMA."
-      short: "Close > BB upper & RSI(14) > {rsi_ob} & close < EMA."
+      long: "Close < BB low & RSI(14) < {rsi_os} & close > SMA."
+      short: "Close > BB upper & RSI(14) > {rsi_ob} & close < SMA."
       regime: "Sideways or right after volatility blow-off."
   
   RSI:

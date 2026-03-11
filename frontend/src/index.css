@@ -3,14 +3,16 @@
 @tailwind utilities;
 
 :root {
-  --color-bull: #26a69a;
-  --color-bear: #ef5350;
-  --color-warning: #ffb300;
+  --color-bull: #22c55e;
+  --color-bear: #ef4444;
+  --color-warning: #f59e0b;
+  --color-info: #38bdf8;
+  --color-accent: #072ac8;
   --color-bg-primary: #0f172a;
-  --color-bg-secondary: #1e293b;
-  --color-text-primary: #f1f5f9;
+  --color-bg-secondary: #121a2b;
+  --color-text-primary: #e6edf7;
   --color-text-secondary: #94a3b8;
-  --color-border: #334155;
+  --color-border: #27324a;
 }
 
 * {
@@ -21,9 +23,21 @@ body {
   margin: 0;
   padding: 0;
   font-family: 'Pretendard', 'Inter', system-ui, sans-serif;
-  background: linear-gradient(135deg, #0f172a 0%, #1a1f35 50%, #0f172a 100%);
+  background: #0f172a;
   color: var(--color-text-primary);
   min-height: 100vh;
+}
+
+html[data-bg-theme='default'] body {
+  background: #0f172a;
+}
+
+html[data-bg-theme='white'] body {
+  background: #ffffff;
+}
+
+html[data-bg-theme='black'] body {
+  background: #000000;
 }
 
 /* Scrollbar styling */
@@ -63,8 +77,8 @@ input[type="number"]:focus,
 input[type="text"]:focus,
 select:focus {
   outline: none;
-  border-color: #4ade80;
-  box-shadow: 0 0 0 3px rgba(74, 222, 128, 0.15);
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px rgba(7, 42, 200, 0.2);
 }
 
 /* Button base styles */
@@ -73,8 +87,8 @@ select:focus {
 }
 
 .btn-primary {
-  @apply bg-gradient-to-r from-emerald-500 to-green-500 text-white;
-  @apply hover:from-emerald-600 hover:to-green-600;
+  @apply bg-gradient-to-r from-primary-500 to-primary-600 text-white;
+  @apply hover:from-primary-600 hover:to-primary-700;
   @apply active:scale-95;
 }
 
@@ -153,7 +167,7 @@ select:focus {
 }
 
 .tab.active {
-  @apply text-emerald-400 border-emerald-400;
+  @apply text-primary-400 border-primary-400;
 }
 
 /* Progress bar */
@@ -163,7 +177,7 @@ select:focus {
 
 .progress-bar-fill {
   @apply h-full rounded-full transition-all duration-500;
-  background: linear-gradient(90deg, #ef5350, #ffb300, #26a69a);
+  background: linear-gradient(90deg, #ef4444, #f59e0b, #22c55e);
 }
 
 /* Tooltip */
@@ -194,4 +208,3 @@ select:focus {
 .badge-sideways {
   @apply bg-warning/20 text-warning;
 }
-

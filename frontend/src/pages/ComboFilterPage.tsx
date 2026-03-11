@@ -1,8 +1,14 @@
 // Combo Filter Test Page
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { runComboFilter } from '../api/client';
-import { useStore } from '../store/useStore';
+import {
+  useBacktestParams,
+  useSelectedCoin,
+  useSelectedInterval,
+  useSetSelectedInterval,
+  useUpdateBacktestParams,
+} from '../store/useStore';
 import { usePageCommon } from '../hooks/usePageCommon';
 import { SkeletonStats, SkeletonChart } from '../components/Skeleton';
 import type { ComboFilterParams } from '../types';
@@ -10,12 +16,16 @@ import type { ComboFilterParams } from '../types';
 const PATTERNS = ['Bullish Engulfing', 'Bearish Engulfing', 'Hammer', 'Doji', 'Shooting Star'];
 
 export default function ComboFilterPage() {
-  const { backtestParams, updateBacktestParams } = useStore();
-  const { isKo, timeframes, selectedCoin } = usePageCommon();
+  const backtestParams = useBacktestParams();
+  const updateBacktestParams = useUpdateBacktestParams();
+  const selectedCoin = useSelectedCoin();
+  const selectedInterval = useSelectedInterval();
+  const setSelectedInterval = useSetSelectedInterval();
+  const { isKo, timeframes } = usePageCommon();
 
   const [params, setParams] = useState<ComboFilterParams>({
     coin: selectedCoin || 'BTC',
-    interval: '1h',
+    interval: selectedInterval,
     direction: 'long',
     tp_pct: backtestParams.tp_pct || 1.0, // 전역 설정 사용
     horizon: 5,
@@ -35,11 +45,24 @@ export default function ComboFilterPage() {
   const mutation = useMutation({
     mutationFn: runComboFilter,
   });
+  const hasInitializedParams = useRef(false);
+
+  useEffect(() => {
+    setParams((p) => ({ ...p, coin: selectedCoin || 'BTC', interval: selectedInterval }));
+  }, [selectedCoin, selectedInterval]);
+
+  useEffect(() => {
+    if (!hasInitializedParams.current) {
+      hasInitializedParams.current = true;
+      return;
+    }
+    // Clear stale result when any filter/input changes.
+    mutation.reset();
+  }, [params]);
 
   const handleRun = () => {
     console.log('🚀 Combo Filter 실행:', params);
-    // useAnalysisMutation의 handleRun이 coin을 덮어쓰므로, 직접 mutation.mutate 호출
-    mutation.mutate(params, {
+    mutation.mutate({ ...params, coin: selectedCoin || 'BTC', interval: selectedInterval }, {
       onSuccess: (data) => {
         console.log('✅ Combo Filter 성공:', data);
       },
@@ -158,7 +181,11 @@ export default function ComboFilterPage() {
             <label className="block text-xs text-dark-400 mb-1">{isKo ? 'TF' : 'TF'}</label>
             <select
               value={params.interval}
-              onChange={(e) => setParams({ ...params, interval: e.target.value })}
+              onChange={(e) => {
+                const v = e.target.value;
+                setSelectedInterval(v as Parameters<typeof setSelectedInterval>[0]);
+                setParams({ ...params, interval: v });
+              }}
               className="w-full bg-dark-800 border border-dark-600 rounded-lg px-2 py-2 text-sm"
             >
               {timeframes.map((tf) => (
@@ -345,7 +372,7 @@ export default function ComboFilterPage() {
               <div className="text-sm text-dark-400">{isKo ? 'TP 미달' : 'No TP'}</div>
             </div>
             <div className="bg-dark-800 rounded-lg p-4 text-center">
-              <div className="text-2xl font-bold text-emerald-400">
+              <div className="text-2xl font-bold text-primary-400">
                 {result.hit_rate?.toFixed(1) || '-'}%
               </div>
               <div className="text-sm text-dark-400">{isKo ? '달성률' : 'Hit Rate'}</div>
@@ -366,7 +393,7 @@ export default function ComboFilterPage() {
             <div className="mt-6">
               <div className="flex h-8 rounded-lg overflow-hidden">
                 <div
-                  className="bg-gradient-to-r from-emerald-500 to-green-400 flex items-center justify-center"
+                  className="bg-gradient-to-r from-primary-500 to-primary-400 flex items-center justify-center"
                   style={{ width: `${(result.tp_hits / result.events) * 100}%` }}
                 >
                   {result.tp_hits > 0 && (
@@ -389,4 +416,3 @@ export default function ComboFilterPage() {
     </div>
   );
 }
-

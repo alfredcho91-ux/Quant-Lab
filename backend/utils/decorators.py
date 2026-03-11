@@ -2,8 +2,8 @@
 """공통 데코레이터 함수"""
 
 from functools import wraps
+import os
 from typing import Callable, Any
-import sys
 from utils.error_handler import APIError, handle_error
 from utils.response_builder import wrap_response
 
@@ -25,15 +25,18 @@ def handle_api_errors(include_traceback: bool = False):
     def decorator(func: Callable) -> Callable:
         @wraps(func)
         async def wrapper(*args, **kwargs) -> dict[str, Any]:
+            expose_traceback = include_traceback and (
+                os.getenv("EXPOSE_API_TRACEBACK", "false").lower() in {"1", "true", "yes", "on"}
+            )
             try:
                 result = await func(*args, **kwargs)
                 # 표준 응답 형식으로 래핑
                 return wrap_response(result)
             except APIError as e:
                 # APIError는 그대로 처리
-                return handle_error(e, include_traceback=include_traceback)
+                return handle_error(e, include_traceback=expose_traceback)
             except Exception as e:
                 # 기타 예외는 표준 형식으로 변환
-                return handle_error(e, include_traceback=include_traceback)
+                return handle_error(e, include_traceback=expose_traceback)
         return wrapper
     return decorator

@@ -1,10 +1,16 @@
 // Layout component with sidebar and main content area
+import { useEffect } from 'react';
 import { Outlet } from 'react-router-dom';
 import Sidebar from './Sidebar';
-import { useStore } from '../store/useStore';
+import { useBackgroundTheme, useSidebarCollapsed } from '../store/useStore';
 
 export default function Layout() {
-  const { sidebarCollapsed } = useStore();
+  const sidebarCollapsed = useSidebarCollapsed();
+  const backgroundTheme = useBackgroundTheme();
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-bg-theme', backgroundTheme);
+  }, [backgroundTheme]);
 
   return (
     <div className="flex min-h-screen">
@@ -21,4 +27,3 @@ export default function Layout() {
     </div>
   );
 }
-

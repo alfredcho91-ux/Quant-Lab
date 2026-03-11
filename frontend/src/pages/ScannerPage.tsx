@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Activity, RefreshCw, CheckCircle, XCircle } from 'lucide-react';
-import { useStore } from '../store/useStore';
+import { useLanguage, useSelectedCoin } from '../store/useStore';
 import { getLabels } from '../store/labels';
 import { getStrategies, getOHLCV } from '../api/client';
 import type { Strategy } from '../types';
@@ -50,27 +50,20 @@ function calculateRSI(closes: number[], period: number = 14): number[] {
   return rsi;
 }
 
-function calculateEMA(data: number[], period: number): number[] {
-  const ema: number[] = [];
-  const multiplier = 2 / (period + 1);
-  
-  // First EMA is SMA
-  let sum = 0;
-  for (let i = 0; i < period && i < data.length; i++) {
-    sum += data[i];
-    ema.push(sum / (i + 1));
+function calculateSMA(data: number[], period: number): number[] {
+  const sma: number[] = [];
+  for (let i = 0; i < data.length; i++) {
+    const start = Math.max(0, i - period + 1);
+    const window = data.slice(start, i + 1);
+    const mean = window.reduce((acc, v) => acc + v, 0) / window.length;
+    sma.push(mean);
   }
-  
-  // Calculate EMA for rest
-  for (let i = period; i < data.length; i++) {
-    ema.push((data[i] - ema[i - 1]) * multiplier + ema[i - 1]);
-  }
-  
-  return ema;
+  return sma;
 }
 
 export default function ScannerPage() {
-  const { language, selectedCoin } = useStore();
+  const language = useLanguage();
+  const selectedCoin = useSelectedCoin();
   const labels = getLabels(language);
   const [interval, setInterval] = useState('1h');
   const [signals, setSignals] = useState<SignalResult[]>([]);
@@ -107,7 +100,7 @@ export default function ScannerPage() {
     
     // Calculate indicators
     const rsi = calculateRSI(closes);
-    const ema200 = calculateEMA(closes, 200);
+    const sma200 = calculateSMA(closes, 200);
     
     // Simple ADX approximation (using RSI as proxy for this demo)
     const adx = rsi.map(r => Math.abs(r - 50) * 2);
@@ -115,13 +108,13 @@ export default function ScannerPage() {
     const lastIdx = data.length - 1;
     const currentClose = closes[lastIdx];
     const currentRSI = rsi[lastIdx];
-    const currentEMA = ema200[lastIdx];
+    const currentSMA = sma200[lastIdx];
     const currentADX = adx[lastIdx];
     
     // Determine regime
     let regime = 'Sideways';
     if (currentADX >= 25) {
-      regime = currentClose > currentEMA ? 'Bull' : 'Bear';
+      regime = currentClose > currentSMA ? 'Bull' : 'Bear';
     }
     
     // Generate signals for each strategy
@@ -137,27 +130,27 @@ export default function ScannerPage() {
           shortSignal = currentRSI > 70;
           break;
         case 'Connors':
-          // RSI(2) simulation with RSI(14) threshold adjustments
-          longSignal = currentClose > currentEMA && currentRSI < 20;
-          shortSignal = currentClose < currentEMA && currentRSI > 80;
+          longSignal = currentClose > currentSMA && currentRSI < 30;
+          shortSignal = currentClose < currentSMA && currentRSI > 70;
           break;
-        case 'MA':
-          // MA cross - simplified
+        case 'MA': {
           const sma20 = closes.slice(-20).reduce((a, b) => a + b, 0) / 20;
           const sma60 = closes.slice(-60).reduce((a, b) => a + b, 0) / 60;
-          longSignal = sma20 > sma60 && currentClose > currentEMA;
-          shortSignal = sma20 < sma60 && currentClose < currentEMA;
+          longSignal = sma20 > sma60 && currentClose > currentSMA;
+          shortSignal = sma20 < sma60 && currentClose < currentSMA;
           break;
-        case 'Turtle':
+        }
+        case 'Turtle': {
           const high20 = Math.max(...data.slice(-20).map(d => d.high));
           const low20 = Math.min(...data.slice(-20).map(d => d.low));
-          longSignal = currentClose > high20 && currentClose > currentEMA;
-          shortSignal = currentClose < low20 && currentClose < currentEMA;
+          longSignal = currentClose > high20 && currentClose > currentSMA;
+          shortSignal = currentClose < low20 && currentClose < currentSMA;
           break;
+        }
         default:
           // Generic signal based on RSI
-          longSignal = currentRSI < 35 && currentClose > currentEMA;
-          shortSignal = currentRSI > 65 && currentClose < currentEMA;
+          longSignal = currentRSI < 35 && currentClose > currentSMA;
+          shortSignal = currentRSI > 65 && currentClose < currentSMA;
       }
       
       results.push({
@@ -183,7 +176,7 @@ export default function ScannerPage() {
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2">
-            <Activity className="w-7 h-7 text-emerald-400" />
+            <Activity className="w-7 h-7 text-primary-400" />
             {language === 'ko' ? '실시간 전략 스캐너' : 'Live Strategy Scanner'}
           </h1>
           <p className="text-dark-400 text-sm mt-1">
@@ -219,7 +212,7 @@ export default function ScannerPage() {
       <div className="card p-4 flex items-center justify-between">
         <div className="flex items-center gap-4">
           <span className="text-sm text-dark-400">
-            {language === 'ko' ? '코인' : 'Coin'}: <strong className="text-emerald-400">{selectedCoin}</strong>
+            {language === 'ko' ? '코인' : 'Coin'}: <strong className="text-primary-400">{selectedCoin}</strong>
           </span>
           <span className="text-sm text-dark-400">
             {language === 'ko' ? '타임프레임' : 'Timeframe'}: <strong>{interval}</strong>
@@ -313,4 +306,3 @@ export default function ScannerPage() {
     </div>
   );
 }
-

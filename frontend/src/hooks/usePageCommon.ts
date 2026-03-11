@@ -4,13 +4,21 @@
  * 반복되는 패턴을 추출하여 코드 중복 제거
  */
 
-import { useStore } from '../store/useStore';
+import {
+  useBacktestParams,
+  useLanguage,
+  useSelectedCoin,
+  useSelectedInterval,
+} from '../store/useStore';
 import { getLabels } from '../store/labels';
 import { useQuery } from '@tanstack/react-query';
 import { getTimeframes } from '../api/client';
 
 export function usePageCommon() {
-  const { language, selectedCoin, backtestParams } = useStore();
+  const language = useLanguage();
+  const selectedCoin = useSelectedCoin();
+  const selectedInterval = useSelectedInterval();
+  const backtestParams = useBacktestParams();
   const labels = getLabels(language);
   const isKo = language === 'ko';
 
@@ -26,6 +34,7 @@ export function usePageCommon() {
   return {
     language,
     selectedCoin,
+    selectedInterval,
     backtestParams,
     labels,
     isKo,

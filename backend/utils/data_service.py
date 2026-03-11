@@ -12,8 +12,11 @@ import ccxt
 import time
 import requests
 import logging
-from functools import lru_cache
-from datetime import datetime, timedelta
+import hashlib
+import json
+from functools import wraps
+
+from utils.cache import DataCache
 
 # 로깅 설정
 logger = logging.getLogger(__name__)
@@ -35,31 +38,42 @@ def _tf_weight(tf: str) -> int:
         unit = tf[-1]
         mult = {"m": 1, "h": 60, "d": 1440, "w": 10080, "M": 43200}
         return num * mult[unit]
-    except Exception:
+    except (ValueError, KeyError, TypeError):
         return 10**9
 
 
-# Simple in-memory cache with TTL
-_cache = {}
-_cache_times = {}
+# Data service cache directory and marker for cached None values
+_CACHE_BASE_DIR = Path(__file__).parent.parent.parent / ".cache" / "data_service"
+_CACHE_WRAPPER_MARK = "__cache_wrapper_v1__"
 
 
 def cached(ttl_seconds: int):
-    """Simple TTL cache decorator"""
+    """TTL cache decorator backed by DataCache (diskcache or memory fallback)."""
     def decorator(func):
+        cache = DataCache(
+            ttl_seconds=ttl_seconds,
+            cache_dir=str(_CACHE_BASE_DIR / func.__name__),
+        )
+
+        @wraps(func)
         def wrapper(*args, **kwargs):
-            key = f"{func.__name__}:{str(args)}:{str(kwargs)}"
-            now = datetime.now()
-            
-            if key in _cache and key in _cache_times:
-                if (now - _cache_times[key]).total_seconds() < ttl_seconds:
-                    return _cache[key]
-            
+            payload = json.dumps(
+                {"args": args, "kwargs": kwargs},
+                sort_keys=True,
+                default=str,
+            )
+            cache_key = f"{func.__name__}:{hashlib.sha256(payload.encode('utf-8')).hexdigest()}"
+
+            cached_entry = cache.get(cache_key)
+            if isinstance(cached_entry, dict) and cached_entry.get(_CACHE_WRAPPER_MARK):
+                return cached_entry.get("value")
+
             result = func(*args, **kwargs)
-            _cache[key] = result
-            _cache_times[key] = now
+            cache.set(cache_key, {_CACHE_WRAPPER_MARK: True, "value": result})
             return result
+
         return wrapper
+
     return decorator
 
 
@@ -73,8 +87,8 @@ def discover_timeframes(coin_name: str, base_dir: Path = BASE_DIR):
                 m = re.match(rf"^{coin_name}USDT-(.+?)-merged\.csv$", p.name, re.I)
                 if m:
                     csv_tfs.add(m.group(1))
-    except Exception:
-        pass
+    except OSError as exc:
+        logger.warning("Failed to scan timeframe CSV files for %s: %s", coin_name, exc)
     
     all_tfs = sorted(set(BINANCE_TFS) | csv_tfs, key=_tf_weight)
     return all_tfs, set(BINANCE_TFS), sorted(csv_tfs, key=_tf_weight)
@@ -85,8 +99,11 @@ def get_fear_and_greed_index():
     """Get Fear & Greed Index from alternative.me API"""
     try:
         r = requests.get("https://api.alternative.me/fng/", timeout=5)
-        return r.json()["data"][0]
-    except Exception:
+        r.raise_for_status()
+        payload = r.json()
+        return payload["data"][0]
+    except (requests.RequestException, ValueError, KeyError, IndexError, TypeError) as exc:
+        logger.debug("Fear & Greed API unavailable: %s", exc)
         return None
 
 
@@ -96,13 +113,17 @@ def get_market_prices():
     try:
         ex = ccxt.binance()
         return ex.fetch_tickers(["BTC/USDT", "ETH/USDT", "SOL/USDT", "XRP/USDT"])
-    except Exception:
+    except ccxt.BaseError as exc:
+        logger.debug("Binance ticker API unavailable: %s", exc)
         return None
 
 
 def fetch_live_data(symbol: str, timeframe: str, limit: int = 1000, total_candles: int = 3000):
     """Fetch live OHLCV data from Binance API with pagination"""
     try:
+        # 주봉(1w): 모든 페이지에서 API 조회 시 최근 300개만 사용
+        if timeframe == "1w":
+            total_candles = min(total_candles, 300)
         ex = ccxt.binance()
         tf_ms = ex.parse_timeframe(timeframe) * 1000
         now = ex.milliseconds()
@@ -116,7 +137,14 @@ def fetch_live_data(symbol: str, timeframe: str, limit: int = 1000, total_candle
                 break
             try:
                 o = ex.fetch_ohlcv(symbol, timeframe, since=cur, limit=limit)
-            except Exception:
+            except ccxt.BaseError as exc:
+                logger.debug(
+                    "fetch_ohlcv retry for %s %s since=%s failed: %s",
+                    symbol,
+                    timeframe,
+                    cur,
+                    exc,
+                )
                 time.sleep(1)
                 continue
             
@@ -142,9 +170,14 @@ def fetch_live_data(symbol: str, timeframe: str, limit: int = 1000, total_candle
         df.sort_values("open_dt", inplace=True)
         df.drop_duplicates(subset=["open_time"], inplace=True)
         df.reset_index(drop=True, inplace=True)
+        if timeframe == "1w" and len(df) > 300:
+            df = df.tail(300).reset_index(drop=True)
         return df
-    except Exception as e:
-        logger.error(f"API Error: {e}")
+    except (ccxt.BaseError, ValueError, TypeError) as exc:
+        logger.error("API Error while loading %s %s: %s", symbol, timeframe, exc)
+        return None
+    except Exception as exc:
+        logger.exception("Unexpected API error while loading %s %s: %s", symbol, timeframe, exc)
         return None
 
 
@@ -177,6 +210,6 @@ def load_csv_data(coin_name: str, interval: str, base_dir: Path = BASE_DIR):
         df.sort_values("open_dt", inplace=True)
         df.reset_index(drop=True, inplace=True)
         return df, "CSV file"
-    except Exception:
+    except (OSError, pd.errors.ParserError, ValueError, KeyError) as exc:
+        logger.warning("Failed to load CSV data from %s: %s", fp, exc)
         return None, "Error"
-

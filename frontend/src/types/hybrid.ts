@@ -26,7 +26,7 @@ export interface HybridAnalysisResult {
 export interface HybridBacktestParams {
   coin: string;
   interval: string;
-  strategy: string;  // EMA_ADX_Strong, MACD_RSI_Trend, Pure_Trend
+  strategy: string;  // SMA_ADX_Strong, MACD_RSI_Trend, Pure_Trend
   tp: number;  // 익절 비율 (%)
   sl: number;  // 손절 비율 (%)
   max_hold: number;  // 최대 보유 기간 (봉 수)
@@ -79,10 +79,10 @@ export interface HybridLiveModeStrategy {
   is_active: boolean;
   timestamp: string;
   conditions: {
-    ema20?: number | null;
-    ema50?: number | null;
+    sma20?: number | null;
+    sma50?: number | null;
     adx?: number | null;
-    ema20_above_ema50?: boolean | null;
+    sma20_above_sma50?: boolean | null;
     adx_above_25?: boolean | null;
     macd_hist?: number | null;
     rsi?: number | null;

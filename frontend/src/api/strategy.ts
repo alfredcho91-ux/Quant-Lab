@@ -17,8 +17,7 @@ export async function getStrategyInfo(
   lang: string = 'ko',
   params?: {
     rsi_ob?: number;
-    rsi2_ob?: number;
-    ema_len?: number;
+    sma_main_len?: number;
     sma1_len?: number;
     sma2_len?: number;
   }

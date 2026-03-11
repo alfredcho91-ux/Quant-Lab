@@ -39,8 +39,7 @@ def get_strategy_explainer(
     strategy_id: str,
     lang: str = "ko",
     rsi_ob: int = 70,
-    rsi2_ob: int = 80,
-    ema_len: int = 200,
+    sma_main_len: int = 200,
     sma1_len: int = 20,
     sma2_len: int = 60,
 ) -> Dict[str, str]:
@@ -51,8 +50,7 @@ def get_strategy_explainer(
         strategy_id: Strategy identifier (e.g., "Connors", "Sqz")
         lang: Language code ("ko" or "en")
         rsi_ob: RSI overbought threshold
-        rsi2_ob: RSI(2) overbought threshold
-        ema_len: EMA length
+        sma_main_len: Main SMA length
         sma1_len: SMA1 length
         sma2_len: SMA2 length
     
@@ -71,26 +69,20 @@ def get_strategy_explainer(
         return {}
     
     rsi_os = 100 - rsi_ob
-    rsi2_os = 100 - rsi2_ob
-    
     # Format strings with parameters
     formatted = {
         "concept": lang_data.get("concept", ""),
         "Long": lang_data.get("long", "").format(
             rsi_ob=rsi_ob,
             rsi_os=rsi_os,
-            rsi2_ob=rsi2_ob,
-            rsi2_os=rsi2_os,
-            ema_len=ema_len,
+            sma_main_len=sma_main_len,
             sma1_len=sma1_len,
             sma2_len=sma2_len,
         ),
         "Short": lang_data.get("short", "").format(
             rsi_ob=rsi_ob,
             rsi_os=rsi_os,
-            rsi2_ob=rsi2_ob,
-            rsi2_os=rsi2_os,
-            ema_len=ema_len,
+            sma_main_len=sma_main_len,
             sma1_len=sma1_len,
             sma2_len=sma2_len,
         ),

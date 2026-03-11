@@ -1,42 +1,99 @@
 # core/indicators.py
 import numpy as np
 import pandas as pd
-from typing import List
+from typing import Any, Dict, List, Literal, Optional
+
+
+def set_bollinger_columns(
+    df: pd.DataFrame,
+    mid: pd.Series,
+    upper: pd.Series,
+    lower: pd.Series,
+) -> pd.DataFrame:
+    """
+    볼린저 밴드 컬럼 명을 대문자/소문자 스키마로 동시 유지한다.
+    - legacy: BB_Mid / BB_Up / BB_Low
+    - newer:  BB_mid / BB_upper / BB_lower
+    """
+    df["BB_Mid"] = mid
+    df["BB_Up"] = upper
+    df["BB_Low"] = lower
+
+    df["BB_mid"] = mid
+    df["BB_upper"] = upper
+    df["BB_lower"] = lower
+    return df
+
+
+def _true_range(df: pd.DataFrame) -> pd.Series:
+    """표준 True Range 계산."""
+    prev_close = df["close"].shift(1)
+    return pd.concat(
+        [
+            df["high"] - df["low"],
+            (df["high"] - prev_close).abs(),
+            (df["low"] - prev_close).abs(),
+        ],
+        axis=1,
+    ).max(axis=1)
+
+
+def compute_rsi_wilder(series: pd.Series, length: int = 14) -> pd.Series:
+    """Wilder(RMA) 방식 RSI."""
+    delta = series.diff()
+    gain = delta.clip(lower=0.0)
+    loss = -delta.clip(upper=0.0)
+
+    avg_gain = gain.ewm(alpha=1 / length, adjust=False, min_periods=length).mean()
+    avg_loss = loss.ewm(alpha=1 / length, adjust=False, min_periods=length).mean()
+    rs = avg_gain / avg_loss.replace(0, np.nan)
+    rsi = 100 - (100 / (1 + rs))
+    rsi = rsi.where(avg_loss != 0, 100.0)
+    rsi = rsi.where(avg_gain != 0, 0.0)
+    return rsi
+
+
+def compute_atr_wilder(df: pd.DataFrame, length: int = 14) -> pd.Series:
+    """Wilder(RMA) 방식 ATR."""
+    tr = _true_range(df)
+    return tr.ewm(alpha=1 / length, adjust=False, min_periods=length).mean()
+
+
+def compute_adx_wilder(df: pd.DataFrame, length: int = 14) -> pd.Series:
+    """Wilder(RMA) 방식 ADX."""
+    up_move = df["high"].diff()
+    down_move = -df["low"].diff()
+
+    plus_dm = up_move.where((up_move > down_move) & (up_move > 0), 0.0)
+    minus_dm = down_move.where((down_move > up_move) & (down_move > 0), 0.0)
+
+    atr = compute_atr_wilder(df, length=length)
+    plus_di = 100 * (
+        plus_dm.ewm(alpha=1 / length, adjust=False, min_periods=length).mean()
+        / atr.replace(0, np.nan)
+    )
+    minus_di = 100 * (
+        minus_dm.ewm(alpha=1 / length, adjust=False, min_periods=length).mean()
+        / atr.replace(0, np.nan)
+    )
+    dx = 100 * (plus_di - minus_di).abs() / (plus_di + minus_di).replace(0, np.nan)
+    return dx.ewm(alpha=1 / length, adjust=False, min_periods=length).mean()
 
 
 def calculate_adx(df: pd.DataFrame, length: int = 14) -> pd.Series:
     """
-    ADX 계산 함수.
-    app.py에서 쓰던 calculate_adx를 그대로 옮겨온 것입니다.
+    ADX 계산 함수 (하위 호환용).
+
+    내부 구현은 compute_adx_wilder()와 동일하게 유지해,
+    전략/라이브 지표 간 계산식 불일치를 방지한다.
     """
-    df = df.copy()
-    h, l, c = df["high"], df["low"], df["close"]
-
-    df["tr0"] = (h - l).abs()
-    df["tr1"] = (h - c.shift(1)).abs()
-    df["tr2"] = (l - c.shift(1)).abs()
-    df["tr"] = df[["tr0", "tr1", "tr2"]].max(axis=1)
-
-    up = h - h.shift(1)
-    dn = l.shift(1) - l
-    df["pdm"] = np.where((up > dn) & (up > 0), up, 0.0)
-    df["mdm"] = np.where((dn > up) & (dn > 0), dn, 0.0)
-
-    df["tr_s"] = df["tr"].rolling(length).sum()
-    df["pdm_s"] = df["pdm"].rolling(length).sum()
-    df["mdm_s"] = df["mdm"].rolling(length).sum()
-
-    df["pdi"] = 100 * (df["pdm_s"] / (df["tr_s"] + 1e-10))
-    df["mdi"] = 100 * (df["mdm_s"] / (df["tr_s"] + 1e-10))
-    df["dx"] = 100 * (df["pdi"] - df["mdi"]).abs() / (df["pdi"] + df["mdi"] + 1e-10)
-    return df["dx"].rolling(length).mean()
+    return compute_adx_wilder(df, length=length)
 
 
 def prepare_strategy_data(
     df: pd.DataFrame,
     rsi_ob_level: int = 70,      # RSI(14) overbought (20~80); oversold = 100 - this
-    rsi2_ob_level: int = 80,     # RSI(2) overbought (20~80); oversold = 100 - this
-    ema_len: int = 200,
+    sma_main_len: int = 200,
     sma1_len: int = 20,
     sma2_len: int = 60,
     adx_threshold: int = 25,
@@ -64,23 +121,14 @@ def prepare_strategy_data(
     df = df.copy()
 
     rsi_os_level = 100 - rsi_ob_level
-    rsi2_os_level = 100 - rsi2_ob_level
-
-    # ───────── 추세: EMA / MA ─────────
-    df["EMA_main"] = df["close"].ewm(span=ema_len, adjust=False).mean()
+    # ───────── 추세: SMA / MA ─────────
+    df["SMA_main"] = df["close"].rolling(sma_main_len).mean()
     df["SMA_1"] = df["close"].rolling(sma1_len).mean()
     df["SMA_2"] = df["close"].rolling(sma2_len).mean()
     df["SMA_200"] = df["close"].rolling(200).mean()  # 참고용
 
-    # ───────── 모멘텀: RSI(14), RSI(2) ─────────
-    d = df["close"].diff()
-    g = (d.where(d > 0, 0)).rolling(14).mean()
-    s = (-d.where(d < 0, 0)).rolling(14).mean()
-    df["RSI"] = 100 - (100 / (1 + g / (s + 1e-10)))
-
-    g2 = (d.where(d > 0, 0)).rolling(2).mean()
-    s2 = (-d.where(d < 0, 0)).rolling(2).mean()
-    df["RSI_2"] = 100 - (100 / (1 + g2 / (s2 + 1e-10)))
+    # ───────── 모멘텀: RSI(14, Wilder) ─────────
+    df["RSI"] = compute_rsi_wilder(df["close"], length=14)
 
     # ───────── MACD (12, 26, 9 기본) ─────────
     ema_fast = df["close"].ewm(span=macd_fast, adjust=False).mean()
@@ -89,34 +137,30 @@ def prepare_strategy_data(
     df["MACD_signal"] = df["MACD"].ewm(span=macd_signal, adjust=False).mean()
     df["MACD_hist"] = df["MACD"] - df["MACD_signal"]
 
-    # ───────── ADX & Regime ─────────
-    df["ADX"] = calculate_adx(df)
+    # ───────── ADX & Regime (Wilder) ─────────
+    df["ADX"] = compute_adx_wilder(df, length=14)
     df["Regime"] = np.select(
         [
             (df["ADX"] < adx_threshold),
-            (df["ADX"] >= adx_threshold) & (df["close"] > df["EMA_main"]),
-            (df["ADX"] >= adx_threshold) & (df["close"] <= df["EMA_main"]),
+            (df["ADX"] >= adx_threshold) & (df["close"] > df["SMA_main"]),
+            (df["ADX"] >= adx_threshold) & (df["close"] <= df["SMA_main"]),
         ],
         ["Sideways", "Bull", "Bear"],
         default="Sideways",
     )
 
     # ───────── 변동성: Bollinger, Keltner, Squeeze ─────────
-    df["BB_Mid"] = df["close"].rolling(bb_length).mean()
-    df["BB_Std"] = df["close"].rolling(bb_length).std()
-    df["BB_Up"] = df["BB_Mid"] + bb_std_mult * df["BB_Std"]
-    df["BB_Low"] = df["BB_Mid"] - bb_std_mult * df["BB_Std"]
+    bb_mid = df["close"].rolling(bb_length).mean()
+    bb_std = df["close"].rolling(bb_length).std()
+    bb_up = bb_mid + bb_std_mult * bb_std
+    bb_low = bb_mid - bb_std_mult * bb_std
+    set_bollinger_columns(df, bb_mid, bb_up, bb_low)
+    df["BB_Std"] = bb_std
 
-    df["TR"] = np.maximum(
-        df["high"] - df["low"],
-        np.maximum(
-            (df["high"] - df["close"].shift(1)).abs(),
-            (df["low"] - df["close"].shift(1)).abs(),
-        ),
-    )
-    df["ATR"] = df["TR"].rolling(atr_length).mean()
-    df["KC_Up"] = df["BB_Mid"] + kc_mult * df["ATR"]
-    df["KC_Low"] = df["BB_Mid"] - kc_mult * df["ATR"]
+    df["TR"] = _true_range(df)
+    df["ATR"] = compute_atr_wilder(df, length=atr_length)
+    df["KC_Up"] = bb_mid + kc_mult * df["ATR"]
+    df["KC_Low"] = bb_mid - kc_mult * df["ATR"]
     df["Squeeze_On"] = (df["BB_Up"] < df["KC_Up"]) & (df["BB_Low"] > df["KC_Low"])
 
     # ───────── Donchian ─────────
@@ -132,11 +176,11 @@ def prepare_strategy_data(
     df["Vol_Spike"] = df["volume"] > (vol_spike_k * df["Vol_MA"])
 
     # ───────── 시그널들 ─────────
-    df["Sig_Connors_Long"] = (df["close"] > df["EMA_main"]) & (
-        df["RSI_2"] < rsi2_os_level
+    df["Sig_Connors_Long"] = (df["close"] > df["SMA_main"]) & (
+        df["RSI"] < rsi_os_level
     )
-    df["Sig_Connors_Short"] = (df["close"] < df["EMA_main"]) & (
-        df["RSI_2"] > rsi2_ob_level
+    df["Sig_Connors_Short"] = (df["close"] < df["SMA_main"]) & (
+        df["RSI"] > rsi_ob_level
     )
 
     df["Sig_Sqz_Long"] = (
@@ -151,19 +195,19 @@ def prepare_strategy_data(
     )
 
     df["Sig_Turtle_Long"] = (df["close"] > df["Donch_High"]) & (
-        df["close"] > df["EMA_main"]
+        df["close"] > df["SMA_main"]
     )
     df["Sig_Turtle_Short"] = (df["close"] < df["Donch_Low"]) & (
-        df["close"] < df["EMA_main"]
+        df["close"] < df["SMA_main"]
     )
 
     df["Sig_MR_Long"] = (
-        (df["close"] > df["EMA_main"])
+        (df["close"] > df["SMA_main"])
         & (df["close"] < df["BB_Low"])
         & (df["RSI"] < rsi_os_level)
     )
     df["Sig_MR_Short"] = (
-        (df["close"] < df["EMA_main"])
+        (df["close"] < df["SMA_main"])
         & (df["close"] > df["BB_Up"])
         & (df["RSI"] > rsi_ob_level)
     )
@@ -205,9 +249,7 @@ def prepare_strategy_data(
     # attrs (정보용)
     df.attrs["RSI_OB"] = rsi_ob_level
     df.attrs["RSI_OS"] = 100 - rsi_ob_level
-    df.attrs["RSI2_OB"] = rsi2_ob_level
-    df.attrs["RSI2_OS"] = 100 - rsi2_ob_level
-    df.attrs["EMA_LEN"] = ema_len
+    df.attrs["SMA_MAIN_LEN"] = sma_main_len
     df.attrs["SMA1_LEN"] = sma1_len
     df.attrs["SMA2_LEN"] = sma2_len
     df.attrs["BB_LEN"] = bb_length
@@ -225,7 +267,9 @@ def prepare_strategy_data(
 
 def compute_rsi(series: pd.Series, length: int = 14) -> pd.Series:
     """
-    RSI (Relative Strength Index) 계산 함수
+    RSI (Relative Strength Index) 계산 함수.
+    내부적으로 Wilder's Smoothing(compute_rsi_wilder)을 사용하여
+    전략/백테스트 엔진과 일관성을 유지합니다.
     
     Args:
         series: 가격 시리즈 (보통 close)
@@ -234,14 +278,7 @@ def compute_rsi(series: pd.Series, length: int = 14) -> pd.Series:
     Returns:
         RSI 값 시리즈
     """
-    delta = series.diff()
-    gain = delta.where(delta > 0, 0.0)
-    loss = -delta.where(delta < 0, 0.0)
-    avg_gain = gain.rolling(window=length, min_periods=length).mean()
-    avg_loss = loss.rolling(window=length, min_periods=length).mean()
-    rs = avg_gain / avg_loss.replace(0, np.nan)
-    rsi = 100 - (100 / (1 + rs))
-    return rsi
+    return compute_rsi_wilder(series, length)
 
 
 def calculate_smas(df: pd.DataFrame, pairs: List[List[int]]) -> pd.DataFrame:
@@ -288,17 +325,18 @@ def add_bb_indicators(
     close = df["close"]
     mid = close.rolling(window=bb_length, min_periods=bb_length).mean()
     std = close.rolling(window=bb_length, min_periods=bb_length).std()
-    df["BB_mid"] = mid
-    df["BB_upper"] = mid + bb_std_mult * std
-    df["BB_lower"] = mid - bb_std_mult * std
-    df["RSI"] = compute_rsi(close, length=rsi_length)
+    upper = mid + bb_std_mult * std
+    lower = mid - bb_std_mult * std
+    set_bollinger_columns(df, mid, upper, lower)
+    # Use Wilder RSI to stay consistent with backtest/trend engines.
+    df["RSI"] = compute_rsi_wilder(close, length=rsi_length)
     df["SMA200"] = close.rolling(window=sma200_length, min_periods=sma200_length).mean()
     
     # Touch flags
     low, high = df["low"], df["high"]
-    df["touch_lower"] = (low <= df["BB_lower"]) & (df["BB_lower"] <= high)
-    df["touch_mid"] = (low <= df["BB_mid"]) & (df["BB_mid"] <= high)
-    df["touch_upper"] = (low <= df["BB_upper"]) & (df["BB_upper"] <= high)
+    df["touch_lower"] = low <= df["BB_lower"]
+    df["touch_mid"] = (low <= df["BB_mid"]) & (high >= df["BB_mid"])
+    df["touch_upper"] = high >= df["BB_upper"]
     return df
 
 
@@ -326,10 +364,11 @@ def add_combo_indicators(df: pd.DataFrame, sma_short: int, sma_long: int) -> pd.
     # BB
     mid = close.rolling(window=20, min_periods=20).mean()
     std = close.rolling(window=20, min_periods=20).std()
-    df["BB_mid"] = mid
-    df["BB_upper"] = mid + 2.0 * std
-    df["BB_lower"] = mid - 2.0 * std
-    df["RSI"] = compute_rsi(close, length=14)
+    upper = mid + 2.0 * std
+    lower = mid - 2.0 * std
+    set_bollinger_columns(df, mid, upper, lower)
+    # Use Wilder RSI to stay consistent with backtest/trend engines.
+    df["RSI"] = compute_rsi_wilder(close, length=14)
     
     # Full candle features (matching candle_patterns.add_candle_features)
     df["is_bull"] = c > o
@@ -360,7 +399,7 @@ def compute_live_indicators(df: pd.DataFrame) -> pd.DataFrame:
     실시간 지표 계산 (고정밀 지표 계산)
     
     하이브리드 전략 및 다른 전략에서 공통으로 사용할 수 있는 지표 계산 함수.
-    Wilder's Smoothing을 적용한 고정밀 지표 계산 (EMA, MACD, RSI, ADX 등).
+    Wilder's Smoothing을 적용한 고정밀 지표 계산 (SMA, MACD, RSI, ADX 등).
     
     일반 분석, 백테스팅, 라이브 모드 모두에서 사용 가능합니다.
     
@@ -373,8 +412,9 @@ def compute_live_indicators(df: pd.DataFrame) -> pd.DataFrame:
     d = df.copy()
     
     # 이평선
-    d['ema20'] = d['close'].ewm(span=20, adjust=False).mean()
-    d['ema50'] = d['close'].ewm(span=50, adjust=False).mean()
+    d['sma20'] = d['close'].rolling(20).mean()
+    d['sma50'] = d['close'].rolling(50).mean()
+    d['sma100'] = d['close'].rolling(100).mean()
     d['sma200'] = d['close'].rolling(200).mean()
     
     # MACD
@@ -383,33 +423,188 @@ def compute_live_indicators(df: pd.DataFrame) -> pd.DataFrame:
     macd_line = ema12 - ema26
     d['macd_hist'] = macd_line - macd_line.ewm(span=9, adjust=False).mean()
     
-    # RSI (Wilder's 방식)
-    delta = d['close'].diff()
-    gain = delta.where(delta > 0, 0)
-    loss = -delta.where(delta < 0, 0)
-    avg_gain = gain.ewm(alpha=1/14, min_periods=14).mean()
-    avg_loss = loss.ewm(alpha=1/14, min_periods=14).mean()
-    d['rsi'] = 100 - (100 / (1 + (avg_gain / (avg_loss + 1e-10))))
-    
-    # ADX (정교한 방식)
-    high_diff = d['high'].diff()
-    low_diff = d['low'].diff()
-    plus_dm = np.where((high_diff > -low_diff) & (high_diff > 0), high_diff, 0)
-    minus_dm = np.where((-low_diff > high_diff) & (low_diff < 0), -low_diff, 0)
-    
-    tr = pd.concat([
-        d['high'] - d['low'],
-        abs(d['high'] - d['close'].shift(1)),
-        abs(d['low'] - d['close'].shift(1))
-    ], axis=1).max(axis=1)
-    
-    atr = tr.ewm(alpha=1/14, min_periods=14).mean()
-    plus_di = 100 * (pd.Series(plus_dm, index=d.index).ewm(alpha=1/14, min_periods=14).mean() / atr)
-    minus_di = 100 * (pd.Series(minus_dm, index=d.index).ewm(alpha=1/14, min_periods=14).mean() / atr)
-    dx = 100 * abs(plus_di - minus_di) / (plus_di + minus_di + 1e-10)
-    d['adx'] = dx.ewm(alpha=1/14, min_periods=14).mean()
-    
+    # RSI/ADX/ATR (Wilder) - 전략 엔진과 동일 공식 사용
+    d['rsi'] = compute_rsi_wilder(d['close'], length=14)
+    d['adx'] = compute_adx_wilder(d, length=14)
+    d['atr'] = compute_atr_wilder(d, length=14)
+    d['atr_pct'] = (d['atr'] / d['close'].replace(0, np.nan)) * 100.0
+
     return d
+
+
+def compute_stoch_rsi(series: pd.Series, rsi_period: int = 14, stoch_k: int = 3, stoch_d: int = 3) -> tuple[pd.Series, pd.Series]:
+    """
+    Stochastic RSI 계산 (RSI에 Stochastic 적용)
+    Returns: (stoch_k, stoch_d)
+    """
+    rsi = compute_rsi(series, length=rsi_period)
+    # Stoch RSI standard:
+    # 1) RSI range window uses rsi_period
+    # 2) %K/%D smoothing use stoch_k/stoch_d respectively
+    rsi_min = rsi.rolling(window=rsi_period, min_periods=rsi_period).min()
+    rsi_max = rsi.rolling(window=rsi_period, min_periods=rsi_period).max()
+    stoch = 100 * (rsi - rsi_min) / (rsi_max - rsi_min + 1e-10)
+    stoch_k_series = stoch.rolling(window=stoch_k, min_periods=stoch_k).mean()
+    stoch_d_series = stoch_k_series.rolling(window=stoch_d, min_periods=stoch_d).mean()
+    return stoch_k_series, stoch_d_series
+
+
+def compute_slow_stochastic(
+    df: pd.DataFrame,
+    length: int = 14,
+    smooth_k: int = 3,
+    smooth_d: int = 3,
+) -> tuple[pd.Series, pd.Series]:
+    """
+    가격 기반 Slow Stochastic 계산 (TradingView ta.highest/lowest + sma 스무딩과 동일 계열)
+    Returns: (slow_k, slow_d)
+    """
+    highest_high = df["high"].rolling(window=length, min_periods=length).max()
+    lowest_low = df["low"].rolling(window=length, min_periods=length).min()
+    denominator = (highest_high - lowest_low).replace(0, np.nan)
+
+    fast_k = 100.0 * (df["close"] - lowest_low) / denominator
+    slow_k = fast_k.rolling(window=smooth_k, min_periods=smooth_k).mean()
+    slow_d = slow_k.rolling(window=smooth_d, min_periods=smooth_d).mean()
+    return slow_k, slow_d
+
+
+def compute_vwap_rolling(df: pd.DataFrame, window: int = 20) -> pd.Series:
+    """롤링 윈도우 VWAP: (H+L+C)/3 * volume의 이동 평균"""
+    typical = (df["high"] + df["low"] + df["close"]) / 3
+    if "volume" not in df.columns:
+        return typical.rolling(window).mean()  # volume 없으면 typical price MA
+    tp_vol = typical * df["volume"]
+    return tp_vol.rolling(window).sum() / (df["volume"].rolling(window).sum() + 1e-10)
+
+
+def compute_supertrend(df: pd.DataFrame, period: int = 10, multiplier: float = 3.0) -> tuple[pd.Series, pd.Series]:
+    """
+    Supertrend (Wilder ATR 기반) - 표준 알고리즘
+    Returns: (supertrend_line, direction: 1=uptrend, -1=downtrend)
+    """
+    h, l, c = df["high"].values, df["low"].values, df["close"].values
+    n = len(df)
+    tr = np.maximum(h - l, np.maximum(np.abs(h - np.roll(c, 1)), np.abs(l - np.roll(c, 1))))
+    tr[0] = h[0] - l[0]
+    atr = pd.Series(tr, index=df.index).ewm(alpha=1 / period, adjust=False).mean().values
+    hl2 = (h + l) / 2
+    basic_ub = hl2 + multiplier * atr
+    basic_lb = hl2 - multiplier * atr
+    final_ub = np.full(n, np.nan)
+    final_lb = np.full(n, np.nan)
+    st = np.full(n, np.nan)
+    final_ub[period - 1] = basic_ub[period - 1]
+    final_lb[period - 1] = basic_lb[period - 1]
+    st[period - 1] = final_ub[period - 1]
+    for i in range(period, n):
+        if basic_ub[i] < final_ub[i - 1] or c[i - 1] > final_ub[i - 1]:
+            final_ub[i] = basic_ub[i]
+        else:
+            final_ub[i] = final_ub[i - 1]
+        if basic_lb[i] > final_lb[i - 1] or c[i - 1] < final_lb[i - 1]:
+            final_lb[i] = basic_lb[i]
+        else:
+            final_lb[i] = final_lb[i - 1]
+        prev_was_ub = not np.isnan(st[i - 1]) and abs(st[i - 1] - final_ub[i - 1]) < 1e-9
+        if prev_was_ub:
+            if c[i] <= final_ub[i]:
+                st[i] = final_ub[i]
+            else:
+                st[i] = final_lb[i]
+        else:
+            if c[i] >= final_lb[i]:
+                st[i] = final_lb[i]
+            else:
+                st[i] = final_ub[i]
+    direction = np.where(c > st, 1, -1)
+    return pd.Series(st, index=df.index), pd.Series(direction, index=df.index)
+
+
+def compute_trend_indicators(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Quant Lab 등 공용 분석용 지표 계산 (레거시 함수명 유지)
+    - 3 Stoch RSI (5-3-3, 10-6-6, 20-12-12)
+    - RSI(14), MACD, ADX (compute_live_indicators)
+    - VWAP(롤링 20)
+    - Supertrend(10, 3)
+
+    주의:
+    - Trend Judgment API(/api/trend-indicators)는 이 함수를 사용하지 않는다.
+    - Trend Judgment는 compute_trend_judgment_indicators()를 통해
+      Slow Stochastic(가격 기반)로 계산한다.
+    """
+    d = compute_live_indicators(df.copy())
+    close = d["close"]
+    sk1, sd1 = compute_stoch_rsi(close, 5, 3, 3)
+    sk2, sd2 = compute_stoch_rsi(close, 10, 6, 6)
+    sk3, sd3 = compute_stoch_rsi(close, 20, 12, 12)
+    d["stoch_rsi_5k"], d["stoch_rsi_5d"] = sk1, sd1
+    d["stoch_rsi_10k"], d["stoch_rsi_10d"] = sk2, sd2
+    d["stoch_rsi_20k"], d["stoch_rsi_20d"] = sk3, sd3
+    d["vwap_20"] = compute_vwap_rolling(d, 20)
+    st, dr = compute_supertrend(d, 10, 3.0)
+    d["supertrend"] = st
+    d["supertrend_dir"] = dr
+    return d
+
+
+def compute_quant_lab_indicators(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Quant Lab 호출부 명확화를 위한 명시적 별칭 함수.
+
+    내부 계산은 compute_trend_indicators(Stoch RSI 기반)와 동일하다.
+    """
+    return compute_trend_indicators(df)
+
+
+def compute_trend_judgment_indicators(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    추세판단 페이지 전용 지표 계산
+    - 3 Slow Stochastic (20-12-12, 10-6-6, 5-3-3)  # Pine B2S2 sto 기준
+    - RSI(14), MACD, ADX (compute_live_indicators)
+    - VWAP(롤링 20)
+    - Supertrend(10, 3)
+    """
+    d = compute_live_indicators(df.copy())
+
+    k20, d20 = compute_slow_stochastic(d, length=20, smooth_k=12, smooth_d=12)
+    k10, d10 = compute_slow_stochastic(d, length=10, smooth_k=6, smooth_d=6)
+    k5, d5 = compute_slow_stochastic(d, length=5, smooth_k=3, smooth_d=3)
+
+    # 정식 필드: Slow Stochastic (가격 기반)
+    d["slow_stoch_20k"], d["slow_stoch_20d"] = k20, d20
+    d["slow_stoch_10k"], d["slow_stoch_10d"] = k10, d10
+    d["slow_stoch_5k"], d["slow_stoch_5d"] = k5, d5
+
+    d["vwap_20"] = compute_vwap_rolling(d, 20)
+    st, dr = compute_supertrend(d, 10, 3.0)
+    d["supertrend"] = st
+    d["supertrend_dir"] = dr
+    return d
+
+
+def build_indicator_adapter(
+    df: pd.DataFrame,
+    mode: Literal["backtest", "trend_judgment", "quant_lab"] = "backtest",
+    prepare_kwargs: Optional[Dict[str, Any]] = None,
+) -> pd.DataFrame:
+    """
+    백테스트/추세판단/AI 분석에서 공통으로 사용하는 지표 어댑터.
+
+    - backtest: 전략 시그널/백테스트용 prepare_strategy_data 결과
+    - trend_judgment: prepare_strategy_data + 추세판단 전용 지표(slow_stoch_*)
+    - quant_lab: prepare_strategy_data + Stoch RSI 계열 지표(stoch_rsi_*)
+    """
+    base = prepare_strategy_data(df.copy(), **(prepare_kwargs or {}))
+
+    if mode == "backtest":
+        return base
+    if mode == "trend_judgment":
+        return compute_trend_judgment_indicators(base)
+    if mode == "quant_lab":
+        return compute_trend_indicators(base)
+    raise ValueError(f"Unsupported indicator adapter mode: {mode}")
 
 
 def get_latest_indicator_values(df: pd.DataFrame, use_previous_candle: bool = True) -> dict:
@@ -440,8 +635,9 @@ def get_latest_indicator_values(df: pd.DataFrame, use_previous_candle: bool = Tr
     return {
         'timestamp': timestamp,
         'close': float(latest['close']) if not pd.isna(latest['close']) else None,
-        'ema20': float(latest['ema20']) if 'ema20' in latest and not pd.isna(latest['ema20']) else None,
-        'ema50': float(latest['ema50']) if 'ema50' in latest and not pd.isna(latest['ema50']) else None,
+        'sma20': float(latest['sma20']) if 'sma20' in latest and not pd.isna(latest['sma20']) else None,
+        'sma50': float(latest['sma50']) if 'sma50' in latest and not pd.isna(latest['sma50']) else None,
+        'sma100': float(latest['sma100']) if 'sma100' in latest and not pd.isna(latest['sma100']) else None,
         'sma200': float(latest['sma200']) if 'sma200' in latest and not pd.isna(latest['sma200']) else None,
         'macd_hist': float(latest['macd_hist']) if 'macd_hist' in latest and not pd.isna(latest['macd_hist']) else None,
         'rsi': float(latest['rsi']) if 'rsi' in latest and not pd.isna(latest['rsi']) else None,

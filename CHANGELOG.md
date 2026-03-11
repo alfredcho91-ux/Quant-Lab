@@ -1,5 +1,16 @@
 # 변경 이력 (Changelog)
 
+## [2026-01-31] 문서 최신화
+
+### 변경사항
+- **ARCHITECTURE.md**: MaCrossParams 제거, Hybrid 관련 Params 추가, MaCrossPage → HybridAnalysisPage, stats API 목록 정리
+- **PROJECT_STRUCTURE.md**: ma_cross/ 전략 제거, hybrid/ 추가, MaCrossPage 제거, HybridAnalysisPage·hybrid.ts 추가, stats.py 설명·OPTIMIZATION_SUMMARY 참조 제거
+- **PAGE_BACKEND_MAPPING.md**: MA 크로스 섹션 제거, 하이브리드 전략 분석 섹션 추가, data_service 경로 수정 (utils/), 요약 테이블 갱신
+- **API.md**: `/api/ma-cross` 제거, `/api/hybrid-analysis`, `/api/hybrid-backtest`, `/api/hybrid-live` 추가, journal API 목록 추가
+- **main.py**: stats_router 주석 수정 (ma-cross → hybrid-*)
+
+---
+
 ## [2026-01-21] 프로젝트 구조 개선
 
 ### 주요 변경사항

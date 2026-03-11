@@ -5,30 +5,12 @@ import pandas as pd
 import numpy as np
 from typing import Dict, Any, Optional
 
-from core.indicators import compute_rsi
+from core.indicators import add_combo_indicators as _core_add_combo_indicators
 
 
 def add_combo_indicators(df: pd.DataFrame, sma_short: int, sma_long: int) -> pd.DataFrame:
-    """Add indicators for combo filter - matching original Streamlit."""
-    df = df.copy()
-    close = df["close"]
-    
-    # SMA
-    df[f"SMA{sma_short}"] = close.rolling(window=sma_short, min_periods=sma_short).mean()
-    df[f"SMA{sma_long}"] = close.rolling(window=sma_long, min_periods=sma_long).mean()
-    
-    # BB
-    mid = close.rolling(window=20, min_periods=20).mean()
-    std = close.rolling(window=20, min_periods=20).std()
-    df["BB_mid"] = mid
-    df["BB_upper"] = mid + 2.0 * std
-    df["BB_lower"] = mid - 2.0 * std
-    df["RSI"] = compute_rsi(close, length=14)
-    
-    # Candle features
-    df = _add_candle_features(df)
-    
-    return df
+    """Add indicators for combo filter via the canonical core implementation."""
+    return _core_add_combo_indicators(df, sma_short=sma_short, sma_long=sma_long)
 
 
 def _add_candle_features(df: pd.DataFrame) -> pd.DataFrame:

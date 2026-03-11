@@ -1,7 +1,7 @@
 // Real-time Pattern Scanner Page
 import { useState } from 'react';
 import { runPatternScanner } from '../api/client';
-import { useStore } from '../store/useStore';
+import { useBacktestParams, useUpdateBacktestParams } from '../store/useStore';
 import { usePageCommon } from '../hooks/usePageCommon';
 import { useAnalysisMutation } from '../hooks/useAnalysisMutation';
 import type { PatternScanParams, PatternStat } from '../types';
@@ -15,7 +15,8 @@ const PATTERN_NAMES_KO: Record<string, string> = {
 };
 
 export default function PatternScannerPage() {
-  const { backtestParams, updateBacktestParams } = useStore();
+  const backtestParams = useBacktestParams();
+  const updateBacktestParams = useUpdateBacktestParams();
   const { isKo, selectedCoin, availableTfs } = usePageCommon();
 
   const [params, setParams] = useState<PatternScanParams>({
@@ -90,7 +91,7 @@ export default function PatternScannerPage() {
                 onClick={() => setParams({ ...params, mode: 'natural' })}
                 className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${
                   params.mode === 'natural'
-                    ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                    ? 'bg-primary-500/20 text-primary-400 border border-primary-500/30'
                     : 'bg-dark-700 text-dark-300 hover:bg-dark-600'
                 }`}
               >
@@ -100,7 +101,7 @@ export default function PatternScannerPage() {
                 onClick={() => setParams({ ...params, mode: 'position' })}
                 className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${
                   params.mode === 'position'
-                    ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                    ? 'bg-primary-500/20 text-primary-400 border border-primary-500/30'
                     : 'bg-dark-700 text-dark-300 hover:bg-dark-600'
                 }`}
               >
@@ -179,7 +180,7 @@ export default function PatternScannerPage() {
                 }}
                 className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
                   params.intervals.includes(tf)
-                    ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                    ? 'bg-primary-500/20 text-primary-400 border border-primary-500/30'
                     : 'bg-dark-700 text-dark-300 hover:bg-dark-600'
                 }`}
               >
@@ -318,4 +319,3 @@ export default function PatternScannerPage() {
     </div>
   );
 }
-

@@ -212,8 +212,8 @@ export default function StrategyScannerPage() {
           {/* Active Signals Summary */}
           {(result.signals.some(s => s.long_signal || s.short_signal) ||
             result.preset_signals.some(p => p.long_signal || p.short_signal)) && (
-            <div className="card p-4 bg-emerald-500/10 border border-emerald-500/30">
-              <h4 className="font-semibold text-emerald-400 mb-2">
+            <div className="card p-4 bg-primary-500/10 border border-primary-500/30">
+              <h4 className="font-semibold text-primary-400 mb-2">
                 ✨ {isKo ? '활성 시그널 요약' : 'Active Signals Summary'}
               </h4>
               <div className="space-y-1 text-sm">

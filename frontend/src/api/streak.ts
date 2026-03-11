@@ -1,89 +1,90 @@
 // 연속 봉패턴 분석 API
 
 import { api } from './config';
+import type { ApiResponse } from './config';
 import type { StreakAnalysisParams, StreakAnalysisResult } from '../types';
+
+type StreakAnalysisApiPayload = Partial<StreakAnalysisResult>;
+
+function hasCoreStreakFields(payload: StreakAnalysisApiPayload): payload is StreakAnalysisResult {
+  return (
+    typeof payload.total_cases === 'number' &&
+    typeof payload.continuation_count === 'number' &&
+    typeof payload.reversal_count === 'number' &&
+    typeof payload.c1_green_count === 'number' &&
+    typeof payload.c1_red_count === 'number' &&
+    payload.comparative_report !== undefined &&
+    payload.coin !== undefined &&
+    payload.interval !== undefined &&
+    payload.n_streak !== undefined &&
+    payload.direction !== undefined
+  );
+}
+
+function normalizePartialStreakPayload(
+  payload: StreakAnalysisApiPayload,
+  params: StreakAnalysisParams
+): StreakAnalysisResult {
+  return {
+    mode: payload.mode,
+    filter_status: payload.filter_status ?? null,
+    total_cases: payload.total_cases ?? 0,
+    continuation_rate: payload.continuation_rate ?? null,
+    reversal_rate: payload.reversal_rate ?? null,
+    continuation_count: payload.continuation_count ?? 0,
+    reversal_count: payload.reversal_count ?? 0,
+    avg_body_pct: payload.avg_body_pct ?? null,
+    continuation_stats: payload.continuation_stats,
+    reversal_stats: payload.reversal_stats,
+    continuation_ci: payload.continuation_ci,
+    c1_p_value: payload.c1_p_value,
+    c1_is_significant: payload.c1_is_significant,
+    c2_after_c1_green_rate: payload.c2_after_c1_green_rate ?? null,
+    c2_after_c1_red_rate: payload.c2_after_c1_red_rate ?? null,
+    c2_after_c1_green_ci: payload.c2_after_c1_green_ci,
+    c2_after_c1_red_ci: payload.c2_after_c1_red_ci,
+    c1_green_count: payload.c1_green_count ?? 0,
+    c1_red_count: payload.c1_red_count ?? 0,
+    c1_green_rate: payload.c1_green_rate,
+    c1_red_rate: payload.c1_red_rate,
+    c1_green_rate_ci: payload.c1_green_rate_ci,
+    c1_red_rate_ci: payload.c1_red_rate_ci,
+    comparative_report: payload.comparative_report ?? null,
+    short_signal: payload.short_signal,
+    volatility_stats: payload.volatility_stats,
+    rsi_by_interval: payload.rsi_by_interval,
+    disp_by_interval: payload.disp_by_interval,
+    atr_by_interval: payload.atr_by_interval,
+    rsi_atr_heatmap: payload.rsi_atr_heatmap,
+    high_prob_rsi_intervals: payload.high_prob_rsi_intervals,
+    high_prob_disp_intervals: payload.high_prob_disp_intervals,
+    high_prob_atr_intervals: payload.high_prob_atr_intervals,
+    complex_pattern_analysis: payload.complex_pattern_analysis,
+    ny_trading_guide: payload.ny_trading_guide,
+    analysis_mode: payload.analysis_mode,
+    coin: payload.coin ?? params.coin,
+    interval: payload.interval ?? params.interval,
+    n_streak: payload.n_streak ?? params.n_streak,
+    direction: payload.direction ?? params.direction,
+  };
+}
 
 export async function runStreakAnalysis(params: StreakAnalysisParams): Promise<StreakAnalysisResult | null> {
   try {
-    const res = await api.post<{
-      success: boolean;
-      mode?: 'simple' | 'complex';
-      filter_status?: import('../types').FilterStatus | null;
-      total_cases: number;
-      continuation_rate: number | null;
-      reversal_rate: number | null;
-      continuation_count: number;
-      reversal_count: number;
-      avg_body_pct: number | null;
-      continuation_ci?: import('../types').ConfidenceInterval | null;
-      c1_p_value?: number;
-      c1_is_significant?: boolean;
-      c2_after_c1_green_rate: number | null;
-      c2_after_c1_red_rate: number | null;
-      c2_after_c1_green_ci?: import('../types').ConfidenceInterval | null;
-      c2_after_c1_red_ci?: import('../types').ConfidenceInterval | null;
-      c1_green_count: number;
-      c1_red_count: number;
-      comparative_report: import('../types').ComparativeReport | null;
-      short_signal?: import('../types').ShortSignal | null;
-      volatility_stats?: import('../types').VolatilityStats;
-      rsi_by_interval?: Record<string, import('../types').IntervalProbability>;
-      high_prob_rsi_intervals?: Record<string, import('../types').IntervalProbability>;
-      complex_pattern_analysis?: import('../types').ComplexPatternAnalysis | null;
-      ny_trading_guide?: import('../types').NYTradingGuide;
-      analysis_mode?: {
-        type: string;
-        description: string;
-        parameters: {
-          n_streak?: number;
-          direction?: string;
-          complex_pattern?: number[];
-          filters?: {
-            rsi_threshold?: number;
-            max_retracement?: number;
-          };
-        };
-      };
-      coin: string;
-      interval: string;
-      n_streak: number;
-      direction: string;
-      error?: string;
-    }>('/streak-analysis', params);
+    const res = await api.post<ApiResponse<StreakAnalysisApiPayload>>('/streak-analysis', params);
     
-    if (res.data.success) {
-      return {
-        mode: res.data.mode,
-        filter_status: res.data.filter_status,
-        total_cases: res.data.total_cases,
-        continuation_rate: res.data.continuation_rate,
-        reversal_rate: res.data.reversal_rate,
-        continuation_count: res.data.continuation_count,
-        reversal_count: res.data.reversal_count,
-        avg_body_pct: res.data.avg_body_pct,
-        continuation_ci: res.data.continuation_ci,
-        c1_p_value: res.data.c1_p_value,
-        c1_is_significant: res.data.c1_is_significant,
-        c2_after_c1_green_rate: res.data.c2_after_c1_green_rate,
-        c2_after_c1_red_rate: res.data.c2_after_c1_red_rate,
-        c2_after_c1_green_ci: res.data.c2_after_c1_green_ci,
-        c2_after_c1_red_ci: res.data.c2_after_c1_red_ci,
-        c1_green_count: res.data.c1_green_count,
-        c1_red_count: res.data.c1_red_count,
-        comparative_report: res.data.comparative_report,
-        short_signal: res.data.short_signal,
-        volatility_stats: res.data.volatility_stats,
-        rsi_by_interval: res.data.rsi_by_interval,
-        high_prob_rsi_intervals: res.data.high_prob_rsi_intervals,
-        complex_pattern_analysis: res.data.complex_pattern_analysis,
-        ny_trading_guide: res.data.ny_trading_guide,
-        analysis_mode: res.data.analysis_mode,
-        coin: res.data.coin,
-        interval: res.data.interval,
-        n_streak: res.data.n_streak,
-        direction: res.data.direction,
-      };
+    if (res.data.success && res.data.data) {
+      const payload = res.data.data;
+      if (hasCoreStreakFields(payload)) return payload;
+      console.warn('Streak Analysis partial payload detected, applying defaults.');
+      return normalizePartialStreakPayload(payload, params);
     }
+
+    if (res.data.data) {
+      console.warn('Streak Analysis error response contained partial data, applying defaults.');
+      return normalizePartialStreakPayload(res.data.data, params);
+    }
+
     console.error('Streak Analysis error:', res.data.error);
     return null;
   } catch (err) {

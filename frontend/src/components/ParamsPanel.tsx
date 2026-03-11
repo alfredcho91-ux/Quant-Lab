@@ -1,7 +1,12 @@
 // Parameters Panel Component
 import { useState } from 'react';
 import { ChevronDown, ChevronUp, Save, RefreshCw } from 'lucide-react';
-import { useStore } from '../store/useStore';
+import {
+  useBacktestParams,
+  useLanguage,
+  useResetBacktestParams,
+  useUpdateBacktestParams,
+} from '../store/useStore';
 import { getLabels } from '../store/labels';
 
 interface ParamsPanelProps {
@@ -10,7 +15,10 @@ interface ParamsPanelProps {
 }
 
 export default function ParamsPanel({ onSavePreset }: ParamsPanelProps) {
-  const { language, backtestParams, updateBacktestParams, resetBacktestParams } = useStore();
+  const language = useLanguage();
+  const backtestParams = useBacktestParams();
+  const updateBacktestParams = useUpdateBacktestParams();
+  const resetBacktestParams = useResetBacktestParams();
   const labels = getLabels(language);
   const [expanded, setExpanded] = useState(true);
 
@@ -63,7 +71,7 @@ export default function ParamsPanel({ onSavePreset }: ParamsPanelProps) {
         <div className="p-4 pt-0 space-y-6">
           {/* Trading Parameters */}
           <div>
-            <h4 className="text-sm font-medium text-emerald-400 mb-3">📊 Trading</h4>
+            <h4 className="text-sm font-medium text-primary-400 mb-3">📊 Trading</h4>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <NumberInput
                 label={labels.tp}
@@ -107,12 +115,12 @@ export default function ParamsPanel({ onSavePreset }: ParamsPanelProps) {
 
           {/* Trend Parameters */}
           <div>
-            <h4 className="text-sm font-medium text-emerald-400 mb-3">📈 Trend</h4>
+            <h4 className="text-sm font-medium text-primary-400 mb-3">📈 Trend</h4>
             <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
               <NumberInput
-                label={labels.ema_len}
-                value={backtestParams.ema_len}
-                onChange={(v) => updateBacktestParams({ ema_len: v })}
+                label={labels.sma_main_len}
+                value={backtestParams.sma_main_len}
+                onChange={(v) => updateBacktestParams({ sma_main_len: v })}
                 min={20}
                 max={400}
               />
@@ -149,7 +157,7 @@ export default function ParamsPanel({ onSavePreset }: ParamsPanelProps) {
 
           {/* Momentum Parameters */}
           <div>
-            <h4 className="text-sm font-medium text-emerald-400 mb-3">⚡ Momentum</h4>
+            <h4 className="text-sm font-medium text-primary-400 mb-3">⚡ Momentum</h4>
             <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
               <NumberInput
                 label={labels.rsi14_ob}
@@ -184,7 +192,7 @@ export default function ParamsPanel({ onSavePreset }: ParamsPanelProps) {
 
           {/* Volatility Parameters */}
           <div>
-            <h4 className="text-sm font-medium text-emerald-400 mb-3">🌪 Volatility</h4>
+            <h4 className="text-sm font-medium text-primary-400 mb-3">🌪 Volatility</h4>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <NumberInput
                 label="BB Length"
@@ -243,4 +251,3 @@ export default function ParamsPanel({ onSavePreset }: ParamsPanelProps) {
     </div>
   );
 }
-

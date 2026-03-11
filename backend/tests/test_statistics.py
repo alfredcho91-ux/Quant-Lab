@@ -2,7 +2,7 @@
 통계 로직 단위 테스트
 
 목적: 핵심 통계 함수들의 정확성을 검증
-위치: backend/strategy/streak/statistics.py, backend/strategy/streak/common.py
+위치: backend/strategy/streak/statistics.py (SSOT)
 
 ⚠️ 핵심 제약 조건: 이 테스트들은 통계적 정확성의 핵심이므로 반드시 통과해야 함
 """
@@ -20,13 +20,12 @@ sys.path.insert(0, str(backend_path.parent))
 
 # Import statistics functions
 from strategy.streak.statistics import (
-    wilson_confidence_interval,
-    calculate_intraday_distribution,
-)
-from strategy.streak.common import (
+    analyze_2d_interval_heatmap,
     analyze_interval_statistics,
     bonferroni_correction,
     calculate_binomial_pvalue,
+    wilson_confidence_interval,
+    calculate_intraday_distribution,
 )
 
 
@@ -153,6 +152,15 @@ class TestBonferroniCorrection:
         
         # Then: p-value < adjusted_alpha이므로 유의함 (엄격한 부등호)
         assert result["is_significant_after_correction"] == False  # 0.00625 < 0.00625는 False
+
+    def test_bonferroni_correction_zero_pvalue_floor_behavior(self):
+        """극소 p-value(0 포함)는 floor로 안정화하되 유의성은 유지"""
+        result = bonferroni_correction(p_value=0.0, num_tests=8)
+
+        assert result["is_significant_after_correction"] is True
+        assert result["original_p"] == 0.0
+        assert result["p_value_floor"] is not None
+        assert result["p_value_display"] is not None
 
 
 class TestBinomialPValue:
@@ -297,6 +305,83 @@ class TestAnalyzeIntervalStatistics:
             if interval_data["sample_size"] >= 30:
                 assert interval_data["reliability"] == "high", \
                     f"샘플 크기 >= 30은 high reliability여야 함 (실제: {interval_data['reliability']})"
+
+
+class TestAnalyze2DIntervalHeatmap:
+    """2차원 조건부 확률(Heatmap) 계산 검증"""
+
+    def test_heatmap_basic_structure(self):
+        dates = pd.date_range(start="2024-01-01", periods=40, freq="D")
+        x_values = pd.Series([25, 35, 45, 55, 65, 75, 85, 95] * 5, index=dates)
+        y_values = pd.Series([0.8, 1.2, 1.8, 2.4, 3.2] * 8, index=dates)
+        targets = pd.Series(([True, False, True, True, False] * 8), index=dates)
+
+        x_bins = [0, 30, 40, 50, 60, 70, 80, 100]
+        y_bins = [0, 1, 2, 3, 4]
+
+        out = analyze_2d_interval_heatmap(
+            x_series=x_values,
+            y_series=y_values,
+            target_series=targets,
+            x_bins=x_bins,
+            y_bins=y_bins,
+            x_label="RSI",
+            y_label="ATR%",
+            confidence=0.95,
+        )
+
+        assert out["x_label"] == "RSI"
+        assert out["y_label"] == "ATR%"
+        assert isinstance(out["x_bins"], list)
+        assert isinstance(out["y_bins"], list)
+        assert isinstance(out["cells"], dict)
+        assert len(out["x_bins"]) == len(x_bins) - 1
+        assert len(out["y_bins"]) == len(y_bins) - 1
+
+        first_y = out["y_bins"][0]
+        first_x = out["x_bins"][0]
+        first_cell = out["cells"][first_y][first_x]
+        assert "rate" in first_cell
+        assert "sample_size" in first_cell
+        assert "ci_lower" in first_cell
+        assert "ci_upper" in first_cell
+        assert "is_significant" in first_cell
+        assert "bonferroni_significant" in first_cell
+
+    def test_heatmap_includes_zero_sample_cells(self):
+        dates = pd.date_range(start="2024-01-01", periods=20, freq="D")
+        x_values = pd.Series([22] * 20, index=dates)  # 저구간에만 집중
+        y_values = pd.Series([0.7] * 20, index=dates)  # 저구간에만 집중
+        targets = pd.Series([True, False] * 10, index=dates)
+
+        x_bins = [0, 30, 40, 50, 60]
+        y_bins = [0, 1, 2, 3]
+
+        out = analyze_2d_interval_heatmap(
+            x_series=x_values,
+            y_series=y_values,
+            target_series=targets,
+            x_bins=x_bins,
+            y_bins=y_bins,
+            x_label="RSI",
+            y_label="ATR%",
+            confidence=0.95,
+        )
+
+        empty_cells = []
+        for y_bin in out["y_bins"]:
+            for x_bin in out["x_bins"]:
+                cell = out["cells"][y_bin][x_bin]
+                if cell["sample_size"] == 0:
+                    empty_cells.append(cell)
+
+        assert len(empty_cells) > 0
+        for cell in empty_cells[:3]:
+            assert cell["rate"] is None
+            assert cell["ci_lower"] is None
+            assert cell["ci_upper"] is None
+            assert cell["is_significant"] is False
+            assert cell["bonferroni_significant"] is False
 
 
 class TestCalculateIntradayDistribution:

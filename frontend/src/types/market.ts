@@ -23,7 +23,7 @@ export interface OHLCV {
   close: number;
   volume: number;
   RSI?: number;
-  EMA_main?: number;
+  SMA_main?: number;
   SMA_1?: number;
   SMA_2?: number;
   BB_Up?: number;
@@ -51,5 +51,4 @@ export interface MarketContext {
   regime: string;
   adx: number;
   rsi: number;
-  rsi2: number | null;
 }

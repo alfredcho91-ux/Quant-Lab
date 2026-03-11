@@ -71,9 +71,9 @@ export default function VolatilityDataGrid({ result, direction, isKo }: Volatili
             )}
           </div>
         </div>
-        <div className="bg-gradient-to-br from-emerald-500/10 to-green-500/5 border border-emerald-500/20 rounded-xl p-4 text-center">
+        <div className="bg-gradient-to-br from-primary-500/10 to-primary-500/5 border border-primary-500/20 rounded-xl p-4 text-center">
           <div className="text-dark-400 text-xs mb-1">{isKo ? '평균 상승폭 (Rise)' : 'Avg Rise'}</div>
-          <div className="text-2xl font-bold text-emerald-400">
+          <div className="text-2xl font-bold text-primary-400">
             {stats.avg_rise !== null ? `${stats.avg_rise}%` : '-'}
           </div>
           <div className="text-dark-500 text-xs mt-1">{isKo ? '익절 기준' : 'Take Profit'}</div>
@@ -111,7 +111,7 @@ export default function VolatilityDataGrid({ result, direction, isKo }: Volatili
               ? 'bg-gradient-to-br from-rose-500/20 to-red-500/10 border-rose-500/40'
               : stats.z_score_interpretation === 'unusual'
                 ? 'bg-gradient-to-br from-amber-500/20 to-yellow-500/10 border-amber-500/40'
-                : 'bg-gradient-to-br from-emerald-500/10 to-green-500/5 border-emerald-500/20'
+                : 'bg-gradient-to-br from-primary-500/10 to-primary-500/5 border-primary-500/20'
           }`}
         >
           <div className="text-dark-400 text-xs mb-1">
@@ -123,7 +123,7 @@ export default function VolatilityDataGrid({ result, direction, isKo }: Volatili
                 ? 'text-rose-400'
                 : stats.z_score_interpretation === 'unusual'
                   ? 'text-amber-400'
-                  : 'text-emerald-400'
+                  : 'text-primary-400'
             }`}
           >
             {stats.z_score_dip !== null ? stats.z_score_dip : '-'}

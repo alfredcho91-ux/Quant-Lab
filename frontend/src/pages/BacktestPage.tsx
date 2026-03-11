@@ -2,10 +2,15 @@
 import { useState, useCallback } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { Play, Loader2, TrendingUp, TrendingDown, AlertTriangle } from 'lucide-react';
-import { useStore } from '../store/useStore';
+import {
+  useBacktestParams,
+  useLanguage,
+  useSelectedCoin,
+  useUpdateBacktestParams,
+} from '../store/useStore';
 import { getLabels } from '../store/labels';
 import { getStrategies, getTimeframes, runBacktest } from '../api/client';
-import Chart from '../components/Chart';
+import Chart from '../components/LazyChart';
 import MetricCard from '../components/MetricCard';
 import ParamsPanel from '../components/ParamsPanel';
 import StrategyExplainer from '../components/StrategyExplainer';
@@ -14,7 +19,10 @@ import DataSourceToggle from '../components/DataSourceToggle';
 import type { BacktestResult, Strategy } from '../types';
 
 export default function BacktestPage() {
-  const { language, selectedCoin, backtestParams, updateBacktestParams } = useStore();
+  const language = useLanguage();
+  const selectedCoin = useSelectedCoin();
+  const backtestParams = useBacktestParams();
+  const updateBacktestParams = useUpdateBacktestParams();
   const labels = getLabels(language);
   const [result, setResult] = useState<BacktestResult | null>(null);
 
@@ -228,4 +236,3 @@ export default function BacktestPage() {
     </div>
   );
 }
-

@@ -14,6 +14,7 @@ export interface BBMidResult {
   events: number;
   success: number;
   success_rate: number | null;
+  avg_bars_to_mid?: number;
 }
 
 export interface BBMidExcursion {
@@ -49,37 +50,6 @@ export interface ComboFilterResult {
   avg_ret: number | null;
 }
 
-export interface MultiTFSqueezeParams {
-  coin: string;
-  high_tf: string;
-  low_tf: string;
-  squeeze_thr_high: number;
-  squeeze_thr_low: number;
-  lower_lookback_bars: number;
-  rsi_min: number;
-  rsi_max: number;
-  require_above_mid: boolean;
-}
-
-export interface SqueezeEvent {
-  break_time: string;
-  direction: 'up' | 'down';
-  immediate_ret: number;
-  lt_rsi_last: number;
-  lt_above_mid: boolean;
-}
-
-export interface SqueezeStats {
-  total_events: number;
-  filtered_events: number;
-  p_up?: number;
-  p_down?: number;
-  n_up?: number;
-  n_down?: number;
-  avg_ret_up?: number | null;
-  avg_ret_down?: number | null;
-}
-
 export interface PatternScanParams {
   coin: string;
   intervals: string[];
@@ -95,4 +65,50 @@ export interface PatternStat {
   signals: number;
   hit_rate: number | null;
   last_on: boolean;
+}
+
+export interface TrendIndicatorsParams {
+  coin: string;
+  interval: string;
+  use_csv: boolean;
+}
+
+export interface TrendIndicatorsLatest {
+  close: number | null;
+  rsi: number | null;
+  macd_hist: number | null;
+  adx: number | null;
+  atr: number | null;
+  atr_pct: number | null;
+  sma20: number | null;
+  sma50: number | null;
+  sma200: number | null;
+  slow_stoch_5k: number | null;
+  slow_stoch_5d: number | null;
+  slow_stoch_10k: number | null;
+  slow_stoch_10d: number | null;
+  slow_stoch_20k: number | null;
+  slow_stoch_20d: number | null;
+  vwap_20: number | null;
+  supertrend: number | null;
+  supertrend_dir: number | null;
+}
+
+export interface TrendIndicatorsResult {
+  success: boolean;
+  latest: TrendIndicatorsLatest;
+  series: Record<string, { t: string[]; v: number[] }>;
+  interval: string;
+  coin: string;
+  error?: string;
+}
+
+export interface IndicatorProjection {
+  current_price: number;
+  rsi_30_price: number;
+  rsi_70_price: number;
+  stoch_20_price: number;
+  stoch_80_price: number;
+  stoch_hh?: number;
+  stoch_ll?: number;
 }

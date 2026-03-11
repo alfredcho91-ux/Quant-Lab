@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { BarChart3, RefreshCw } from 'lucide-react';
-import { useStore } from '../store/useStore';
+import { useLanguage, useSelectedCoin } from '../store/useStore';
 import { getLabels } from '../store/labels';
 import { getOHLCV } from '../api/client';
 
@@ -77,7 +77,8 @@ interface PatternStat {
 }
 
 export default function PatternPage() {
-  const { language, selectedCoin } = useStore();
+  const language = useLanguage();
+  const selectedCoin = useSelectedCoin();
   const labels = getLabels(language);
   const [interval, setInterval] = useState('1h');
   const [patternStats, setPatternStats] = useState<PatternStat[]>([]);
@@ -235,7 +236,7 @@ export default function PatternPage() {
       {patternStats.length > 0 && (
         <div className="card">
           <div className="p-4 border-b border-dark-700 flex items-center gap-2">
-            <BarChart3 className="w-5 h-5 text-emerald-400" />
+            <BarChart3 className="w-5 h-5 text-primary-400" />
             <h3 className="text-lg font-semibold">
               {language === 'ko' ? '패턴 통계' : 'Pattern Statistics'}
             </h3>
@@ -303,4 +304,3 @@ export default function PatternPage() {
     </div>
   );
 }
-

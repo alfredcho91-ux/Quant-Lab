@@ -1,7 +1,7 @@
 """
 하이브리드 전략 분석 로직
 
-EMA, MACD, RSI, ADX 등을 조합한 전략 분석
+SMA, MACD, RSI, ADX 등을 조합한 전략 분석
 """
 
 import pandas as pd
@@ -18,6 +18,13 @@ logger = logging.getLogger(__name__)
 compute_refined_indicators = compute_live_indicators
 
 
+def _normalize_strategy_name(strategy_name: str) -> str:
+    """Normalize legacy strategy identifiers."""
+    if strategy_name == "EMA_ADX_Strong":
+        return "SMA_ADX_Strong"
+    return strategy_name
+
+
 def _prepare_indicators_and_signals(
     df: pd.DataFrame,
     strategies: Optional[List[str]] = None
@@ -32,6 +39,13 @@ def _prepare_indicators_and_signals(
     Returns:
         (df_with_indicators, signals, selected_strategies) 튜플
     """
+    # DatetimeIndex 설정 (open_dt 컬럼이 있으면 인덱스로 사용)
+    if 'open_dt' in df.columns and not isinstance(df.index, pd.DatetimeIndex):
+        df = df.copy()
+        df['open_dt'] = pd.to_datetime(df['open_dt'])
+        df = df.set_index('open_dt')
+        df = df.sort_index()
+    
     # 지표 계산
     df_with_indicators = compute_live_indicators(df)
     df_with_indicators = df_with_indicators.dropna()
@@ -46,7 +60,8 @@ def _prepare_indicators_and_signals(
     if strategies is None:
         selected_strategies = list(signals.keys())
     else:
-        selected_strategies = [s for s in strategies if s in signals]
+        normalized = [_normalize_strategy_name(s) for s in strategies]
+        selected_strategies = [s for s in normalized if s in signals]
     
     return df_with_indicators, signals, selected_strategies
 
@@ -63,8 +78,8 @@ def generate_strategy_signals(df: pd.DataFrame) -> Dict[str, pd.Series]:
     """
     signals = {}
     
-    # EMA_ADX_Strong: EMA20 > EMA50 & ADX > 25
-    signals['EMA_ADX_Strong'] = (df['ema20'] > df['ema50']) & (df['adx'] > 25)
+    # SMA_ADX_Strong: SMA20 > SMA50 & ADX > 25
+    signals['SMA_ADX_Strong'] = (df['sma20'] > df['sma50']) & (df['adx'] > 25)
     
     # MACD_RSI_Trend: MACD > 0 & RSI > 55 & Close > SMA200
     signals['MACD_RSI_Trend'] = (
@@ -183,6 +198,28 @@ def analyze_live_mode(
         latest = df_with_indicators.iloc[-2]  # -2: 전 봉 (완성된 봉)
         latest_timestamp = df_with_indicators.index[-2]  # 전 봉의 타임스탬프
         
+        # 타임스탬프 변환 (DatetimeIndex가 아닌 경우 처리)
+        if isinstance(latest_timestamp, pd.Timestamp):
+            timestamp_str = latest_timestamp.isoformat()
+        elif hasattr(latest_timestamp, 'isoformat'):
+            timestamp_str = latest_timestamp.isoformat()
+        else:
+            # 인덱스가 DatetimeIndex가 아닌 경우, open_dt 컬럼 사용 시도
+            if 'open_dt' in df_with_indicators.columns:
+                timestamp_str = pd.to_datetime(df_with_indicators.iloc[-2]['open_dt']).isoformat()
+            elif 'open_time' in df_with_indicators.columns:
+                # open_time이 숫자인 경우 변환
+                open_time_val = df_with_indicators.iloc[-2]['open_time']
+                if pd.api.types.is_numeric_dtype(type(open_time_val)):
+                    timestamp_str = pd.to_datetime(open_time_val, unit='ms').isoformat()
+                else:
+                    timestamp_str = pd.to_datetime(open_time_val).isoformat()
+            else:
+                # 최후의 수단: 현재 시간 사용
+                import datetime
+                timestamp_str = datetime.datetime.now().isoformat()
+                logger.warning(f"타임스탬프를 찾을 수 없어 현재 시간 사용: {latest_timestamp}")
+        
         results = []
         for strategy_name in selected_strategies:
             signal = signals[strategy_name]
@@ -193,17 +230,17 @@ def analyze_live_mode(
             strategy_info = {
                 "strategy": strategy_name,
                 "is_active": is_active,
-                "timestamp": latest_timestamp.isoformat() if hasattr(latest_timestamp, 'isoformat') else str(latest_timestamp),
+                "timestamp": timestamp_str,
             }
             
             # 각 전략별 조건 상세 정보
-            if strategy_name == 'EMA_ADX_Strong':
+            if strategy_name == 'SMA_ADX_Strong':
                 strategy_info.update({
                     "conditions": {
-                        "ema20": float(latest['ema20']) if not pd.isna(latest['ema20']) else None,
-                        "ema50": float(latest['ema50']) if not pd.isna(latest['ema50']) else None,
+                        "sma20": float(latest['sma20']) if not pd.isna(latest['sma20']) else None,
+                        "sma50": float(latest['sma50']) if not pd.isna(latest['sma50']) else None,
                         "adx": float(latest['adx']) if not pd.isna(latest['adx']) else None,
-                        "ema20_above_ema50": bool(latest['ema20'] > latest['ema50']) if not pd.isna(latest['ema20']) and not pd.isna(latest['ema50']) else None,
+                        "sma20_above_sma50": bool(latest['sma20'] > latest['sma50']) if not pd.isna(latest['sma20']) and not pd.isna(latest['sma50']) else None,
                         "adx_above_25": bool(latest['adx'] > 25) if not pd.isna(latest['adx']) else None,
                     }
                 })
@@ -234,7 +271,7 @@ def analyze_live_mode(
             "success": True,
             "coin": coin,
             "interval": interval,
-            "timestamp": latest_timestamp.isoformat() if hasattr(latest_timestamp, 'isoformat') else str(latest_timestamp),
+            "timestamp": timestamp_str,
             "current_price": float(latest['close']) if not pd.isna(latest['close']) else None,
             "strategies": results,
         }

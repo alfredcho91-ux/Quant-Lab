@@ -1,5 +1,9 @@
 // Data Source Toggle Component (API/CSV)
-import { useStore } from '../store/useStore';
+import {
+  useBacktestParams,
+  useLanguage,
+  useUpdateBacktestParams,
+} from '../store/useStore';
 import { getLabels } from '../store/labels';
 
 interface DataSourceToggleProps {
@@ -8,7 +12,9 @@ interface DataSourceToggleProps {
 }
 
 export default function DataSourceToggle({ className = '', showLabel = true }: DataSourceToggleProps) {
-  const { language, backtestParams, updateBacktestParams } = useStore();
+  const language = useLanguage();
+  const backtestParams = useBacktestParams();
+  const updateBacktestParams = useUpdateBacktestParams();
   const labels = getLabels(language);
 
   return (
@@ -21,7 +27,7 @@ export default function DataSourceToggle({ className = '', showLabel = true }: D
           onClick={() => updateBacktestParams({ use_csv: false })}
           className={`flex-1 py-2 px-3 rounded-lg text-sm transition-all ${
             !backtestParams.use_csv
-              ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+              ? 'bg-primary-500/20 text-primary-400 border border-primary-500/30'
               : 'bg-dark-700 text-dark-400 hover:bg-dark-600'
           }`}
         >
@@ -31,7 +37,7 @@ export default function DataSourceToggle({ className = '', showLabel = true }: D
           onClick={() => updateBacktestParams({ use_csv: true })}
           className={`flex-1 py-2 px-3 rounded-lg text-sm transition-all ${
             backtestParams.use_csv
-              ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+              ? 'bg-primary-500/20 text-primary-400 border border-primary-500/30'
               : 'bg-dark-700 text-dark-400 hover:bg-dark-600'
           }`}
         >

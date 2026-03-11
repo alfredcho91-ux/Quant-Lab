@@ -2,12 +2,20 @@
 import { useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { runAdvancedBacktest, getStrategies, getTimeframes } from '../api/client';
-import { useStore } from '../store/useStore';
+import {
+  useBacktestParams,
+  useLanguage,
+  useSelectedCoin,
+  useUpdateBacktestParams,
+} from '../store/useStore';
 import type { BacktestParams, AdvancedBacktestResult } from '../types';
 import { AlertTriangle, CheckCircle, BarChart2 } from 'lucide-react';
 
 export default function AdvancedBacktestPage() {
-  const { language, selectedCoin, backtestParams, updateBacktestParams } = useStore();
+  const language = useLanguage();
+  const selectedCoin = useSelectedCoin();
+  const backtestParams = useBacktestParams();
+  const updateBacktestParams = useUpdateBacktestParams();
   const isKo = language === 'ko';
 
   const { data: strategies } = useQuery({
@@ -34,8 +42,7 @@ export default function AdvancedBacktestPage() {
     entry_fee_pct: backtestParams.entry_fee_pct || 0.04,
     exit_fee_pct: backtestParams.exit_fee_pct || 0.04,
     rsi_ob: backtestParams.rsi_ob || 70,
-    rsi2_ob: backtestParams.rsi2_ob || 80,
-    ema_len: backtestParams.ema_len || 200,
+    sma_main_len: backtestParams.sma_main_len || 200,
     sma1_len: backtestParams.sma1_len || 20,
     sma2_len: backtestParams.sma2_len || 60,
     adx_thr: backtestParams.adx_thr || 25,
@@ -84,12 +91,12 @@ export default function AdvancedBacktestPage() {
     isTest: boolean = false
   ) => {
     return (
-      <div className={`card p-6 ${isTest ? 'border-2 border-emerald-500/30' : ''}`}>
+      <div className={`card p-6 ${isTest ? 'border-2 border-primary-500/30' : ''}`}>
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold flex items-center gap-2">
-            {isTest ? <CheckCircle className="w-5 h-5 text-emerald-400" /> : <BarChart2 className="w-5 h-5 text-dark-400" />}
+            {isTest ? <CheckCircle className="w-5 h-5 text-primary-400" /> : <BarChart2 className="w-5 h-5 text-dark-400" />}
             {title}
-            {isTest && <span className="text-xs bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded">
+            {isTest && <span className="text-xs bg-primary-500/20 text-primary-400 px-2 py-0.5 rounded">
               {isKo ? '실제 성과' : 'Real Performance'}
             </span>}
           </h3>
@@ -120,15 +127,15 @@ export default function AdvancedBacktestPage() {
         {/* Statistical Significance */}
         {summary.n_trades >= 30 && (
           <div className={`mt-4 p-3 rounded-lg flex items-center gap-3 ${
-            stats.is_significant ? 'bg-emerald-500/10 border border-emerald-500/30' : 'bg-yellow-500/10 border border-yellow-500/30'
+            stats.is_significant ? 'bg-primary-500/10 border border-primary-500/30' : 'bg-yellow-500/10 border border-yellow-500/30'
           }`}>
             {stats.is_significant ? (
-              <CheckCircle className="w-5 h-5 text-emerald-400" />
+              <CheckCircle className="w-5 h-5 text-primary-400" />
             ) : (
               <AlertTriangle className="w-5 h-5 text-yellow-400" />
             )}
             <div>
-              <div className={`font-medium ${stats.is_significant ? 'text-emerald-400' : 'text-yellow-400'}`}>
+              <div className={`font-medium ${stats.is_significant ? 'text-primary-400' : 'text-yellow-400'}`}>
                 {stats.is_significant 
                   ? (isKo ? '통계적으로 유의미함 ✓' : 'Statistically Significant ✓')
                   : (isKo ? '통계적 유의성 부족' : 'Not Statistically Significant')}
@@ -277,7 +284,7 @@ export default function AdvancedBacktestPage() {
                 </span>
               </div>
               <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded bg-emerald-500"></div>
+                <div className="w-3 h-3 rounded bg-primary-500"></div>
                 <span className="text-dark-400">
                   Out-of-Sample ({((1 - params.train_ratio) * 100).toFixed(0)}%): {isKo ? '실제 성과 검증' : 'Real validation'}
                 </span>
@@ -385,4 +392,3 @@ export default function AdvancedBacktestPage() {
     </div>
   );
 }
-

@@ -4,7 +4,7 @@ import pandas as pd
 import numpy as np
 from typing import Dict, Optional
 
-from core.indicators import compute_rsi
+from core.indicators import add_bb_indicators as _core_add_bb_indicators
 
 
 def add_bb_indicators(
@@ -27,22 +27,14 @@ def add_bb_indicators(
     Returns:
         지표가 추가된 데이터프레임
     """
-    df = df.copy()
-    close = df["close"]
-    mid = close.rolling(window=bb_length, min_periods=bb_length).mean()
-    std = close.rolling(window=bb_length, min_periods=bb_length).std()
-    df["BB_mid"] = mid
-    df["BB_upper"] = mid + bb_std_mult * std
-    df["BB_lower"] = mid - bb_std_mult * std
-    df["RSI"] = compute_rsi(close, length=rsi_length)
-    df["SMA200"] = close.rolling(window=sma200_length, min_periods=sma200_length).mean()
-    
-    # Touch flags (정확한 터치 기준: 저점/고점이 밴드에 닿거나 관통)
-    low, high = df["low"], df["high"]
-    df["touch_lower"] = low <= df["BB_lower"]  # 저점이 하단 밴드 이하
-    df["touch_mid"] = (low <= df["BB_mid"]) & (df["BB_mid"] <= high)  # 봉이 중단선 관통
-    df["touch_upper"] = high >= df["BB_upper"]  # 고점이 상단 밴드 이상
-    return df
+    # Delegate to the single canonical implementation in core.indicators.
+    return _core_add_bb_indicators(
+        df=df,
+        bb_length=bb_length,
+        bb_std_mult=bb_std_mult,
+        rsi_length=rsi_length,
+        sma200_length=sma200_length,
+    )
 
 
 def _build_event_filter(
@@ -91,6 +83,9 @@ def analyze_bb_mid_touch(
     
     Returns:
         통계 결과 딕셔너리
+        - failed_in_n: n봉 이내 터치 실패한 이벤트 수 (이후 5봉 검사 가능한 것만)
+        - next5_bar_counts: {1..5} 정확히 k봉째 터치한 이벤트 수
+        - next5_bar_rates: {1..5} k봉째 터치 확률 (%)
     """
     # Filter events
     cond = _build_event_filter(df, start_side, regime)
@@ -101,13 +96,24 @@ def analyze_bb_mid_touch(
     
     event_idx = df.index[first_touch]
     if len(event_idx) == 0:
-        return {"events": 0, "success": 0, "success_rate": None}
+        return {
+            "events": 0,
+            "success": 0,
+            "success_rate": None,
+            "failed_in_n": 0,
+            "next5_bar_counts": {1: 0, 2: 0, 3: 0, 4: 0, 5: 0},
+            "next5_bar_rates": {1: None, 2: None, 3: None, 4: None, 5: None},
+        }
     
     pos_idx = df.index.get_indexer(event_idx)
     touch_mid = df["touch_mid"].values
     max_i = len(df) - 1
+    extend_bars = 5
     
     total, success = 0, 0
+    failed_in_n = 0
+    bar_counts = {1: 0, 2: 0, 3: 0, 4: 0, 5: 0}
+    
     for i in pos_idx:
         start, end = i + 1, i + max_bars
         if start > max_i:
@@ -116,11 +122,36 @@ def analyze_bb_mid_touch(
         if start > end:
             continue
         total += 1
-        if np.any(touch_mid[start:end + 1]):
+        touched = np.any(touch_mid[start : end + 1])
+        if touched:
             success += 1
+        else:
+            end_full = i + max_bars
+            if end_full + extend_bars <= max_i:
+                failed_in_n += 1
+                # 정확히 k봉째에 최초 터치한지 판정 (1~5)
+                found = False
+                for k in range(1, 6):
+                    bk = end_full + k
+                    if touch_mid[bk]:
+                        bar_counts[k] += 1
+                        found = True
+                        break
+                    # k봉째 미터치 → 다음 봉 검사
     
     success_rate = success / total * 100.0 if total > 0 else None
-    return {"events": total, "success": success, "success_rate": success_rate}
+    bar_rates = {}
+    for k in range(1, 6):
+        bar_rates[k] = bar_counts[k] / failed_in_n * 100.0 if failed_in_n > 0 else None
+    
+    return {
+        "events": total,
+        "success": success,
+        "success_rate": success_rate,
+        "failed_in_n": failed_in_n,
+        "next5_bar_counts": bar_counts,
+        "next5_bar_rates": bar_rates,
+    }
 
 
 def collect_event_returns(

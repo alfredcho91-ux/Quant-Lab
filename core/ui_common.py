@@ -6,8 +6,7 @@ from typing import Dict, List
 def get_strategy_explainer(
     lang: str,
     rsi_ob: int,
-    rsi2_ob: int,
-    ema_len: int,
+    sma_main_len: int,
     sma1_len: int,
     sma2_len: int,
 ) -> Dict[str, Dict[str, str]]:
@@ -15,18 +14,17 @@ def get_strategy_explainer(
     전략 설명 텍스트 (한국어 / English)
     """
     rsi_os = 100 - rsi_ob
-    rsi2_os = 100 - rsi2_ob
 
     if lang == "English":
         return {
             "Connors": {
-                "concept": "Very short RSI(2) reversion to capture snapbacks after extreme moves.",
+                "concept": "RSI(14) reversion to capture snapbacks after extreme moves.",
                 "Long": (
-                    f"RSI(2) < {rsi2_os} & price > EMA({ema_len}). "
+                    f"RSI(14) < {rsi_os} & price > SMA({sma_main_len}). "
                     f"Exit: TP/SL or price crosses above SMA({sma1_len}) again."
                 ),
                 "Short": (
-                    f"RSI(2) > {rsi2_ob} & price < EMA({ema_len}). "
+                    f"RSI(14) > {rsi_ob} & price < SMA({sma_main_len}). "
                     f"Exit: TP/SL or price crosses below SMA({sma1_len}) again."
                 ),
                 "regime": "Range to mild trend; after panic drops/pumps.",
@@ -39,14 +37,14 @@ def get_strategy_explainer(
             },
             "Turtle": {
                 "concept": "Donchian breakout trend-following.",
-                "Long": "Close breaks recent Donchian High & close > EMA.",
-                "Short": "Close breaks recent Donchian Low & close < EMA.",
+                "Long": "Close breaks recent Donchian High & close > SMA.",
+                "Short": "Close breaks recent Donchian Low & close < SMA.",
                 "regime": "Strong Bull/Bear trends; beware whipsaws in ranges.",
             },
             "MR": {
                 "concept": "Mean reversion after overshoot beyond the bands.",
-                "Long": f"Close < BB low & RSI(14) < {rsi_os} & close > EMA.",
-                "Short": f"Close > BB upper & RSI(14) > {rsi_ob} & close < EMA.",
+                "Long": f"Close < BB low & RSI(14) < {rsi_os} & close > SMA.",
+                "Short": f"Close > BB upper & RSI(14) > {rsi_ob} & close < SMA.",
                 "regime": "Sideways or right after volatility blow-off.",
             },
             "RSI": {
@@ -78,13 +76,13 @@ def get_strategy_explainer(
     # ───────────────── 한국어 ─────────────────
     return {
         "Connors": {
-            "concept": "아주 짧은 RSI(2)로 극단의 과매도/과매수 구간에서 반등(되돌림)을 노리는 전략.",
+            "concept": "RSI(14)로 극단의 과매도/과매수 구간에서 반등(되돌림)을 노리는 전략.",
             "Long": (
-                f"RSI(2) < {rsi2_os} & 가격 > EMA({ema_len}). "
+                f"RSI(14) < {rsi_os} & 가격 > SMA({sma_main_len}). "
                 f"청산: TP/SL 또는 SMA({sma1_len}) 재돌파."
             ),
             "Short": (
-                f"RSI(2) > {rsi2_ob} & 가격 < EMA({ema_len}). "
+                f"RSI(14) > {rsi_ob} & 가격 < SMA({sma_main_len}). "
                 f"청산: TP/SL 또는 SMA({sma1_len}) 재하향."
             ),
             "regime": "횡보~약한 추세, 급등락 직후 기술적 반등/반납.",
@@ -97,14 +95,14 @@ def get_strategy_explainer(
         },
         "Turtle": {
             "concept": "Donchian 고가/저가 돌파 추세 추종.",
-            "Long": "종가가 Donchian High 상향 돌파 & EMA 위.",
-            "Short": "종가가 Donchian Low 하향 돌파 & EMA 아래.",
+            "Long": "종가가 Donchian High 상향 돌파 & SMA 위.",
+            "Short": "종가가 Donchian Low 하향 돌파 & SMA 아래.",
             "regime": "강한 불/베어 추세에 유리, 횡보 시 휩쏘 주의.",
         },
         "MR": {
             "concept": "밴드 밖 오버슈팅 후 평균 회귀.",
-            "Long": f"종가 < BB 하단 & RSI(14) < {rsi_os} & EMA 위.",
-            "Short": f"종가 > BB 상단 & RSI(14) > {rsi_ob} & EMA 아래.",
+            "Long": f"종가 < BB 하단 & RSI(14) < {rsi_os} & SMA 위.",
+            "Short": f"종가 > BB 상단 & RSI(14) > {rsi_ob} & SMA 아래.",
             "regime": "횡보 또는 과열 직후.",
         },
         "RSI": {
@@ -142,7 +140,7 @@ def get_labels(lang: str, csv_tfs: List[str]) -> Dict[str, object]:
 
     if lang == "English":
         return {
-            "sidebar_title": "💎 WolGem's Quant Master",
+            "sidebar_title": "💎 Quant Master",
             "sidebar_caption": "8 Strategies • RSI Single Knobs • Chart on Top",
             "coin_select": "Select Coin",
             "menu_title": "Menu",
@@ -173,8 +171,7 @@ def get_labels(lang: str, csv_tfs: List[str]) -> Dict[str, object]:
 
             "params": "🎛️ Parameters",
             "rsi14_ob": "RSI(14) Overbought (Oversold=100-this)",
-            "rsi2_ob": "RSI(2) Overbought (Oversold=100-this)",
-            "ema_len": "EMA Length",
+            "sma_main_len": "SMA Main Length",
             "sma1_len": "SMA1 Length",
             "sma2_len": "SMA2 Length",
             "adx_thr": "ADX Threshold (Regime)",
@@ -212,12 +209,12 @@ def get_labels(lang: str, csv_tfs: List[str]) -> Dict[str, object]:
             "scanner_update": "Update",
 
             "regime_map_title": "🗺️ Market Regime Map",
-            "regime_map_chart_title": "Price & Regime (ADX + EMA filter)",
+            "regime_map_chart_title": "Price & Regime (ADX + SMA filter)",
         }
 
     # ───────────────── 한국어 라벨 ─────────────────
     return {
-        "sidebar_title": "💎 월젬의 퀀트 마스터",
+        "sidebar_title": "💎 퀀트 마스터",
         "sidebar_caption": "8 Strategies • RSI Single Knobs • Chart on Top",
         "coin_select": "코인 선택",
         "menu_title": "메뉴",
@@ -248,8 +245,7 @@ def get_labels(lang: str, csv_tfs: List[str]) -> Dict[str, object]:
 
         "params": "🎛️ 파라미터",
         "rsi14_ob": "RSI(14) 과매수 (과매도=100-이값)",
-        "rsi2_ob": "RSI(2) 과매수 (과매도=100-이값)",
-        "ema_len": "EMA 길이",
+        "sma_main_len": "메인 SMA 길이",
         "sma1_len": "SMA1 길이",
         "sma2_len": "SMA2 길이",
         "adx_thr": "ADX 임계값 (장세구분)",
@@ -287,5 +283,5 @@ def get_labels(lang: str, csv_tfs: List[str]) -> Dict[str, object]:
         "scanner_update": "Update",
 
         "regime_map_title": "🗺️ Market Regime Map",
-        "regime_map_chart_title": "가격과 장세(ADX + EMA 필터)",
+        "regime_map_chart_title": "가격과 장세(ADX + SMA 필터)",
     }

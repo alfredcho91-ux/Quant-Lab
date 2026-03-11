@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { ChevronDown, ChevronUp, Download } from 'lucide-react';
 import type { Trade, RegimeStat } from '../types';
-import { useStore } from '../store/useStore';
+import { useLanguage } from '../store/useStore';
 import { getLabels } from '../store/labels';
 
 interface TradesTableProps {
@@ -11,7 +11,7 @@ interface TradesTableProps {
 }
 
 export default function TradesTable({ trades, regimeStats }: TradesTableProps) {
-  const { language } = useStore();
+  const language = useLanguage();
   const labels = getLabels(language);
   const [activeTab, setActiveTab] = useState<'history' | 'regime'>('history');
   const [sortBy, setSortBy] = useState<'time' | 'pnl'>('time');
@@ -245,4 +245,3 @@ export default function TradesTable({ trades, regimeStats }: TradesTableProps) {
     </div>
   );
 }
-

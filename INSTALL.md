@@ -1,6 +1,6 @@
 # 📦 설치 가이드 (Installation Guide)
 
-이 문서는 WolGem Quant Master의 상세 설치 방법을 설명합니다.
+이 문서는 Quant Master의 상세 설치 방법을 설명합니다.
 
 ## 사전 요구사항
 
@@ -163,7 +163,7 @@ TIMEZONE_OFFSET=-5
 VITE_API_URL=http://localhost:8000
 ```
 
-자세한 환경 변수 설명은 [README.md](./README.md#-환경-변수)를 참조하세요.
+자세한 환경 변수 설명은 이 문서의 위 섹션(환경 변수 예시)을 기준으로 설정하세요.
 
 ## 테스트 실행
 

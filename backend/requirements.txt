@@ -4,6 +4,7 @@ pandas>=2.0.0
 numpy>=1.24.0
 ccxt>=4.0.0
 requests>=2.31.0
+urllib3<2  # temporary pin for LibreSSL-based local Python environments
 python-multipart>=0.0.6
 pydantic>=2.5.0
 pytest>=7.4.0

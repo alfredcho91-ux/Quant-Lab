@@ -1,9 +1,9 @@
 // Candlestick Chart component using Plotly
 import { useMemo } from 'react';
-import Plot from 'react-plotly.js';
+import Plot from './PlotlyLite';
 import type { OHLCV, Trade, SRLevel } from '../types';
 
-interface ChartProps {
+export interface ChartProps {
   data: OHLCV[];
   trades?: Trade[];
   srLevels?: SRLevel[];
@@ -42,14 +42,14 @@ export default function Chart({
       yaxis: 'y',
     });
 
-    // EMA
-    if (showMA && data[0]?.EMA_main !== undefined) {
+    // Main SMA
+    if (showMA && data[0]?.SMA_main !== undefined) {
       traces.push({
         type: 'scatter',
         mode: 'lines',
         x: data.map((d) => d.open_dt),
-        y: data.map((d) => d.EMA_main ?? null),
-        name: 'EMA 200',
+        y: data.map((d) => d.SMA_main ?? null),
+        name: 'SMA 200',
         line: { color: '#fbbf24', width: 1 },
         xaxis: 'x',
         yaxis: 'y',
@@ -299,4 +299,3 @@ export default function Chart({
     </div>
   );
 }
-

@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { ChevronDown, ChevronUp, BookOpen } from 'lucide-react';
 import { getStrategyInfo } from '../api/client';
-import { useStore } from '../store/useStore';
+import { useBacktestParams, useLanguage } from '../store/useStore';
 import { getLabels } from '../store/labels';
 
 interface StrategyExplainerProps {
@@ -11,7 +11,8 @@ interface StrategyExplainerProps {
 }
 
 export default function StrategyExplainer({ strategyId }: StrategyExplainerProps) {
-  const { language, backtestParams } = useStore();
+  const language = useLanguage();
+  const backtestParams = useBacktestParams();
   const labels = getLabels(language);
   const [expanded, setExpanded] = useState(false);
 
@@ -20,8 +21,7 @@ export default function StrategyExplainer({ strategyId }: StrategyExplainerProps
     queryFn: () =>
       getStrategyInfo(strategyId, language, {
         rsi_ob: backtestParams.rsi_ob,
-        rsi2_ob: backtestParams.rsi2_ob,
-        ema_len: backtestParams.ema_len,
+        sma_main_len: backtestParams.sma_main_len,
         sma1_len: backtestParams.sma1_len,
         sma2_len: backtestParams.sma2_len,
       }),
@@ -37,7 +37,7 @@ export default function StrategyExplainer({ strategyId }: StrategyExplainerProps
         className="w-full flex items-center justify-between p-4 hover:bg-dark-700/50 transition-colors"
       >
         <div className="flex items-center gap-2">
-          <BookOpen className="w-5 h-5 text-emerald-400" />
+          <BookOpen className="w-5 h-5 text-primary-400" />
           <span className="font-medium">{labels.expander_edu}</span>
         </div>
         {expanded ? (
@@ -88,4 +88,3 @@ export default function StrategyExplainer({ strategyId }: StrategyExplainerProps
     </div>
   );
 }
-

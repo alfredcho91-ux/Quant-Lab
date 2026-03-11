@@ -1,34 +1,13 @@
 /**
  * 분석 컨트롤 패널 컴포넌트
- * 타임프레임 선택, 패턴 설정, 실행 버튼
+ * 패턴 설정, 실행 버튼
  */
 import { RefreshCw, BarChart2 } from 'lucide-react';
 import type { PatternCondition } from '../utils/patternHelper';
 import { getPatternPreview } from '../utils/patternHelper';
 
-const TIMEFRAMES = [
-  { label: '월봉', value: '1M' },
-  { label: '주봉', value: '1w' },
-  { label: '1일봉', value: '1d' },
-  { label: '3일봉', value: '3d' },
-  { label: '4시간봉', value: '4h' },
-  { label: '2시간봉', value: '2h' },
-  { label: '1시간봉', value: '1h' },
-];
-
-const TIMEFRAMES_EN = [
-  { label: 'Monthly', value: '1M' },
-  { label: 'Weekly', value: '1w' },
-  { label: '1 Day', value: '1d' },
-  { label: '3 Days', value: '3d' },
-  { label: '4 Hours', value: '4h' },
-  { label: '2 Hours', value: '2h' },
-  { label: '1 Hour', value: '1h' },
-];
-
 interface AnalysisControlsProps {
   // State
-  interval: string;
   useComplexPattern: boolean;
   condition1: PatternCondition;
   condition2: PatternCondition;
@@ -36,7 +15,6 @@ interface AnalysisControlsProps {
   isPending: boolean;
   isKo: boolean;
   // Handlers
-  onIntervalChange: (interval: string) => void;
   onUseComplexPatternChange: (value: boolean) => void;
   onCondition1Change: (condition: PatternCondition) => void;
   onCondition2Change: (condition: PatternCondition) => void;
@@ -45,44 +23,22 @@ interface AnalysisControlsProps {
 }
 
 export default function AnalysisControls({
-  interval,
   useComplexPattern,
   condition1,
   condition2,
   minTotalBodyPct,
   isPending,
   isKo,
-  onIntervalChange,
   onUseComplexPatternChange,
   onCondition1Change,
   onCondition2Change,
   onMinTotalBodyPctChange,
   onRun,
 }: AnalysisControlsProps) {
-  const timeframes = isKo ? TIMEFRAMES : TIMEFRAMES_EN;
-
   return (
     <div className="card p-6 space-y-5">
-      {/* 타임프레임 선택 */}
-      <div>
-        <label className="block text-sm font-medium text-dark-300 mb-2">
-          {isKo ? '⏱️ 타임프레임' : '⏱️ Timeframe'}
-        </label>
-        <select
-          value={interval}
-          onChange={(e) => onIntervalChange(e.target.value)}
-          className="w-full bg-dark-800 border border-dark-600 rounded-xl px-4 py-3 text-white focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition-all"
-        >
-          {timeframes.map((tf) => (
-            <option key={tf.value} value={tf.value}>
-              {tf.label}
-            </option>
-          ))}
-        </select>
-      </div>
-
       {/* 패턴 분석 설정 */}
-      <div className="border-t border-dark-700 pt-5 space-y-5">
+      <div className="space-y-5">
         {/* 복합 패턴 분석 체크박스 */}
         <div className="flex items-center gap-3">
           <input
@@ -134,7 +90,7 @@ export default function AnalysisControls({
                   onClick={() => onCondition1Change({ ...condition1, direction: 'green' })}
                   className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-all ${
                     condition1.direction === 'green'
-                      ? 'bg-emerald-500/20 text-emerald-400 border-2 border-emerald-500/50'
+                      ? 'bg-primary-500/20 text-primary-400 border-2 border-primary-500/50'
                       : 'bg-dark-700 text-dark-300 border-2 border-transparent hover:bg-dark-600'
                   }`}
                 >
@@ -193,7 +149,7 @@ export default function AnalysisControls({
                       onClick={() => onCondition2Change({ ...condition2, direction: 'green' })}
                       className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-all ${
                         condition2.direction === 'green'
-                          ? 'bg-emerald-500/20 text-emerald-400 border-2 border-emerald-500/50'
+                          ? 'bg-primary-500/20 text-primary-400 border-2 border-primary-500/50'
                           : 'bg-dark-700 text-dark-300 border-2 border-transparent hover:bg-dark-600'
                       }`}
                     >

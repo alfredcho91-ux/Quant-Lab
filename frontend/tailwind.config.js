@@ -7,7 +7,7 @@ export default {
   theme: {
     extend: {
       colors: {
-        primary: {
+        emerald: {
           50: '#f0fdf4',
           100: '#dcfce7',
           200: '#bbf7d0',
@@ -19,22 +19,35 @@ export default {
           800: '#166534',
           900: '#14532d',
         },
-        dark: {
-          50: '#f8fafc',
-          100: '#f1f5f9',
-          200: '#e2e8f0',
-          300: '#cbd5e1',
-          400: '#94a3b8',
-          500: '#64748b',
-          600: '#475569',
-          700: '#334155',
-          800: '#1e293b',
-          900: '#0f172a',
-          950: '#020617',
+        primary: {
+          50: '#e7ebff',
+          100: '#cfd7ff',
+          200: '#9facff',
+          300: '#6f81eb',
+          400: '#072ac8',
+          500: '#072ac8',
+          600: '#0623a9',
+          700: '#051c87',
+          800: '#041566',
+          900: '#030f47',
         },
-        bull: '#26a69a',
-        bear: '#ef5350',
-        warning: '#ffb300',
+        dark: {
+          50: '#eef3fb',
+          100: '#e6edf7',
+          200: '#c9d4e6',
+          300: '#aebcd3',
+          400: '#94a3b8',
+          500: '#7386a3',
+          600: '#4f607d',
+          700: '#27324a',
+          800: '#121a2b',
+          900: '#0f172a',
+          950: '#070b16',
+        },
+        bull: '#22c55e',
+        bear: '#ef4444',
+        warning: '#f59e0b',
+        info: '#38bdf8',
       },
       fontFamily: {
         mono: ['JetBrains Mono', 'Fira Code', 'monospace'],
@@ -59,4 +72,3 @@ export default {
   },
   plugins: [],
 }
-

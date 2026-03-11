@@ -32,13 +32,24 @@ class DataCache:
         _misses: 캐시 미스 횟수
     """
     
-    def __init__(self, ttl_minutes: int = 5, cache_dir: Optional[str] = None):
+    def __init__(
+        self,
+        ttl_minutes: int = 5,
+        cache_dir: Optional[str] = None,
+        ttl_seconds: Optional[int] = None,
+    ):
         """
         Args:
             ttl_minutes: 캐시 TTL (분 단위)
             cache_dir: 캐시 디렉토리 경로 (None이면 기본값 사용)
+            ttl_seconds: 캐시 TTL (초 단위, 지정 시 ttl_minutes보다 우선)
         """
-        self.ttl_seconds = ttl_minutes * 60
+        if ttl_seconds is not None and ttl_seconds > 0:
+            self.ttl_seconds = int(ttl_seconds)
+        else:
+            self.ttl_seconds = ttl_minutes * 60
+        # Fallback 메모리 캐시 상한 (diskcache 미사용 환경 안전장치)
+        self.memory_max_items = int(os.getenv("MEMORY_CACHE_MAX_ITEMS", "5000"))
         
         if DISKCACHE_AVAILABLE:
             # 캐시 디렉토리 설정
@@ -61,6 +72,30 @@ class DataCache:
         
         self._hits = 0
         self._misses = 0
+
+    def _evict_expired_memory_entries(self) -> None:
+        """Fallback 메모리 캐시에서 만료 항목 제거."""
+        if self._use_diskcache:
+            return
+        now = datetime.now()
+        expired_keys = [
+            key
+            for key, ts in self._timestamps.items()
+            if now - ts >= timedelta(seconds=self.ttl_seconds)
+        ]
+        for key in expired_keys:
+            self._cache.pop(key, None)
+            self._timestamps.pop(key, None)
+
+    def _evict_memory_overflow(self) -> None:
+        """Fallback 메모리 캐시가 상한을 넘으면 오래된 항목부터 제거."""
+        if self._use_diskcache or len(self._cache) <= self.memory_max_items:
+            return
+        overflow = len(self._cache) - self.memory_max_items
+        oldest_keys = sorted(self._timestamps.items(), key=lambda item: item[1])[:overflow]
+        for key, _ in oldest_keys:
+            self._cache.pop(key, None)
+            self._timestamps.pop(key, None)
     
     def get(self, key: str) -> Optional[Any]:
         """
@@ -109,6 +144,8 @@ class DataCache:
             # Fallback: 메모리 캐시
             self._cache[key] = value
             self._timestamps[key] = datetime.now()
+            self._evict_expired_memory_entries()
+            self._evict_memory_overflow()
     
     def clear(self) -> None:
         """캐시 초기화"""
@@ -150,4 +187,5 @@ class DataCache:
             "total_requests": total_requests,
             "hit_rate": round(hit_rate, 2),  # 히트율 (%)
             "persistent": self._use_diskcache,  # 영속 캐시 사용 여부
+            "memory_max_items": None if self._use_diskcache else self.memory_max_items,
         }

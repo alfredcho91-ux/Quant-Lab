@@ -47,8 +47,7 @@ export interface BacktestParams {
   entry_fee_pct: number;
   exit_fee_pct: number;
   rsi_ob: number;
-  rsi2_ob: number;
-  ema_len: number;
+  sma_main_len: number;
   sma1_len: number;
   sma2_len: number;
   adx_thr: number;

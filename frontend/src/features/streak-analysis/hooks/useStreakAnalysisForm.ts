@@ -4,13 +4,15 @@
 import { useState, useEffect } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { runStreakAnalysis } from '../../../api/client';
-import { useStore } from '../../../store/useStore';
+import { useSelectedCoin, useSelectedInterval } from '../../../store/useStore';
 import { usePageCommon } from '../../../hooks/usePageCommon';
 import type { StreakAnalysisParams } from '../../../types';
 import { generatePattern, type PatternCondition } from '../utils/patternHelper';
+import { getErrorMessage } from '../../../utils/error';
 
 export function useStreakAnalysisForm() {
-  const { selectedCoin } = useStore();
+  const selectedCoin = useSelectedCoin();
+  const selectedInterval = useSelectedInterval();
   const { isKo } = usePageCommon();
   const safeSelectedCoin = selectedCoin || 'BTC';
 
@@ -27,7 +29,7 @@ export function useStreakAnalysisForm() {
 
   const [params, setParams] = useState<StreakAnalysisParams>({
     coin: safeSelectedCoin,
-    interval: '1d',
+    interval: selectedInterval,
     n_streak: 3,
     direction: 'green',
     use_complex_pattern: false,
@@ -38,12 +40,21 @@ export function useStreakAnalysisForm() {
   // 몸통 총합 필터 (Simple Mode만)
   const [minTotalBodyPct, setMinTotalBodyPct] = useState<number | null>(null);
 
-  // 코인 변경 시 업데이트
+  const mutation = useMutation({
+    mutationFn: runStreakAnalysis,
+  });
+  const resetMutation = mutation.reset;
+
+  // 코인·타임프레임(사이드바) 변경 시 동기화
   useEffect(() => {
-    if (selectedCoin) {
-      setParams((p) => ({ ...p, coin: selectedCoin }));
-    }
-  }, [selectedCoin]);
+    setParams((p) => ({
+      ...p,
+      ...(selectedCoin ? { coin: selectedCoin } : {}),
+      interval: selectedInterval,
+    }));
+    // 사이드바 변경 시 이전 분석 결과를 초기화해 stale 결과 오해를 방지
+    resetMutation();
+  }, [selectedCoin, selectedInterval, resetMutation]);
 
   // 패턴 자동 생성 (조건 변경 시)
   useEffect(() => {
@@ -57,10 +68,6 @@ export function useStreakAnalysisForm() {
       direction: useComplexPattern ? p.direction : condition1.direction,
     }));
   }, [useComplexPattern, condition1, condition2, selectedCoin]);
-
-  const mutation = useMutation({
-    mutationFn: runStreakAnalysis,
-  });
 
   // API 호출
   const handleRun = () => {
@@ -93,25 +100,19 @@ export function useStreakAnalysisForm() {
       console.log('📋 Pattern:', pattern);
 
       mutation.mutate(requestParams, {
-        onError: (error: any) => {
+        onError: (error: unknown) => {
           console.error('❌ Analysis failed:', error);
-          alert(
-            isKo
-              ? `분석 실패: ${error?.response?.data?.error || error?.message || '알 수 없는 오류'}`
-              : `Analysis failed: ${error?.response?.data?.error || error?.message || 'Unknown error'}`
-          );
+          const msg = getErrorMessage(error);
+          alert(isKo ? `분석 실패: ${msg}` : `Analysis failed: ${msg}`);
         },
         onSuccess: (data) => {
           console.log('✅ Analysis success:', data);
         },
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('❌ Error in handleRun:', error);
-      alert(
-        isKo
-          ? `오류 발생: ${error?.message || '알 수 없는 오류'}`
-          : `Error: ${error?.message || 'Unknown error'}`
-      );
+      const msg = getErrorMessage(error);
+      alert(isKo ? `오류 발생: ${msg}` : `Error: ${msg}`);
     }
   };
 

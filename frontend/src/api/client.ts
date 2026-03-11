@@ -1,4 +1,4 @@
-// API client for WolGem Quant Master
+// API client for Quant Master
 // 모든 API 함수를 기능별 모듈에서 re-export
 
 // 시장 데이터
@@ -22,11 +22,11 @@ export * from './journal';
 // 연속 봉패턴 분석
 export * from './streak';
 
-// 주간 패턴 분석
-export * from './weekly-pattern';
-
 // 하이브리드 전략 분석
 export * from './hybrid';
+
+// AI Lab
+export * from './ai_lab';
 
 // 공통 설정 (내부 사용)
 export { api } from './config';

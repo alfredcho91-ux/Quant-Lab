@@ -61,6 +61,28 @@ export interface IntervalProbability {
   bonferroni_significant?: boolean;
 }
 
+export interface ConditionalHeatmapCell {
+  rate: number | null;
+  sample_size: number;
+  ci_lower: number | null;
+  ci_upper: number | null;
+  is_reliable: boolean;
+  reliability: 'high' | 'medium' | 'low';
+  is_significant: boolean;
+  bonferroni_significant: boolean;
+}
+
+export interface ConditionalHeatmap {
+  x_label: string;
+  y_label: string;
+  x_bins: string[];
+  y_bins: string[];
+  cells: Record<string, Record<string, ConditionalHeatmapCell>>;
+  total_samples: number;
+  tested_cells: number;
+  significant_cells: number;
+}
+
 export interface ConfidenceInterval {
   rate: number;
   ci_lower: number;
@@ -127,8 +149,11 @@ export interface StreakAnalysisResult {
   volatility_stats?: VolatilityStats;
   rsi_by_interval?: Record<string, IntervalProbability>;
   disp_by_interval?: Record<string, IntervalProbability>;
+  atr_by_interval?: Record<string, IntervalProbability>;
+  rsi_atr_heatmap?: ConditionalHeatmap | null;
   high_prob_rsi_intervals?: Record<string, IntervalProbability>;
   high_prob_disp_intervals?: Record<string, IntervalProbability>;
+  high_prob_atr_intervals?: Record<string, IntervalProbability>;
   complex_pattern_analysis?: ComplexPatternAnalysis | null;
   ny_trading_guide?: NYTradingGuide;
   analysis_mode?: {
@@ -168,9 +193,12 @@ export interface ComplexPatternAnalysis {
   volatility_stats?: VolatilityStats;
   rsi_by_interval?: Record<string, IntervalProbability>;
   disp_by_interval?: Record<string, IntervalProbability>;
+  atr_by_interval?: Record<string, IntervalProbability>;
+  rsi_atr_heatmap?: ConditionalHeatmap | null;
   retracement_by_interval?: Record<string, IntervalProbability>;
   high_prob_rsi_intervals?: Record<string, IntervalProbability>;
   high_prob_disp_intervals?: Record<string, IntervalProbability>;
+  high_prob_atr_intervals?: Record<string, IntervalProbability>;
   high_prob_retracement_intervals?: Record<string, IntervalProbability>;
   comparative_report?: ComparativeReport | null;
 }

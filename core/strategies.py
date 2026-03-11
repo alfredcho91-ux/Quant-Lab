@@ -3,8 +3,8 @@
 STRATS = [
     {
         "id": "Connors",
-        "name_ko": "A1. Connors (RSI2 역추세)",
-        "name_en": "A1. Connors (RSI2 Reversion)",
+        "name_ko": "A1. Connors (RSI 역추세)",
+        "name_en": "A1. Connors (RSI Reversion)",
         "prefix": "Sig_Connors",
         "logic": "Connors",
     },

@@ -307,6 +307,7 @@ my_quant_V2/
 │   ├── main.py             # 메인 앱 (Router 등록 및 CORS 설정)
 │   ├── __init__.py         # 패키지 초기화 (경로 설정 통합 관리)
 │   ├── routes/             # 분리된 API 라우터 (모듈화된 엔드포인트)
+│   │   ├── ai_lab.py      # AI 퀀트 연구소 API (/api/ai/research)
 │   │   ├── backtest.py    # 백테스트 API (/api/backtest*, /api/backtest-advanced)
 │   │   ├── journal.py     # 매매 일지 API (/api/journal)
 │   │   ├── market.py      # 시장 데이터 API (/api/market/*, /api/support-resistance/*)
@@ -323,6 +324,10 @@ my_quant_V2/
 │   │   ├── statistics.py  # 백테스트 통계 계산 (Sharpe, Sortino, MDD, Monte Carlo)
 │   │   └── pattern_logic.py # 패턴 감지 및 통계 계산
 │   ├── strategy/           # 전략 모듈 (비즈니스 로직)
+│   │   ├── ai_lab/         # AI 퀀트 연구소 로직
+│   │   │   ├── service.py  # AI 백테스트 오케스트레이션
+│   │   │   ├── parser.py   # 자연어 프롬프트 파싱
+│   │   │   └── analyzer.py # 조건부 확률 분석
 │   │   ├── common.py       # 공통 통계 함수 (re-export from streak/common)
 │   │   ├── streak/         # 연속 봉패턴 분석 전략
 │   │   │   ├── simple_strategy.py  # 심플 모드
@@ -369,6 +374,7 @@ my_quant_V2/
 │   │   │   ├── usePageCommon.ts       # 페이지 공통 훅 (language, labels, timeframes 등)
 │   │   │   └── useAnalysisMutation.ts # 분석 API Mutation 훅 (에러 처리, 파라미터 동기화)
 │   │   ├── pages/         # 페이지 컴포넌트
+│   │   │   ├── AIStrategyLabPage.tsx       # AI 퀀트 연구소 페이지
 │   │   │   ├── StreakAnalysisPage.tsx      # 연속 봉패턴 분석 페이지
 │   │   │   ├── WeeklyPatternPage.tsx       # 주간 패턴 분석 페이지
 │   │   │   ├── BBMidPage.tsx               # 볼밴 중단 회귀 페이지
@@ -532,6 +538,7 @@ my_quant_V2/
 | GET | `/api/market/ohlcv/{coin}/{interval}` | OHLCV 데이터 | JSON |
 | GET | `/api/strategies` | 전략 목록 | JSON |
 | GET | `/api/strategy-info/{id}` | 전략 설명 | JSON |
+| POST | `/api/ai/research` | AI 퀀트 연구소 (자연어 백테스트/확률 분석) | AIResearchRequest → AIResearchResponse |
 | POST | `/api/backtest` | 백테스트 실행 | BacktestParams → BacktestResult |
 | POST | `/api/backtest-advanced` | 고급 백테스트 | AdvancedBacktestParams → AdvancedBacktestResult |
 | POST | `/api/streak-analysis` | 연속 봉패턴 분석 | StreakAnalysisParams → StreakAnalysisResult |
