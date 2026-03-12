@@ -6,6 +6,8 @@ import Layout from './components/Layout';
 
 const AIStrategyLabPage = lazy(() => import('./pages/AIStrategyLabPage'));
 const TrendJudgmentPage = lazy(() => import('./pages/TrendJudgmentPage'));
+const BacktestPage = lazy(() => import('./pages/BacktestPage'));
+const AdvancedBacktestPage = lazy(() => import('./pages/AdvancedBacktestPage'));
 const BBMidPage = lazy(() => import('./pages/BBMidPage'));
 const ComboFilterPage = lazy(() => import('./pages/ComboFilterPage'));
 const HybridAnalysisPage = lazy(() => import('./pages/HybridAnalysisPage'));
@@ -24,9 +26,9 @@ function App() {
         <Routes>
           <Route path="/" element={<Layout />}>
             <Route index element={<Navigate to="/trend-judgment" replace />} />
-            {/* 백테스트 페이지 숨김 */}
-            {/* <Route path="backtest" element={<BacktestPage />} /> */}
-            {/* <Route path="backtest-advanced" element={<AdvancedBacktestPage />} /> */}
+            {/* 백테스트 페이지 복구 */}
+            <Route path="backtest" element={<BacktestPage />} />
+            <Route path="backtest-advanced" element={<AdvancedBacktestPage />} />
             <Route path="trend-judgment" element={<TrendJudgmentPage />} />
             <Route path="bb-mid" element={<BBMidPage />} />
             <Route path="combo-filter" element={<ComboFilterPage />} />

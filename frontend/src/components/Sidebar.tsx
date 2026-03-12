@@ -19,6 +19,8 @@ import {
   Flame,
   Zap,
   Bot,
+  Rocket,
+  FlaskConical,
 } from 'lucide-react';
 import {
   useBackgroundTheme,
@@ -38,7 +40,7 @@ import type { Coin, Language } from '../types';
 import type { BackgroundTheme, Interval } from '../store/useStore';
 
 const COINS: Coin[] = ['BTC', 'ETH', 'SOL', 'XRP'];
-const INTERVALS: Interval[] = ['15m', '1h', '2h', '4h', '1d', '3d', '1w', '1M'];
+const INTERVALS: Interval[] = ['15m', '30m', '1h', '2h', '4h', '1d', '3d', '1w', '1M'];
 
 const menuItems = [
   // 주요 분석 페이지 (맨 위)
@@ -52,9 +54,9 @@ const menuItems = [
   { path: '/pattern', icon: BarChart3, labelKey: 'menu_pattern' as const },
   { path: '/pattern-scanner', icon: Search, labelKey: 'menu_pattern_scanner' as const },
   { path: '/strategy-scanner', icon: Radio, labelKey: 'menu_strategy_scanner' as const },
-  // 백테스트 페이지 숨김
-  // { path: '/backtest', icon: Rocket, labelKey: 'menu_backtest' as const },
-  // { path: '/backtest-advanced', icon: FlaskConical, labelKey: 'menu_backtest_advanced' as const },
+  // 백테스트 페이지 복구
+  { path: '/backtest', icon: Rocket, labelKey: 'menu_backtest' as const },
+  { path: '/backtest-advanced', icon: FlaskConical, labelKey: 'menu_backtest_advanced' as const },
   { path: '/journal', icon: BookOpen, labelKey: 'menu_journal' as const },
 ];
 

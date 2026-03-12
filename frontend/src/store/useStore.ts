@@ -3,7 +3,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { Language, Coin, MenuPage, BacktestParams } from '../types';
 
-const INTERVALS = ['15m', '1h', '2h', '4h', '1d', '3d', '1w', '1M'] as const;
+const INTERVALS = ['15m', '30m', '1h', '2h', '4h', '1d', '3d', '1w', '1M'] as const;
 export type Interval = (typeof INTERVALS)[number];
 export type BackgroundTheme = 'default' | 'white' | 'black';
 
