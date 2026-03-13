@@ -165,62 +165,125 @@ function IntervalBlock({
   );
 }
 
-function HeatmapBlock({ heatmap, isKo }: { heatmap: ConditionalHeatmap; isKo: boolean }) {
+function HeatmapBlock({
+  heatmap,
+  isKo,
+  currentValues,
+}: {
+  heatmap: ConditionalHeatmap;
+  isKo: boolean;
+  currentValues?: { rsi?: number | null; atr?: number | null };
+}) {
   const xBins = heatmap.x_bins ?? [];
   const yBins = heatmap.y_bins ?? [];
   if (xBins.length === 0 || yBins.length === 0) {
     return null;
   }
 
+  // Determine which axis is RSI and which is ATR based on labels
+  const isXRsi = heatmap.x_label.toLowerCase().includes('rsi');
+  const isYRsi = heatmap.y_label.toLowerCase().includes('rsi');
+  const isXAtr = heatmap.x_label.toLowerCase().includes('atr');
+  const isYAtr = heatmap.y_label.toLowerCase().includes('atr');
+
   return (
-    <div className="bg-dark-800 rounded-xl p-4">
-      <div className="text-amber-400 font-semibold mb-3 flex items-center gap-2">
-        🧩 {isKo ? '조건 결합 히트맵' : 'Condition Heatmap'} ({heatmap.x_label} × {heatmap.y_label})
+    <div className="bg-dark-800 rounded-xl p-4 col-span-1 md:col-span-3 overflow-hidden">
+      <div className="text-amber-400 font-semibold mb-3 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          🧩 {isKo ? '조건 결합 히트맵' : 'Condition Heatmap'} ({heatmap.x_label} × {heatmap.y_label})
+        </div>
+        {currentValues && (currentValues.rsi != null || currentValues.atr != null) && (
+          <div className="text-xs font-mono bg-blue-500/20 text-blue-400 px-2 py-1 rounded border border-blue-500/30">
+            {isKo ? '현재' : 'Current'}:{' '}
+            {currentValues.rsi != null && `RSI ${currentValues.rsi.toFixed(1)}`}
+            {currentValues.rsi != null && currentValues.atr != null && ' / '}
+            {currentValues.atr != null && `ATR ${currentValues.atr.toFixed(2)}%`}
+          </div>
+        )}
       </div>
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[680px] border-separate border-spacing-1 text-xs">
+      <div className="overflow-x-auto pb-2">
+        <table className="w-full min-w-full border-separate border-spacing-1 text-xs">
           <thead>
             <tr>
               <th className="text-left text-dark-400 font-medium px-2 py-1 whitespace-nowrap">
                 {heatmap.y_label} \ {heatmap.x_label}
               </th>
-              {xBins.map((xBin) => (
-                <th key={xBin} className="text-center text-dark-400 font-medium px-2 py-1 whitespace-nowrap">
-                  {xBin}
-                </th>
-              ))}
+              {xBins.map((xBin) => {
+                const isCurrentX = isXRsi
+                  ? isValueInInterval(currentValues?.rsi, xBin)
+                  : isXAtr
+                    ? isValueInInterval(currentValues?.atr, xBin)
+                    : false;
+                return (
+                  <th
+                    key={xBin}
+                    className={`text-center font-medium px-2 py-1 whitespace-nowrap ${
+                      isCurrentX ? 'text-blue-400 bg-blue-500/10 rounded' : 'text-dark-400'
+                    }`}
+                  >
+                    {xBin}
+                  </th>
+                );
+              })}
             </tr>
           </thead>
           <tbody>
-            {yBins.map((yBin) => (
-              <tr key={yBin}>
-                <th className="text-left text-dark-400 font-medium px-2 py-2 whitespace-nowrap">{yBin}</th>
-                {xBins.map((xBin) => {
-                  const cell = heatmap.cells?.[yBin]?.[xBin];
-                  return (
-                    <td
-                      key={`${yBin}-${xBin}`}
-                      className={`relative rounded border px-2 py-2 text-center align-middle ${getHeatmapCellClass(
-                        cell
-                      )}`}
-                    >
-                      {cell?.bonferroni_significant && (
-                        <span className="absolute right-1 top-1 text-[10px] text-primary-300">✓✓</span>
-                      )}
-                      {!cell?.bonferroni_significant && cell?.is_significant && (
-                        <span className="absolute right-1 top-1 text-[10px] text-amber-300">✓</span>
-                      )}
-                      <div className="font-semibold leading-tight">
-                        {cell?.rate == null ? '—' : `${cell.rate.toFixed(1)}%`}
-                      </div>
-                      <div className="text-[10px] text-dark-400 leading-tight">
-                        n={cell?.sample_size ?? 0}
-                      </div>
-                    </td>
-                  );
-                })}
-              </tr>
-            ))}
+            {yBins.map((yBin) => {
+              const isCurrentY = isYRsi
+                ? isValueInInterval(currentValues?.rsi, yBin)
+                : isYAtr
+                  ? isValueInInterval(currentValues?.atr, yBin)
+                  : false;
+              return (
+                <tr key={yBin}>
+                  <th
+                    className={`text-left font-medium px-2 py-2 whitespace-nowrap ${
+                      isCurrentY ? 'text-blue-400 bg-blue-500/10 rounded' : 'text-dark-400'
+                    }`}
+                  >
+                    {yBin}
+                  </th>
+                  {xBins.map((xBin) => {
+                    const cell = heatmap.cells?.[yBin]?.[xBin];
+                    const isCurrentX = isXRsi
+                      ? isValueInInterval(currentValues?.rsi, xBin)
+                      : isXAtr
+                        ? isValueInInterval(currentValues?.atr, xBin)
+                        : false;
+                    const isCurrentCell = isCurrentX && isCurrentY;
+
+                    return (
+                      <td
+                        key={`${yBin}-${xBin}`}
+                        className={`relative rounded border px-2 py-2 text-center align-middle ${
+                          isCurrentCell
+                            ? 'ring-2 ring-blue-500 bg-blue-500/20 border-blue-500/50 z-10'
+                            : getHeatmapCellClass(cell)
+                        }`}
+                      >
+                        {isCurrentCell && (
+                          <span className="absolute -top-2 -right-2 bg-blue-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full shadow-lg z-20">
+                            Current
+                          </span>
+                        )}
+                        {cell?.bonferroni_significant && (
+                          <span className="absolute right-1 top-1 text-[10px] text-primary-300">✓✓</span>
+                        )}
+                        {!cell?.bonferroni_significant && cell?.is_significant && (
+                          <span className="absolute right-1 top-1 text-[10px] text-amber-300">✓</span>
+                        )}
+                        <div className="font-semibold leading-tight">
+                          {cell?.rate == null ? '—' : `${cell.rate.toFixed(1)}%`}
+                        </div>
+                        <div className="text-[10px] text-dark-400 leading-tight">
+                          n={cell?.sample_size ?? 0}
+                        </div>
+                      </td>
+                    );
+                  })}
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
@@ -295,7 +358,7 @@ export default function IntervalAnalysisTable({ result, isKo, currentValues }: I
             currentValue={currentValues?.atr}
           />
         )}
-        {hasHeatmap && rsiAtrHeatmap && <HeatmapBlock heatmap={rsiAtrHeatmap} isKo={isKo} />}
+        {hasHeatmap && rsiAtrHeatmap && <HeatmapBlock heatmap={rsiAtrHeatmap} isKo={isKo} currentValues={currentValues} />}
       </div>
 
       <div className="mt-3 pt-3 border-t border-dark-700 flex flex-wrap gap-3 text-xs">
