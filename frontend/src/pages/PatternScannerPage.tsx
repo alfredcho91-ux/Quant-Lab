@@ -54,7 +54,7 @@ export default function PatternScannerPage() {
 
     return (
       <span className={stat.last_on ? (stat.direction === 'bull' ? 'text-bull' : 'text-bear') : 'text-dark-300'}>
-        {statusIcon} {stat.hit_rate.toFixed(1)}% (n={stat.signals})
+        {statusIcon} {stat.hit_rate.toFixed(2)}% (n={stat.signals})
       </span>
     );
   };

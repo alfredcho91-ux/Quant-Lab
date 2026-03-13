@@ -277,7 +277,7 @@ export default function PatternPage() {
                         stat.winRate >= 50 ? 'text-bull' : 'text-bear'
                       }`}
                     >
-                      {stat.winRate.toFixed(1)}%
+                      {stat.winRate.toFixed(2)}%
                     </td>
                   </tr>
                 ))}

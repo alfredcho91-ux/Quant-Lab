@@ -223,7 +223,7 @@ export default function TradesTable({ trades, regimeStats }: TradesTableProps) {
                   </div>
                   <div className="flex justify-between">
                     <span className="text-dark-400">Win Rate</span>
-                    <span className="font-mono">{stat.WinRate.toFixed(1)}%</span>
+                    <span className="font-mono">{stat.WinRate.toFixed(2)}%</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-dark-400">Avg PnL</span>

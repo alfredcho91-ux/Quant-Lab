@@ -197,7 +197,7 @@ export default function BacktestPage() {
             />
             <MetricCard
               label={labels.winrate}
-              value={`${result.summary.win_rate.toFixed(1)}%`}
+              value={`${result.summary.win_rate.toFixed(2)}%`}
               trend={result.summary.win_rate >= 50 ? 'up' : 'down'}
             />
             <MetricCard

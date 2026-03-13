@@ -373,7 +373,7 @@ export default function ComboFilterPage() {
             </div>
             <div className="bg-dark-800 rounded-lg p-4 text-center">
               <div className="text-2xl font-bold text-primary-400">
-                {result.hit_rate?.toFixed(1) || '-'}%
+                {result.hit_rate?.toFixed(2) || '-'}%
               </div>
               <div className="text-sm text-dark-400">{isKo ? '달성률' : 'Hit Rate'}</div>
             </div>

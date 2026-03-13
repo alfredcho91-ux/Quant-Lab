@@ -215,7 +215,7 @@ export default function BBMidPage() {
                       style={{ width: `${row.success_rate ?? 0}%` }}
                     >
                       <span className="text-xs font-bold text-white">
-                        {row.success_rate?.toFixed(1) ?? 0}%
+                        {row.success_rate?.toFixed(2) ?? 0}%
                       </span>
                     </div>
                   </div>

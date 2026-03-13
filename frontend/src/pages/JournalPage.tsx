@@ -92,7 +92,7 @@ export default function JournalPage() {
           <div className="text-sm text-dark-400">{isKo ? '총 거래' : 'Total Trades'}</div>
         </div>
         <div className="card p-4 text-center">
-          <div className="text-2xl font-bold text-primary-400">{winRate.toFixed(1)}%</div>
+          <div className="text-2xl font-bold text-primary-400">{winRate.toFixed(2)}%</div>
           <div className="text-sm text-dark-400">{isKo ? '승률' : 'Win Rate'}</div>
         </div>
         <div className="card p-4 text-center">

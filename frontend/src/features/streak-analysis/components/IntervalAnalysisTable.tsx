@@ -273,7 +273,7 @@ function HeatmapBlock({
                           <span className="absolute right-1 top-1 text-[10px] text-amber-300">✓</span>
                         )}
                         <div className="font-semibold leading-tight">
-                          {cell?.rate == null ? '—' : `${cell.rate.toFixed(1)}%`}
+                          {cell?.rate == null ? '—' : `${cell.rate.toFixed(2)}%`}
                         </div>
                         <div className="text-[10px] text-dark-400 leading-tight">
                           n={cell?.sample_size ?? 0}
