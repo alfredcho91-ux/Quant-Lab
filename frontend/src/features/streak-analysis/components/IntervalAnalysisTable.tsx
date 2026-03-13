@@ -295,22 +295,6 @@ export default function IntervalAnalysisTable({ result, isKo, currentValues }: I
             currentValue={currentValues?.atr}
           />
         )}
-        {hasDisp && dispByInterval && (
-          <IntervalBlock
-            title={isKo ? '패턴 완성 시점 이격도(Disparity) 구간' : 'Disparity at Pattern Completion'}
-            prefixIcon="📏"
-            data={dispByInterval}
-            isKo={isKo}
-          />
-        )}
-        {hasAtr && atrByInterval && (
-          <IntervalBlock
-            title={isKo ? '패턴 완성 시점 ATR% 구간' : 'ATR% at Pattern Completion'}
-            prefixIcon="🌊"
-            data={atrByInterval}
-            isKo={isKo}
-          />
-        )}
         {hasHeatmap && rsiAtrHeatmap && <HeatmapBlock heatmap={rsiAtrHeatmap} isKo={isKo} />}
       </div>
 
