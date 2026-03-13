@@ -1,4 +1,5 @@
 // Streak Analysis Page - 양봉/음봉 연속성 시뮬레이터
+import { useQuery } from '@tanstack/react-query';
 import { usePageCommon } from '../hooks/usePageCommon';
 import { SkeletonAnalysis } from '../components/Skeleton';
 import { Zap, AlertTriangle } from 'lucide-react';
@@ -7,6 +8,7 @@ import AnalysisControls from '../features/streak-analysis/components/AnalysisCon
 import StatisticsSummary from '../features/streak-analysis/components/StatisticsSummary';
 import VolatilityDataGrid from '../features/streak-analysis/components/VolatilityDataGrid';
 import IntervalAnalysisTable from '../features/streak-analysis/components/IntervalAnalysisTable';
+import { runTrendIndicators } from '../api/stats';
 
 export default function StreakAnalysisPage() {
   const { isKo } = usePageCommon();
@@ -28,6 +30,19 @@ export default function StreakAnalysisPage() {
   const result = mutation.data;
   const moveLabel =
     params.direction === 'green' ? (isKo ? '상승' : 'Up') : (isKo ? '하락' : 'Down');
+
+  // Fetch current indicators for highlighting in Conditional Breakdown
+  const { data: trendData } = useQuery({
+    queryKey: ['trendIndicators', params.coin, params.interval],
+    queryFn: () => runTrendIndicators({ coin: params.coin, interval: params.interval, use_csv: false }),
+    refetchInterval: 60000, // 1 minute
+  });
+
+  const currentValues = trendData?.latest ? {
+    rsi: trendData.latest.rsi,
+    disp: trendData.latest.close && trendData.latest.sma20 ? (trendData.latest.close / trendData.latest.sma20) * 100 : null,
+    atr: trendData.latest.atr_pct,
+  } : undefined;
 
   const getStrategyAdvice = () => {
     if (!result || result.continuation_rate === null) return null;
@@ -108,7 +123,7 @@ export default function StreakAnalysisPage() {
             <VolatilityDataGrid result={result} direction={params.direction} isKo={isKo} />
 
             {/* Interval Analysis Table */}
-            <IntervalAnalysisTable result={result} isKo={isKo} />
+            <IntervalAnalysisTable result={result} isKo={isKo} currentValues={currentValues} />
 
             {/* Strategy Advice */}
             {advice && (

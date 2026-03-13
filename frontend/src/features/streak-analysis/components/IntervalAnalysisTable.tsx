@@ -13,6 +13,31 @@ import type {
 interface IntervalAnalysisTableProps {
   result: StreakAnalysisResult;
   isKo: boolean;
+  currentValues?: {
+    rsi?: number | null;
+    disp?: number | null;
+    atr?: number | null;
+  };
+}
+
+function isValueInInterval(value: number | null | undefined, intervalStr: string): boolean {
+  if (value == null) return false;
+  
+  const match = intervalStr.match(/^([\[\(])([^,]+),\s*([^\]\)]+)([\]\)])$/);
+  if (!match) return false;
+  
+  const leftBracket = match[1];
+  const leftValStr = match[2];
+  const rightValStr = match[3];
+  const rightBracket = match[4];
+  
+  const leftVal = leftValStr.includes('-inf') ? -Infinity : parseFloat(leftValStr);
+  const rightVal = rightValStr.includes('inf') ? Infinity : parseFloat(rightValStr);
+  
+  const leftPass = leftBracket === '[' ? value >= leftVal : value > leftVal;
+  const rightPass = rightBracket === ']' ? value <= rightVal : value < rightVal;
+  
+  return leftPass && rightPass;
 }
 
 function getHeatmapCellClass(cell: ConditionalHeatmapCell | undefined): string {
@@ -41,37 +66,55 @@ function IntervalBlock({
   prefixIcon,
   data,
   isKo,
+  currentValue,
 }: {
   title: string;
   prefixIcon: string;
   data: Record<string, IntervalProbability>;
   isKo: boolean;
+  currentValue?: number | null;
 }) {
   return (
     <div className="bg-dark-800 rounded-xl p-4">
-      <div className="text-amber-400 font-semibold mb-3 flex items-center gap-2">
-        {prefixIcon} {title}
-        <span className="text-dark-500 text-xs font-normal">
-          ({Object.keys(data).length}
-          {isKo ? '개 구간 테스트' : ' intervals tested'})
-        </span>
+      <div className="text-amber-400 font-semibold mb-3 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          {prefixIcon} {title}
+          <span className="text-dark-500 text-xs font-normal">
+            ({Object.keys(data).length}
+            {isKo ? '개 구간 테스트' : ' intervals tested'})
+          </span>
+        </div>
+        {currentValue != null && (
+          <div className="text-xs font-mono bg-blue-500/20 text-blue-400 px-2 py-1 rounded border border-blue-500/30">
+            {isKo ? '현재' : 'Current'}: {currentValue.toFixed(2)}
+          </div>
+        )}
       </div>
       <div className="space-y-2">
         {Object.entries(data).map(([interval, row]) => {
           const isHighProb = row.rate >= 60 && row.sample_size >= 10;
           const isNominalSig = row.is_significant;
           const isBonfSig = row.bonferroni?.is_significant_after_correction;
+          const isCurrent = isValueInInterval(currentValue, interval);
+          
           return (
             <div
               key={interval}
-              className={`rounded-lg px-3 py-2 ${
-                isHighProb && isBonfSig
-                  ? 'bg-primary-500/20 border border-primary-500/30'
-                  : isHighProb
-                    ? 'bg-amber-500/10 border border-amber-500/20'
-                    : 'bg-dark-700/50'
+              className={`rounded-lg px-3 py-2 relative ${
+                isCurrent
+                  ? 'ring-2 ring-blue-500 bg-blue-500/10'
+                  : isHighProb && isBonfSig
+                    ? 'bg-primary-500/20 border border-primary-500/30'
+                    : isHighProb
+                      ? 'bg-amber-500/10 border border-amber-500/20'
+                      : 'bg-dark-700/50'
               }`}
             >
+              {isCurrent && (
+                <div className="absolute -top-2 -right-2 bg-blue-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-lg z-10">
+                  Current
+                </div>
+              )}
               <div className="flex items-center justify-between">
                 <span className="text-dark-300 text-sm font-mono">{interval}</span>
                 <div className="flex items-center gap-2">
@@ -190,7 +233,7 @@ function HeatmapBlock({ heatmap, isKo }: { heatmap: ConditionalHeatmap; isKo: bo
   );
 }
 
-export default function IntervalAnalysisTable({ result, isKo }: IntervalAnalysisTableProps) {
+export default function IntervalAnalysisTable({ result, isKo, currentValues }: IntervalAnalysisTableProps) {
   const rsiByInterval = result.rsi_by_interval;
   const dispByInterval =
     result.disp_by_interval ?? result.complex_pattern_analysis?.disp_by_interval;
@@ -206,8 +249,8 @@ export default function IntervalAnalysisTable({ result, isKo }: IntervalAnalysis
     !!rsiAtrHeatmap &&
     Array.isArray((rsiAtrHeatmap as { x_bins?: unknown[] }).x_bins) &&
     Array.isArray((rsiAtrHeatmap as { y_bins?: unknown[] }).y_bins) &&
-    (rsiAtrHeatmap as { x_bins: unknown[] }).x_bins.length > 0 &&
-    (rsiAtrHeatmap as { y_bins: unknown[] }).y_bins.length > 0;
+    ((rsiAtrHeatmap as { x_bins?: unknown[] }).x_bins?.length ?? 0) > 0 &&
+    ((rsiAtrHeatmap as { y_bins?: unknown[] }).y_bins?.length ?? 0) > 0;
 
   if (!hasRSI && !hasDisp && !hasAtr && !hasHeatmap) {
     return null;
@@ -215,23 +258,41 @@ export default function IntervalAnalysisTable({ result, isKo }: IntervalAnalysis
 
   return (
     <div className="card p-6">
-      <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-        <Activity className="w-5 h-5 text-green-400" />
-        {isKo ? '📊 조건부 분해 분석 (95% 신뢰구간)' : '📊 Conditional Breakdown (95% CI)'}
-      </h3>
-      <p className="text-dark-400 text-sm mb-4">
-        {isKo
-          ? '패턴 완성 시점의 조건별(지표 구간별) 다음 봉 양봉 확률. ⚠️ 다중비교 보정 적용됨'
-          : 'Next-candle green probability by condition buckets. ⚠️ Bonferroni correction applied'}
-      </p>
+      <div className="flex items-center gap-3 mb-6">
+        <div className="p-2 bg-amber-500/10 rounded-lg">
+          <Activity className="w-5 h-5 text-amber-400" />
+        </div>
+        <h2 className="text-lg font-bold text-white">
+          {isKo ? '📊 조건부 분해 분석 (95% 신뢰구간)' : '📊 Conditional Breakdown (95% CI)'}
+        </h2>
+      </div>
 
-      <div className="grid grid-cols-1 gap-4">
-        {hasRSI && (
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {hasRSI && rsiByInterval && (
           <IntervalBlock
             title={isKo ? '패턴 완성 시점 RSI 구간' : 'RSI at Pattern Completion'}
             prefixIcon="📈"
             data={rsiByInterval}
             isKo={isKo}
+            currentValue={currentValues?.rsi}
+          />
+        )}
+        {hasDisp && dispByInterval && (
+          <IntervalBlock
+            title={isKo ? '패턴 완성 시점 이격도(Disparity) 구간' : 'Disparity at Pattern Completion'}
+            prefixIcon="📏"
+            data={dispByInterval}
+            isKo={isKo}
+            currentValue={currentValues?.disp}
+          />
+        )}
+        {hasAtr && atrByInterval && (
+          <IntervalBlock
+            title={isKo ? '패턴 완성 시점 ATR% 구간' : 'ATR% at Pattern Completion'}
+            prefixIcon="🌊"
+            data={atrByInterval}
+            isKo={isKo}
+            currentValue={currentValues?.atr}
           />
         )}
         {hasDisp && dispByInterval && (
