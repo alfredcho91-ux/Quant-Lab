@@ -127,7 +127,7 @@ function IntervalBlock({
                           : 'text-rose-400'
                     }`}
                   >
-                    {row.rate}%
+                    {row.rate.toFixed(2)}%
                   </span>
                   <span className="text-dark-500 text-xs">
                     ({row.sample_size}
@@ -154,7 +154,7 @@ function IntervalBlock({
                   />
                 </div>
                 <span className="text-dark-500 text-xs whitespace-nowrap">
-                  [{row.ci_lower}~{row.ci_upper}]
+                  [{row.ci_lower.toFixed(2)}~{row.ci_upper.toFixed(2)}]
                 </span>
               </div>
             </div>
