@@ -127,7 +127,7 @@ function IntervalBlock({
                           : 'text-rose-400'
                     }`}
                   >
-                    {row.rate.toFixed(2)}%
+                    {isKo ? '양봉 ' : 'Bull '}{row.rate.toFixed(2)}%
                   </span>
                   <span className="text-dark-500 text-xs">
                     ({row.sample_size}
