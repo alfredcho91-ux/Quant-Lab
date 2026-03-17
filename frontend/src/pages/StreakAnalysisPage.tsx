@@ -23,6 +23,7 @@ export default function StreakAnalysisPage() {
     minTotalBodyPct,
     setMinTotalBodyPct,
     params,
+    setParams,
     mutation,
     handleRun,
   } = useStreakAnalysisForm();
@@ -99,12 +100,16 @@ export default function StreakAnalysisPage() {
         condition1={condition1}
         condition2={condition2}
         minTotalBodyPct={minTotalBodyPct}
+        ema200Position={params.ema_200_position ?? null}
         isPending={mutation.isPending}
         isKo={isKo}
         onUseComplexPatternChange={setUseComplexPattern}
         onCondition1Change={setCondition1}
         onCondition2Change={setCondition2}
         onMinTotalBodyPctChange={setMinTotalBodyPct}
+        onEma200PositionChange={(value) =>
+          setParams((prev) => ({ ...prev, ema_200_position: value }))
+        }
         onRun={handleRun}
       />
 

@@ -1,0 +1,2 @@
+"""Stats domain module."""
+

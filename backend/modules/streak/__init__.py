@@ -1,0 +1,2 @@
+"""Streak domain module."""
+

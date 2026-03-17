@@ -103,7 +103,7 @@ export const useStore = create<AppState>()(
         })),
     }),
     {
-      name: 'wolgem-quant-storage',
+      name: 'quant-lab-storage',
       partialize: (state) => ({
         language: state.language,
         backgroundTheme: state.backgroundTheme,

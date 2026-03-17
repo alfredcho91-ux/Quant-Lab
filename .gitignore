@@ -12,3 +12,14 @@ __pycache__/
 .DS_Store
 .cache/  # diskcache 영속 캐시 디렉토리
 .cache/
+.codex_backups/
+.run/
+.sisyphus/
+server.log
+backend/server.log
+backend/backend.log
+backend/.coverage
+backend/.pytest_cache/
+backend/.cache/
+frontend/test-results/
+**/AGENTS.md

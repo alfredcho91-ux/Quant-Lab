@@ -1,5 +1,7 @@
 // 연속 봉패턴 분석 타입
 
+export type Ema200Position = 'above' | 'below';
+
 export interface StreakAnalysisParams {
   coin: string;
   interval: string;
@@ -9,6 +11,7 @@ export interface StreakAnalysisParams {
   complex_pattern?: number[] | null;
   rsi_threshold?: number;
   min_total_body_pct?: number | null; // N개 연속 봉의 몸통 총합 최소값 (%)
+  ema_200_position?: Ema200Position | null; // 패턴 완성 봉 종가가 일봉 EMA 200 위/아래인지
 }
 
 export interface ComparativeMetrics {
@@ -118,6 +121,7 @@ export interface FilterStatus {
   quality_results?: number;
   filtered_count?: number;
   rsi_threshold?: number;
+  ema_200_position?: Ema200Position;
 }
 
 export interface StreakAnalysisResult {
@@ -165,6 +169,8 @@ export interface StreakAnalysisResult {
       complex_pattern?: number[];
       filters?: {
         rsi_threshold?: number;
+        ema_200_position?: Ema200Position | null;
+        min_total_body_pct?: number | null;
       };
     };
   };
@@ -188,6 +194,7 @@ export interface ComplexPatternAnalysis {
   summary?: PatternSummary;
   filters_applied?: {
     rsi_threshold: number;
+    ema_200_position?: Ema200Position | null;
   };
   short_signal?: ShortSignal | null;
   volatility_stats?: VolatilityStats;

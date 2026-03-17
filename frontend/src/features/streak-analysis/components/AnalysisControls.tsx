@@ -4,6 +4,7 @@
  */
 import { RefreshCw, BarChart2 } from 'lucide-react';
 import type { PatternCondition } from '../utils/patternHelper';
+import type { Ema200Position } from '../../../types';
 import { getPatternPreview } from '../utils/patternHelper';
 
 interface AnalysisControlsProps {
@@ -12,6 +13,7 @@ interface AnalysisControlsProps {
   condition1: PatternCondition;
   condition2: PatternCondition;
   minTotalBodyPct: number | null;
+  ema200Position: Ema200Position | null;
   isPending: boolean;
   isKo: boolean;
   // Handlers
@@ -19,6 +21,7 @@ interface AnalysisControlsProps {
   onCondition1Change: (condition: PatternCondition) => void;
   onCondition2Change: (condition: PatternCondition) => void;
   onMinTotalBodyPctChange: (value: number | null) => void;
+  onEma200PositionChange: (value: Ema200Position | null) => void;
   onRun: () => void;
 }
 
@@ -27,18 +30,55 @@ export default function AnalysisControls({
   condition1,
   condition2,
   minTotalBodyPct,
+  ema200Position,
   isPending,
   isKo,
   onUseComplexPatternChange,
   onCondition1Change,
   onCondition2Change,
   onMinTotalBodyPctChange,
+  onEma200PositionChange,
   onRun,
 }: AnalysisControlsProps) {
   return (
     <div className="card p-6 space-y-5">
       {/* 패턴 분석 설정 */}
       <div className="space-y-5">
+        <div className="bg-dark-800/50 rounded-lg p-4 border border-dark-700">
+          <h4 className="text-sm font-semibold text-emerald-400 mb-3">
+            {isKo ? 'EMA 200 필터 (일봉 고정, 선택)' : 'EMA 200 Filter (Daily Fixed, Optional)'}
+          </h4>
+          <div className="space-y-2">
+            <label className="block text-xs text-dark-400">
+              {isKo
+                ? '패턴 완성 봉 종가를 일봉 EMA 200과 비교해 위/아래 조건을 적용합니다'
+                : 'Apply above/below condition against daily EMA 200 on the pattern completion candle close'}
+            </label>
+            <select
+              value={ema200Position ?? ''}
+              onChange={(e) => {
+                const value = e.target.value;
+                onEma200PositionChange(
+                  value === 'above' || value === 'below'
+                    ? value
+                    : null
+                );
+              }}
+              className="w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2 text-white text-sm focus:border-emerald-500"
+            >
+              <option value="">
+                {isKo ? '전체 (필터 없음)' : 'All (No Filter)'}
+              </option>
+              <option value="above">
+                {isKo ? '일봉 EMA 200 이상' : 'Above Daily EMA 200'}
+              </option>
+              <option value="below">
+                {isKo ? '일봉 EMA 200 이하' : 'Below Daily EMA 200'}
+              </option>
+            </select>
+          </div>
+        </div>
+
         {/* 복합 패턴 분석 체크박스 */}
         <div className="flex items-center gap-3">
           <input

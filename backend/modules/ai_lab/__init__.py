@@ -1,0 +1,2 @@
+"""AI Lab domain module."""
+

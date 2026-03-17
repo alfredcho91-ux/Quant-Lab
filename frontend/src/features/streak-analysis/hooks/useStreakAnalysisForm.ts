@@ -35,6 +35,7 @@ export function useStreakAnalysisForm() {
     use_complex_pattern: false,
     complex_pattern: null,
     rsi_threshold: 60.0,
+    ema_200_position: null,
   });
 
   // 몸통 총합 필터 (Simple Mode만)
@@ -83,6 +84,7 @@ export function useStreakAnalysisForm() {
         complex_pattern: pattern,
         rsi_threshold: params.rsi_threshold || 60.0,
         min_total_body_pct: useComplexPattern ? null : minTotalBodyPct, // Simple Mode만 적용
+        ema_200_position: params.ema_200_position ?? null,
       };
 
       // Complex Mode에서 2차 조건 검증

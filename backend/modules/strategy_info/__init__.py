@@ -1,0 +1,2 @@
+"""Strategy info domain module."""
+

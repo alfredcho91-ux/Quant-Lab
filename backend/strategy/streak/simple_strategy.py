@@ -1,12 +1,13 @@
 """Simple Mode 전략 (N-연속 양봉/음봉 분석)"""
 
 import pandas as pd
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 import logging
 import traceback
 
 from strategy.context import AnalysisContext
 from strategy.streak.common import get_or_calculate_indicators, sanitize_for_json
+from strategy.streak.data_ops import filter_rows_by_ema_200_position
 from strategy.streak.simple_analyzer import calculate_simple_metrics
 from strategy.streak.simple_runner import collect_simple_target_cases
 
@@ -37,6 +38,24 @@ def run_simple_analysis(df: pd.DataFrame, context: AnalysisContext, from_cache: 
             return _empty_simple_result(context, from_cache)
 
         df = get_or_calculate_indicators(context.coin, context.interval, df)
+        total_matches = len(target_cases)
+        target_cases = filter_rows_by_ema_200_position(
+            df=df,
+            rows=target_cases,
+            ema_200_position=context.ema_200_position,
+        )
+        if target_cases.empty:
+            return _empty_simple_result(
+                context,
+                from_cache,
+                filter_status={
+                    "status": "filtered_out",
+                    "total_matches": total_matches,
+                    "filtered_count": 0,
+                    "ema_200_position": context.ema_200_position,
+                },
+            )
+
         metrics = calculate_simple_metrics(df=df, target_cases=target_cases, context=context)
 
         result = {
@@ -51,6 +70,10 @@ def run_simple_analysis(df: pd.DataFrame, context: AnalysisContext, from_cache: 
                 "parameters": {
                     "n_streak": n,
                     "direction": context.direction,
+                    "filters": {
+                        "ema_200_position": context.ema_200_position,
+                        "min_total_body_pct": context.min_total_body_pct,
+                    },
                 },
             },
             "from_cache": from_cache,
@@ -72,12 +95,16 @@ def run_simple_analysis(df: pd.DataFrame, context: AnalysisContext, from_cache: 
         }
 
 
-def _empty_simple_result(context: AnalysisContext, from_cache: bool) -> Dict[str, Any]:
+def _empty_simple_result(
+    context: AnalysisContext,
+    from_cache: bool,
+    filter_status: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
     """빈 결과 반환 (패턴을 찾을 수 없을 때)"""
     return {
         "success": True,
         "mode": "simple",
-        "filter_status": None,
+        "filter_status": filter_status,
         "total_cases": 0,
         "continuation_rate": None,
         "reversal_rate": None,
@@ -103,6 +130,10 @@ def _empty_simple_result(context: AnalysisContext, from_cache: bool) -> Dict[str
             "parameters": {
                 "n_streak": context.n_streak,
                 "direction": context.direction,
+                "filters": {
+                    "ema_200_position": context.ema_200_position,
+                    "min_total_body_pct": context.min_total_body_pct,
+                },
             }
         },
         "from_cache": from_cache,

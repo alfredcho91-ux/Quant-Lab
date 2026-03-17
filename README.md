@@ -1,93 +1,91 @@
-# Quant-Lab: Algorithmic Trading & Quantitative Analysis Platform
+# Quant-Lab
 
 ![React](https://img.shields.io/badge/Frontend-React_18-blue)
 ![FastAPI](https://img.shields.io/badge/Backend-FastAPI-009688)
 ![Python](https://img.shields.io/badge/Quant-Python_3.9-3776AB)
 ![TypeScript](https://img.shields.io/badge/Language-TypeScript-3178C6)
 
-> **Project Manager's Note:**
-> This repository is not just a collection of scripts; it is a fully architected, production-ready quantitative analysis platform. As an Implementation PM with a background in Quant Finance, I designed this system to bridge the gap between complex financial modeling and scalable software engineering. The focus here is on **maintainability, modularity, and actionable data visualization**.
+Quant-Lab is a quantitative research and strategy analysis platform for crypto markets. The project turns raw hypothesis testing into an operable product: typed APIs, modular quant logic, reusable indicator pipelines, multi-page React workflows, and documentation that makes implementation decisions traceable.
 
-## 🎯 Executive Summary
+> Portfolio lens: this repository is intentionally positioned as an Implementation PM case study. It demonstrates how quant research is translated into a maintainable software system with delivery structure, architecture boundaries, execution artifacts, and a clear roadmap.
 
-Quant-Lab is a comprehensive cryptocurrency trading analysis platform designed to validate trading hypotheses through rigorous statistical testing and backtesting. It moves beyond simple indicator crossovers by implementing advanced conditional probability analysis, streak pattern recognition, and AI-driven strategy optimization.
+## Executive Snapshot
 
-### Key Business Value (ROI)
-- **Data-Driven Decision Making:** Replaces intuition with 95% Wilson Confidence Intervals and Bonferroni-corrected p-values.
-- **Rapid Strategy Prototyping:** The "AI Quant Lab" module allows users to test complex trading conditions using natural language, drastically reducing the time from hypothesis to backtest.
-- **Risk Mitigation:** Built-in multi-timeframe (MTF) analysis and strict EMA 200 trend filters prevent trading against macro trends.
+- Product scope: 15 frontend pages, 11 backend modules, and 19 backend test files supporting research, scanning, backtesting, and AI-assisted exploration.
+- Quant focus: streak analysis, hybrid filters, MTF trend judgment, pattern scanning, and AI-assisted strategy drafting.
+- Engineering focus: React + TypeScript frontend, FastAPI backend, pure indicator/core layers, and explicit documentation for architecture, install flow, and feature-to-backend mapping.
 
----
+## What This Repository Proves
 
-## 🏗️ Architecture & Implementation Strategy
+- I can decompose a quant product into bounded modules instead of growing a monolithic script pile.
+- I can move from research logic to implementation artifacts: API contracts, UI workflows, startup scripts, and validation docs.
+- I can manage technical execution as an Implementation PM, not just write isolated code, by making system decisions explicit and repeatable.
 
-As the Technical PM, I prioritized a clean separation of concerns to ensure the platform can scale from a personal research tool to a multi-user SaaS.
+## Core Capabilities
 
-### 1. Domain-Driven Design (DDD)
-The backend is strictly modularized. We moved away from monolithic scripts to a domain-centric approach:
-- `core/`: Pure, stateless financial math and indicator pipelines (RSI, MACD, Bollinger Bands, ATR).
-- `backend/strategy/`: Complex business logic for specific trading strategies (e.g., N-Streak Analysis, Hybrid Models).
-- `backend/modules/`: API routing and service layers, ensuring HTTP concerns never leak into quant logic.
+### 1. Streak And Conditional Probability Analysis
+- Evaluates bullish and bearish streak behavior with follow-through statistics.
+- Surfaces confidence intervals, conditional splits, and significance-aware reporting rather than raw hit rates alone.
 
-### 2. The "AI Quant Lab" (NLP to Quant)
-A standout feature is the AI integration. Instead of writing Python code to test a new idea, users can ask:
-> *"What is the probability of the next candle being green if RSI < 30 and Price touches the lower Bollinger Band on the 1H timeframe?"*
+### 2. Multi-Timeframe Trend Judgment
+- Aggregates directional evidence across multiple intervals to reduce single-timeframe bias.
+- Uses indicators such as EMA, MACD, Supertrend, and stochastic context to frame regime-level decisions.
 
-**Implementation Flow:**
-1. **LLM Gateway:** Parses natural language into structured JSON conditions.
-2. **Condition Parser:** Translates JSON into Pandas boolean masks.
-3. **Statistical Engine:** Calculates success rates, p-values, and GATI (Custom Edge Index).
-4. **UI Presentation:** Renders interactive Plotly charts and confidence bands.
+### 3. Hybrid Strategy And Pattern Workflows
+- Supports combined indicator filters, scan-first workflows, and backtest-ready parameterization.
+- Organizes strategy-specific logic under bounded backend modules so features can evolve independently.
 
-### 3. Frontend Engineering
-Built with React and TypeScript, the frontend is designed for high-density data visualization without sacrificing performance.
-- **State Management:** Zustand for global state (Coin selection, Timeframes) to ensure UI consistency across 14+ analysis pages.
-- **Component Architecture:** Feature-sliced design (`src/features/`) keeps complex logic (like the Streak Analysis tables) isolated and testable.
+### 4. AI Quant Lab
+- Converts natural-language research prompts into structured analysis conditions.
+- Separates LLM parsing, rule normalization, statistical evaluation, and frontend presentation so AI features remain auditable.
 
----
+## Architecture Decisions
 
-## 📊 Core Quant Features
+- `core/`: Pure quant primitives and indicator pipelines with no HTTP or UI awareness.
+- `backend/strategy/`: Strategy-specific business logic for streak, hybrid, combo filter, and related domains.
+- `backend/modules/`: API-facing orchestration, schemas, and service boundaries.
+- `frontend/src/features/`: Feature-sliced UI modules that keep complex workflows localized instead of spreading logic across generic components.
 
-### 1. N-Streak Analysis (연속 봉 분석)
-Analyzes the statistical edge of consecutive bullish/bearish candles.
-- **Conditional Breakdown:** Heatmaps showing win rates based on RSI and ATR at the time of pattern completion.
-- **Statistical Rigor:** Displays 95% Confidence Intervals and flags statistically significant edges.
+Architecture details live in [ARCHITECTURE.md](./ARCHITECTURE.md).
 
-### 2. Multi-Timeframe (MTF) Trend Judgment
-Aggregates trend data across 15m, 1H, 4H, and 1D timeframes using Supertrend, MACD, and EMA alignments to provide a single "Market Regime" score.
+## Implementation PM Evidence
 
-### 3. Strategy & Pattern Scanners
-Real-time scanning of multiple assets against predefined quantitative criteria (e.g., Bollinger Band Squeeze + RSI Divergence).
+- [Implementation PM Case Study](./docs/IMPLEMENTATION_PM_CASE_STUDY.md)
+- [System Architecture](./ARCHITECTURE.md)
+- [API Specification](./API_SPEC.md)
+- [Install And Recovery Guide](./INSTALL.md)
+- [Page To Backend Mapping](./docs/PAGE_BACKEND_MAPPING.md)
+- [Streak Analysis Flow](./docs/STREAK_ANALYSIS_FLOW.md)
+- [Complex Mode Flow](./docs/COMPLEX_MODE_FLOW.md)
 
----
-
-## 🚀 Getting Started
+## Quick Start
 
 ### Prerequisites
+
 - Python 3.9+
 - Node.js 18+
-- Binance API access (for live data fetching)
+- Optional local Binance CSV cache under `binance_klines/`
 
-### Quick Start
+### Run Locally
+
 ```bash
-# Clone the repository
-git clone https://github.com/your-username/quant-lab.git
-cd quant-lab
-
-# Start both Backend and Frontend concurrently
+git clone https://github.com/alfredcho91-ux/Quant-Lab.git
+cd Quant-Lab
 chmod +x start.sh
 ./start.sh
 ```
 
----
+## Delivery Principles
 
-## 📈 Roadmap & Future Phases
+- Quant logic is isolated from transport and presentation layers.
+- New features are documented with implementation maps so the repository stays understandable as scope grows.
+- Local startup and recovery are scripted to reduce friction when onboarding or restoring the project.
 
-As a PM, I manage this project in distinct phases:
-- [x] **Phase 1: Core Infrastructure & Statistical Engine** (Current)
-- [ ] **Phase 2: Live Trading Integration** (Execution engine via CCXT)
-- [ ] **Phase 3: Machine Learning Models** (Predictive modeling using XGBoost/LSTM)
-- [ ] **Phase 4: Cloud Deployment & CI/CD** (Dockerization, AWS ECS, GitHub Actions)
+## Roadmap
 
----
-*Designed and implemented by [Your Name] - Bridging Quant Finance and Software Engineering.*
+- [x] Phase 1: Core analytics, backtesting workflows, and architectural modularization
+- [ ] Phase 2: Execution-ready live trading integration and portfolio state management
+- [ ] Phase 3: Strategy optimization and ML-assisted ranking
+- [ ] Phase 4: CI/CD, containerization, and cloud deployment hardening
+
+Designed and implemented by Geunwoo Cho, focused on the intersection of Quant Finance and Software Implementation.

@@ -278,14 +278,14 @@ TIMEZONE_OFFSET=-5
 #### 1단계: Git 저장소 클론
 
 ```bash
-git clone <저장소_URL>
-cd my_quant_V2
+git clone https://github.com/alfredcho91-ux/Quant-Lab.git
+cd Quant-Lab
 ```
 
 또는 기존 저장소가 있다면:
 
 ```bash
-cd my_quant_V2
+cd Quant-Lab
 git pull origin main
 ```
 

@@ -53,6 +53,7 @@ from .data_ops import (
     prepare_dataframe,
     calculate_indicators,
     get_or_calculate_indicators,
+    filter_rows_by_ema_200_position,
     normalize_single_index,
     normalize_indices,
     safe_get_rsi
@@ -72,7 +73,7 @@ __all__ = [
     'safe_round', 'sanitize_for_json',
     'data_cache', 'analysis_cache', 'indicators_cache', 'generate_analysis_cache_key', 'get_cache_stats', 'clear_cache',
     'normalize_datetime_index', 'load_data', 'prepare_dataframe', 'calculate_indicators', 'get_or_calculate_indicators',
-    'normalize_single_index', 'normalize_indices', 'safe_get_rsi',
+    'filter_rows_by_ema_200_position', 'normalize_single_index', 'normalize_indices', 'safe_get_rsi',
     'find_complex_pattern', 'analyze_pullback_quality', 'extract_c1_indices', 'extract_c1_dates_from_chart_data', 'calculate_signal_score',
     'DEFAULT_RSI', 'RSI_THRESHOLD_DEFAULT', 'RSI_OVERBOUGHT', 'MAX_RETRACEMENT_DEFAULT',
     'CONFIDENCE_LEVEL',

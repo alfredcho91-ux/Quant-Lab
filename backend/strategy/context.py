@@ -37,6 +37,7 @@ class AnalysisContext:
     complex_pattern: Optional[List[int]] = None
     rsi_threshold: float = RSI_THRESHOLD_DEFAULT
     min_total_body_pct: Optional[float] = None  # N개 연속 봉의 몸통 총합 최소값
+    ema_200_position: Optional[str] = None  # 패턴 완성 봉 종가가 EMA 200 위/아래인지
     timezone_offset: Optional[int] = None
     
     @classmethod
@@ -68,6 +69,7 @@ class AnalysisContext:
             complex_pattern=params.get('complex_pattern'),
             rsi_threshold=params.get('rsi_threshold', RSI_THRESHOLD_DEFAULT),
             min_total_body_pct=params.get('min_total_body_pct'),
+            ema_200_position=params.get('ema_200_position'),
             timezone_offset=params.get('timezone_offset'),
         )
     
