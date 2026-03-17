@@ -14,6 +14,18 @@ import type {
   IndicatorProjection,
 } from '../types';
 
+interface IndicatorProjectionPayload {
+  current_price: number;
+  projections: {
+    rsi_30: number;
+    rsi_70: number;
+    stoch_20: number;
+    stoch_80: number;
+    stoch_hh?: number;
+    stoch_ll?: number;
+  };
+}
+
 
 export async function runBBMid(params: BBMidParams): Promise<{
   data: BBMidResult[];
@@ -117,7 +129,9 @@ export async function runTrendIndicators(params: TrendIndicatorsParams): Promise
 
 export async function getIndicatorProjection(coin: string, interval: string): Promise<IndicatorProjection | null> {
   try {
-    const res = await api.get<{success: boolean, data: {current_price: number, projections: any}}>(`/indicators/projection?coin=${coin}&interval=${interval}`);
+    const res = await api.get<{ success: boolean; data: IndicatorProjectionPayload }>(
+      `/indicators/projection?coin=${coin}&interval=${interval}`
+    );
     if (res.data && res.data.success) {
       const { current_price, projections } = res.data.data;
       return {

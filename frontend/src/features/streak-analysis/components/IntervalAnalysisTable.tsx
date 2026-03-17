@@ -23,7 +23,7 @@ interface IntervalAnalysisTableProps {
 function isValueInInterval(value: number | null | undefined, intervalStr: string): boolean {
   if (value == null) return false;
   
-  const match = intervalStr.match(/^([\[\(])([^,]+),\s*([^\]\)]+)([\]\)])$/);
+  const match = intervalStr.match(/^(\[|\()([^,]+),\s*([^)\]]+)(\]|\))$/);
   if (!match) return false;
   
   const leftBracket = match[1];

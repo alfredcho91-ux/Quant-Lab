@@ -46,6 +46,7 @@ export default function ComboFilterPage() {
     mutationFn: runComboFilter,
   });
   const hasInitializedParams = useRef(false);
+  const resetMutation = mutation.reset;
 
   useEffect(() => {
     setParams((p) => ({ ...p, coin: selectedCoin || 'BTC', interval: selectedInterval }));
@@ -57,8 +58,8 @@ export default function ComboFilterPage() {
       return;
     }
     // Clear stale result when any filter/input changes.
-    mutation.reset();
-  }, [params]);
+    resetMutation();
+  }, [params, resetMutation]);
 
   const handleRun = () => {
     console.log('🚀 Combo Filter 실행:', params);

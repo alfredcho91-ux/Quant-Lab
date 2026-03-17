@@ -25,6 +25,7 @@ interface UseAIBacktestBuilderOptions {
 }
 
 const DEFAULT_INTERVALS = ['1h', '4h', '1d'];
+const EMPTY_STRATEGIES: Strategy[] = [];
 
 export function useAIBacktestBuilder({
   isKo,
@@ -66,7 +67,7 @@ export function useAIBacktestBuilder({
     staleTime: Infinity,
   });
 
-  const strategies = strategiesData ?? [];
+  const strategies = strategiesData ?? EMPTY_STRATEGIES;
 
   const { data: tfData } = useQuery({
     queryKey: ['timeframes', selectedCoin],

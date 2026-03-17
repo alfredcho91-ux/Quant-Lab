@@ -248,7 +248,7 @@ export function useAIResearch(language: string, config: AIConfig) {
       stopProgressTimer();
       setIsTyping(false);
     }
-  }, [config, isKo, messages, stopProgressTimer]);
+  }, [config, messages, stopProgressTimer]);
 
   return {
     messages,
