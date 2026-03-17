@@ -1,5 +1,6 @@
 # Quant-Lab
 
+[![Tests](https://github.com/alfredcho91-ux/Quant-Lab/actions/workflows/test.yml/badge.svg)](https://github.com/alfredcho91-ux/Quant-Lab/actions/workflows/test.yml)
 ![React](https://img.shields.io/badge/Frontend-React_18-blue)
 ![FastAPI](https://img.shields.io/badge/Backend-FastAPI-009688)
 ![Python](https://img.shields.io/badge/Quant-Python_3.9-3776AB)
@@ -51,12 +52,19 @@ Architecture details live in [ARCHITECTURE.md](./ARCHITECTURE.md).
 ## Implementation PM Evidence
 
 - [Implementation PM Case Study](./docs/IMPLEMENTATION_PM_CASE_STUDY.md)
+- [Portfolio Release Notes](./docs/PORTFOLIO_RELEASE_NOTES.md)
 - [System Architecture](./ARCHITECTURE.md)
 - [API Specification](./API_SPEC.md)
 - [Install And Recovery Guide](./INSTALL.md)
 - [Page To Backend Mapping](./docs/PAGE_BACKEND_MAPPING.md)
 - [Streak Analysis Flow](./docs/STREAK_ANALYSIS_FLOW.md)
 - [Complex Mode Flow](./docs/COMPLEX_MODE_FLOW.md)
+
+## Quality Gates
+
+- GitHub Actions runs backend tests, frontend lint/build, and architecture guard scripts on every push to `main`.
+- The repository includes explicit import guards to prevent `core/` and router layers from accumulating cross-layer coupling.
+- Public repo hygiene is enforced via ignore rules that exclude logs, local caches, agent artifacts, and large market data files.
 
 ## Quick Start
 
@@ -80,6 +88,12 @@ chmod +x start.sh
 - Quant logic is isolated from transport and presentation layers.
 - New features are documented with implementation maps so the repository stays understandable as scope grows.
 - Local startup and recovery are scripted to reduce friction when onboarding or restoring the project.
+
+## Public Release
+
+- Repository: [alfredcho91-ux/Quant-Lab](https://github.com/alfredcho91-ux/Quant-Lab)
+- Current CI workflow: [Tests](https://github.com/alfredcho91-ux/Quant-Lab/actions/workflows/test.yml)
+- Portfolio release notes: [docs/PORTFOLIO_RELEASE_NOTES.md](./docs/PORTFOLIO_RELEASE_NOTES.md)
 
 ## Roadmap
 
