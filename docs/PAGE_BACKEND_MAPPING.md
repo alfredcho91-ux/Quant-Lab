@@ -1,9 +1,10 @@
-# 페이지별 백엔드 매핑
+# Page-to-Backend Mapping
 
-현재 코드 기준으로 각 페이지가 호출하는 백엔드 라우터/서비스/핵심 계산 모듈을 정리한 문서입니다.  
-문서 기준일: 2026-02-27
+This document maps each major frontend page to the backend router, service layer, and primary calculation modules it depends on.
 
-## 1) 연속 봉 분석 (`StreakAnalysisPage`)
+Document date: 2026-02-27
+
+## 1. Streak Analysis (`StreakAnalysisPage`)
 
 - API: `POST /api/streak-analysis`
 - Router: `backend/modules/streak/router.py`
@@ -14,23 +15,23 @@
   - `backend/strategy/streak/common.py`
   - `backend/strategy/streak/statistics.py`
   - `backend/strategy/context.py`
-- Shared utils:
+- Shared utilities:
   - `backend/utils/data_loader.py`
   - `backend/utils/data_service.py`
   - `backend/utils/cache.py`
 
-## 2) 추세판단 (`TrendJudgmentPage`)
+## 2. Trend Judgment (`TrendJudgmentPage`)
 
 - API: `POST /api/trend-indicators`
 - Router: `backend/modules/stats/router.py`
 - Service: `backend/modules/stats/service.py`
 - Core logic:
-  - `core/indicators.py` (`compute_trend_judgment_indicators`)
-- Shared utils:
+  - `core/indicators.py` via `compute_trend_judgment_indicators`
+- Shared utilities:
   - `backend/utils/data_loader.py`
   - `backend/utils/data_service.py`
 
-## 3) 볼밴 중단 통계 (`BBMidPage`)
+## 3. BB Mid Statistics (`BBMidPage`)
 
 - API: `POST /api/bb-mid`
 - Router: `backend/modules/stats/router.py`
@@ -38,7 +39,7 @@
 - Strategy logic:
   - `backend/strategy/bb_mid/logic.py`
 
-## 4) 콤보 필터 (`ComboFilterPage`)
+## 4. Combo Filter (`ComboFilterPage`)
 
 - API: `POST /api/combo-filter`
 - Router: `backend/modules/stats/router.py`
@@ -46,7 +47,7 @@
 - Strategy logic:
   - `backend/strategy/combo_filter/logic.py`
 
-## 5) 하이브리드 분석 (`HybridAnalysisPage`)
+## 5. Hybrid Analysis (`HybridAnalysisPage`)
 
 - API:
   - `POST /api/hybrid-analysis`
@@ -57,14 +58,14 @@
 - Strategy logic:
   - `backend/strategy/hybrid/logic.py`
 
-## 6) 패턴 통계 (`PatternPage`)
+## 6. Pattern Statistics (`PatternPage`)
 
 - API: `GET /api/ohlcv/{coin}/{interval}`
 - Router: `backend/modules/market/router.py`
 - Service: `backend/modules/market/service.py`
-- Note: 패턴 분류 자체는 프론트엔드 계산 중심
+- Note: candle/pattern classification on this page is primarily frontend-side logic.
 
-## 7) 패턴 스캐너 (`PatternScannerPage`)
+## 7. Pattern Scanner (`PatternScannerPage`)
 
 - API: `POST /api/pattern-scanner`
 - Router: `backend/modules/scanner/router.py`
@@ -72,7 +73,7 @@
 - Shared logic:
   - `backend/services/pattern_logic.py`
 
-## 8) 전략 스캐너 (`StrategyScannerPage`)
+## 8. Strategy Scanner (`StrategyScannerPage`)
 
 - API: `POST /api/scanner`
 - Router: `backend/modules/scanner/router.py`
@@ -81,7 +82,7 @@
   - `core/strategies.py`
   - `core/indicators.py`
 
-## 9) 매매 일지 (`JournalPage`)
+## 9. Journal (`JournalPage`)
 
 - API:
   - `GET /api/journal`
@@ -90,7 +91,7 @@
 - Router: `backend/modules/journal/router.py`
 - Service: `backend/modules/journal/service.py`
 
-## 10) AI 백테스트 랩 (`AIBacktestLabPage`, `AIStrategyLabPage`)
+## 10. AI Backtest Lab (`AIBacktestLabPage`, `AIStrategyLabPage`)
 
 - API: `POST /api/ai/research`
 - Router: `backend/modules/ai_lab/router.py`
@@ -98,12 +99,12 @@
 - Supporting modules:
   - `backend/modules/ai_lab/prompts.py`
   - `backend/services/ai_clients.py`
-  - `backend/modules/backtest/service.py` (백테스트 실행)
+  - `backend/modules/backtest/service.py` for backtest execution
 
-## 공통 참고
+## Shared References
 
-- Active Router 등록 위치: `backend/main.py`
-- 요청 스키마 정식 위치: `backend/modules/*/schemas.py`
-- 호환 re-export: `backend/models/request.py`
-- 라우터 계층 검증: `scripts/check_route_imports.py`
-- 코어 계층 검증: `scripts/check_core_imports.py`
+- Active router registration: `backend/main.py`
+- Canonical request schemas: `backend/modules/*/schemas.py`
+- Compatibility re-export: `backend/models/request.py`
+- Router layer guard: `scripts/check_route_imports.py`
+- Core layer guard: `scripts/check_core_imports.py`

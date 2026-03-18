@@ -1,94 +1,100 @@
-# 변경 이력 (Changelog)
+# Changelog
 
-## [2026-01-31] 문서 최신화
+## [2026-01-31] Documentation Refresh
 
-### 변경사항
-- **ARCHITECTURE.md**: MaCrossParams 제거, Hybrid 관련 Params 추가, MaCrossPage → HybridAnalysisPage, stats API 목록 정리
-- **PROJECT_STRUCTURE.md**: ma_cross/ 전략 제거, hybrid/ 추가, MaCrossPage 제거, HybridAnalysisPage·hybrid.ts 추가, stats.py 설명·OPTIMIZATION_SUMMARY 참조 제거
-- **PAGE_BACKEND_MAPPING.md**: MA 크로스 섹션 제거, 하이브리드 전략 분석 섹션 추가, data_service 경로 수정 (utils/), 요약 테이블 갱신
-- **API.md**: `/api/ma-cross` 제거, `/api/hybrid-analysis`, `/api/hybrid-backtest`, `/api/hybrid-live` 추가, journal API 목록 추가
-- **main.py**: stats_router 주석 수정 (ma-cross → hybrid-*)
+### Changes
+
+- `ARCHITECTURE.md`: removed `MaCrossParams`, added hybrid-related params, renamed `MaCrossPage` references to `HybridAnalysisPage`, and cleaned up the stats API list
+- `PROJECT_STRUCTURE.md`: removed the `ma_cross/` strategy, added `hybrid/`, replaced `MaCrossPage` references with `HybridAnalysisPage`, added `hybrid.ts`, and removed obsolete `stats.py` / `OPTIMIZATION_SUMMARY` references
+- `PAGE_BACKEND_MAPPING.md`: removed the MA cross section, added the hybrid strategy analysis section, corrected the `data_service` path to `utils/`, and refreshed the summary table
+- `API.md`: removed `/api/ma-cross`, added `/api/hybrid-analysis`, `/api/hybrid-backtest`, `/api/hybrid-live`, and added journal API coverage
+- `main.py`: updated the `stats_router` comment from `ma-cross` to `hybrid-*`
 
 ---
 
-## [2026-01-21] 프로젝트 구조 개선
+## [2026-01-21] Project Structure Improvements
 
-### 주요 변경사항
+### Major Changes
 
-#### 1. 의존성 관리 개선
-- **추가**: `backend/__init__.py` 생성
-  - 프로젝트 루트 경로를 한 곳에서 통합 관리
-  - `sys.path.insert` 중앙화
-- **제거**: 모든 파일에서 개별 `sys.path.insert` 제거 (19개 파일)
-  - `routes/`: 5개 파일
-  - `strategy/`: 8개 파일
-  - `services/`: 1개 파일
-  - `tests/`: 2개 파일 (테스트 환경 특성상 유지)
-- **효과**: 
-  - 코드 가독성 향상
-  - 경로 설정 일관성 확보
-  - 테스트 환경 안정성 향상
+#### 1. Dependency management cleanup
 
-#### 2. 데이터 서비스 구조 개선
-- **이동**: `backend/data_service.py` → `backend/utils/data_service.py`
-- **수정**: 모든 import 경로 업데이트 (7개 파일)
+- Added `backend/__init__.py`
+  - centralizes project-root path handling
+  - removes scattered `sys.path.insert` usage
+- Removed per-file `sys.path.insert` calls from 19 files
+  - `routes/`: 5 files
+  - `strategy/`: 8 files
+  - `services/`: 1 file
+  - `tests/`: 2 files kept due to test-environment specifics
+- Result:
+  - better readability
+  - more consistent path handling
+  - more stable test setup
+
+#### 2. Data service restructuring
+
+- Moved `backend/data_service.py` to `backend/utils/data_service.py`
+- Updated import paths in 7 files:
   - `utils/data_loader.py`
   - `routes/market.py`
   - `routes/support_resistance.py`
   - `strategy/streak/common.py`
   - `strategy/weekly_pattern/logic.py`
   - `strategy/streak/statistics.py`
-- **수정**: `BASE_DIR` 경로 수정 (`parent.parent` → `parent.parent.parent`)
-- **효과**: 
-  - 의존성 역전 문제 해결
-  - 모든 데이터 관련 유틸리티가 `utils/`에 집중
-  - 구조적 명확성 향상
+- Updated `BASE_DIR` from `parent.parent` to `parent.parent.parent`
+- Result:
+  - fixed dependency-direction issues
+  - concentrated data utilities under `utils/`
+  - improved structural clarity
 
-#### 3. 중복 코드 제거
-- **삭제**: `backend/services/squeeze_service.py` (195줄)
-- **이유**: `backend/strategy/squeeze/logic.py`와 중복 로직
-- **효과**: 
-  - 유지보수 비용 감소
-  - 버그 수정 일관성 확보
-  - 코드 줄수 감소 (~195줄)
+#### 3. Duplicate code removal
 
-#### 4. 명명 개선
-- **리네임**: `backend/services/backtest_logic.py` → `backend/services/statistics.py`
-- **이유**: 실제로는 통계 계산만 수행 (백테스트 실행이 아님)
-- **효과**: 
-  - 파일 역할이 더 명확해짐
-  - 코드 가독성 향상
+- Deleted `backend/services/squeeze_service.py` (`195` lines)
+- Reason: duplicated logic already covered by `backend/strategy/squeeze/logic.py`
+- Result:
+  - lower maintenance cost
+  - more consistent bug-fix path
+  - approximately `195` lines removed
 
-### 통계
+#### 4. Naming cleanup
 
-- **코드 줄수 감소**: 약 388줄 (398줄 삭제 - 10줄 추가)
-- **파일 이동**: 1개 (`data_service.py`)
-- **파일 삭제**: 1개 (`squeeze_service.py`)
-- **파일 리네임**: 1개 (`backtest_logic.py` → `statistics.py`)
-- **Import 경로 수정**: 7개 파일
-- **sys.path 제거**: 19개 파일
+- Renamed `backend/services/backtest_logic.py` to `backend/services/statistics.py`
+- Reason: the file was performing statistical calculations rather than backtest execution
+- Result:
+  - clearer file responsibility
+  - improved readability
 
-### 문서 업데이트
+### Stats
 
-- `PROJECT_STRUCTURE.md`: 파일 구조 및 최근 변경사항 업데이트
-- `ARCHITECTURE.md`: 모듈 설명 및 의존성 관계 업데이트
-- `README.md`: 파일 구조 다이어그램 업데이트
-- `CHANGELOG.md`: 변경 이력 문서 생성
+- Approximate net code reduction: `388` lines (`398` removed, `10` added)
+- Files moved: `1` (`data_service.py`)
+- Files deleted: `1` (`squeeze_service.py`)
+- Files renamed: `1` (`backtest_logic.py` -> `statistics.py`)
+- Import paths updated: `7` files
+- `sys.path` removals: `19` files
 
-### 테스트 결과
+### Documentation Updates
 
-- ✅ 백엔드 서버 정상 시작
-- ✅ 프론트엔드 서버 정상 시작
-- ✅ 모든 API 엔드포인트 정상 작동
-- ✅ Import 경로 모두 정상
-- ✅ BASE_DIR 경로 정상
+- `PROJECT_STRUCTURE.md`: updated file structure and recent changes
+- `ARCHITECTURE.md`: updated module descriptions and dependency relationships
+- `README.md`: refreshed the file-structure diagram
+- `CHANGELOG.md`: created the changelog
+
+### Test Results
+
+- Backend server starts successfully
+- Frontend server starts successfully
+- All API endpoints respond correctly
+- Import paths resolve correctly
+- `BASE_DIR` resolves correctly
 
 ---
 
-## 이전 변경사항
+## Earlier Changes
 
-### 2025년 변경사항
-- 주간 패턴 분석 리팩토링
-- 통합 필터 테스트 수정
-- 타입 및 API 클라이언트 모듈화
-- 캐싱 및 컨텍스트 관리
+### 2025 Highlights
+
+- Weekly pattern analysis refactor
+- Combo filter test updates
+- Type and API-client modularization
+- Caching and context-management improvements

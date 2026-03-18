@@ -1,31 +1,31 @@
 # API Spec (Core Endpoints)
 
-상세 예시/파라미터는 `API.md`를 참고하고, 이 문서는 핵심 계약만 요약합니다.
+See `API.md` for detailed examples and full parameter references. This file is the concise contract summary for the public repository.
 
 ## Envelopes
 
-- 성공 응답: `{ "success": true, "data": ... }`
-- 실패 응답: `{ "success": false, "error": "..." }`
+- Success response: `{ "success": true, "data": ... }`
+- Error response: `{ "success": false, "error": "..." }`
 
-## 주요 엔드포인트
+## Core Endpoints
 
-| Endpoint | Method | 설명 |
+| Endpoint | Method | Description |
 |---|---|---|
-| `/api/streak-analysis` | `POST` | 연속 봉 패턴 분석 |
-| `/api/bb-mid` | `POST` | BB 중단 터치 확률 통계 |
-| `/api/combo-filter` | `POST` | 콤보 필터 백테스트 |
-| `/api/trend-indicators` | `POST` | 추세판단 지표 조회 |
-| `/api/hybrid-analysis` | `POST` | 하이브리드 전략 통계 |
-| `/api/hybrid-backtest` | `POST` | 하이브리드 전략 백테스트 |
-| `/api/hybrid-live` | `POST` | 하이브리드 전략 라이브 상태 |
-| `/api/qx/profiles` | `GET` | Quant Lab 프로파일 목록 |
-| `/api/qx/regime-snapshot` | `POST` | Quant Lab 레짐 스냅샷 |
-| `/api/qx/conditional-prob` | `POST` | Quant Lab 조건부 확률 |
-| `/api/qx/event-study` | `POST` | Quant Lab 이벤트 스터디 |
-| `/api/qx/robustness` | `POST` | Quant Lab 강건성 비교 |
+| `/api/streak-analysis` | `POST` | Streak-pattern probability analysis |
+| `/api/bb-mid` | `POST` | Bollinger Band mid-touch probability statistics |
+| `/api/combo-filter` | `POST` | Combo filter backtest |
+| `/api/trend-indicators` | `POST` | Trend-judgment indicator lookup |
+| `/api/hybrid-analysis` | `POST` | Hybrid strategy statistics |
+| `/api/hybrid-backtest` | `POST` | Hybrid strategy backtest |
+| `/api/hybrid-live` | `POST` | Hybrid strategy live-state evaluation |
+| `/api/qx/profiles` | `GET` | Quant-Lab profile list |
+| `/api/qx/regime-snapshot` | `POST` | Quant-Lab regime snapshot |
+| `/api/qx/conditional-prob` | `POST` | Quant-Lab conditional probability study |
+| `/api/qx/event-study` | `POST` | Quant-Lab event study |
+| `/api/qx/robustness` | `POST` | Quant-Lab robustness comparison |
 
-## 품질 게이트 (Quant Lab)
+## Quality Gates (Quant-Lab)
 
-`/api/qx/*` 분석은 입력 데이터 품질 게이트를 통과하지 못하면 실패 응답을 반환합니다.
+`/api/qx/*` analyses return a failure response when the incoming dataset does not satisfy the required data-quality gate.
 
-- 품질 메타 포함: `quality_report`, `quality_gate`, `reproducibility`
+- Included quality metadata: `quality_report`, `quality_gate`, `reproducibility`

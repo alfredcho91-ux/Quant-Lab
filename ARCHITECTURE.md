@@ -45,7 +45,7 @@ The frontend uses a Feature-Sliced Design (FSD) approach to manage complexity.
 
 To demonstrate the architecture in action, here is the flow when a user asks the AI to analyze a condition:
 
-1.  **User Input:** "RSI < 30 일 때 다음 봉 양봉 확률" (Frontend `ChatInterface.tsx`)
+1.  **User Input:** "Probability that the next candle is bullish when RSI < 30" (Frontend `ChatInterface.tsx`)
 2.  **API Call:** POST `/api/ai/research` (Frontend `api/ai_lab.ts`)
 3.  **Routing:** `backend/modules/ai_lab/router.py` receives the request.
 4.  **Service & LLM:** `service.py` sends the prompt to the LLM Gateway to parse the natural language into a structured JSON condition.
