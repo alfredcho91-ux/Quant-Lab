@@ -16,6 +16,26 @@ Quant-Lab is a quantitative research and strategy analysis platform for crypto m
 - Quant focus: streak analysis, hybrid filters, MTF trend judgment, pattern scanning, and AI-assisted strategy drafting.
 - Engineering focus: React + TypeScript frontend, FastAPI backend, pure indicator/core layers, and explicit documentation for architecture, install flow, and feature-to-backend mapping.
 
+## Screenshots
+
+### AI Strategy Lab
+
+Natural-language strategy drafting, indicator selection, and execution parameter setup in a single workbench.
+
+![AI Strategy Lab](./docs/screenshots/ai-strategy-lab.png)
+
+### Streak Analysis
+
+Pattern-driven streak analysis workflow with EMA filtering, conditional breakdowns, and execution-ready controls.
+
+![Streak Analysis](./docs/screenshots/streak-analysis.png)
+
+### Combo Filter
+
+Rule-combination backtest page for composing MA, Bollinger, and pattern-based entry filters.
+
+![Combo Filter](./docs/screenshots/combo-filter.png)
+
 ## What This Repository Proves
 
 - I can decompose a quant product into bounded modules instead of growing a monolithic script pile.
@@ -52,6 +72,7 @@ Architecture details live in [ARCHITECTURE.md](./ARCHITECTURE.md).
 ## Implementation PM Evidence
 
 - [Implementation PM Case Study](./docs/IMPLEMENTATION_PM_CASE_STUDY.md)
+- [GitHub Profile Blurb](./docs/GITHUB_PROFILE_BLURB.md)
 - [Portfolio Release Notes](./docs/PORTFOLIO_RELEASE_NOTES.md)
 - [System Architecture](./ARCHITECTURE.md)
 - [API Specification](./API_SPEC.md)
