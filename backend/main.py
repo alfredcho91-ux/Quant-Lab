@@ -8,6 +8,7 @@ import sys
 import os
 import time
 import logging
+import secrets
 from pathlib import Path
 
 # Add project root to Python path (for importing core modules)
@@ -16,9 +17,11 @@ _project_root = Path(__file__).parent.parent
 if str(_project_root) not in sys.path:
     sys.path.insert(0, str(_project_root))
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import ORJSONResponse
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
+from fastapi.staticfiles import StaticFiles
 from config.settings import CORS_ORIGINS
 
 # Import routers
@@ -35,11 +38,30 @@ from modules.ai_lab.router import router as ai_lab_router
 from modules.indicators.router import router as indicators_router
 from core.strategies import STRATS
 
+security = HTTPBasic()
+
+
+def verify_credentials(credentials: HTTPBasicCredentials = Depends(security)):
+    """Verify HTTP Basic Auth credentials against environment variables."""
+    correct_username = os.getenv("DEMO_USERNAME", "demo")
+    correct_password = os.getenv("DEMO_PASSWORD", "demo")
+    is_username_correct = secrets.compare_digest(credentials.username, correct_username)
+    is_password_correct = secrets.compare_digest(credentials.password, correct_password)
+    if not (is_username_correct and is_password_correct):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect username or password",
+            headers={"WWW-Authenticate": "Basic"},
+        )
+    return credentials.username
+
+
 app = FastAPI(
     title="Quant Master API",
     description="Backend API for crypto trading analysis platform",
     version="1.0.0",
     default_response_class=ORJSONResponse,  # orjson 사용으로 JSON 직렬화 성능 향상
+    dependencies=[Depends(verify_credentials)],
 )
 
 LOG_LEVEL = os.getenv("APP_LOG_LEVEL", "INFO").upper()
@@ -113,10 +135,11 @@ app.include_router(journal_router)  # /api/journal
 app.include_router(ai_lab_router)  # /api/ai/research
 app.include_router(indicators_router)  # /api/indicators
 
+# Serve frontend static files
+frontend_dist = _project_root / "frontend" / "dist"
+frontend_dist.mkdir(parents=True, exist_ok=True)
+app.mount("/", StaticFiles(directory=str(frontend_dist), html=True), name="frontend")
 
-@app.get("/")
-async def root():
-    return {"message": "Quant Master API is running!"}
 
 
 @app.get("/api/strategies")
