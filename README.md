@@ -6,7 +6,9 @@
 ![Python](https://img.shields.io/badge/Quant-Python_3.9-3776AB)
 ![TypeScript](https://img.shields.io/badge/Language-TypeScript-3178C6)
 
-Quant-Lab is a quantitative research and strategy analysis platform for crypto markets. The project turns raw hypothesis testing into an operable product: typed APIs, modular quant logic, reusable indicator pipelines, multi-page React workflows, and documentation that makes implementation decisions traceable.
+Quant-Lab is a quantitative research and strategy analysis platform for crypto and stock markets. The project turns raw hypothesis testing into an operable product: typed APIs, modular quant logic, reusable indicator pipelines, multi-page React workflows, and documentation that makes implementation decisions traceable.
+
+Keywords: quant finance, crypto, stocks, stock trading, algorithmic trading, backtesting, AI-assisted strategy analysis.
 
 > Portfolio lens: this repository is intentionally positioned as an Implementation PM case study. It demonstrates how quant research is translated into a maintainable software system with delivery structure, architecture boundaries, execution artifacts, and a clear roadmap.
 
