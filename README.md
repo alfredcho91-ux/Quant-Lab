@@ -120,7 +120,7 @@ chmod +x start.sh
 
 - [x] Phase 1: Core analytics, backtesting workflows, and architectural modularization
 - [ ] Phase 2: Execution-ready live trading integration and portfolio state management
-- [ ] Phase 3: Strategy optimization and ML-assisted ranking
+- [ ] Phase 3: Natural-language indicator customization, user-defined strategy composition, and ML-assisted ranking
 - [ ] Phase 4: CI/CD, containerization, and cloud deployment hardening
 
 Designed and implemented by Geunwoo Cho, focused on the intersection of Quant Finance and Software Implementation.

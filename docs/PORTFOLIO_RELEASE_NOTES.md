@@ -41,5 +41,6 @@ It is the first public cut curated to present the project as an Implementation P
 ## Next Portfolio Upgrades
 
 - Add a hosted demo or recorded walkthrough
+- Add a natural-language indicator customization page so users can combine indicators into their own strategies
 - Introduce release cadence and changelog discipline
 - Extend CI with deployment packaging and container validation
