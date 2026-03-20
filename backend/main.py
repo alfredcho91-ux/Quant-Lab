@@ -43,6 +43,10 @@ security = HTTPBasic()
 
 def verify_credentials(credentials: HTTPBasicCredentials = Depends(security)):
     """Verify HTTP Basic Auth credentials against environment variables."""
+    # 로컬 개발 환경(APP_ENV가 production이 아닐 때)에서는 비밀번호 검사를 건너뜁니다.
+    if os.getenv("APP_ENV", "development") != "production":
+        return "local_dev"
+        
     correct_username = os.getenv("DEMO_USERNAME", "demo")
     correct_password = os.getenv("DEMO_PASSWORD", "demo")
     is_username_correct = secrets.compare_digest(credentials.username, correct_username)
