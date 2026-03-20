@@ -10,6 +10,7 @@ import time
 import logging
 import secrets
 from pathlib import Path
+from typing import Optional
 
 # Add project root to Python path (for importing core modules)
 # This ensures core/ can be imported even when running directly with uvicorn
@@ -38,15 +39,22 @@ from modules.ai_lab.router import router as ai_lab_router
 from modules.indicators.router import router as indicators_router
 from core.strategies import STRATS
 
-security = HTTPBasic()
+security = HTTPBasic(auto_error=False)
 
 
-def verify_credentials(credentials: HTTPBasicCredentials = Depends(security)):
+def verify_credentials(credentials: Optional[HTTPBasicCredentials] = Depends(security)):
     """Verify HTTP Basic Auth credentials against environment variables."""
     # 로컬 개발 환경(APP_ENV가 production이 아닐 때)에서는 비밀번호 검사를 건너뜁니다.
-    if os.getenv("APP_ENV", "development") != "production":
+    if os.getenv("APP_ENV", "development").lower() != "production":
         return "local_dev"
-        
+
+    if credentials is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication required",
+            headers={"WWW-Authenticate": "Basic"},
+        )
+
     correct_username = os.getenv("DEMO_USERNAME", "demo")
     correct_password = os.getenv("DEMO_PASSWORD", "demo")
     is_username_correct = secrets.compare_digest(credentials.username, correct_username)

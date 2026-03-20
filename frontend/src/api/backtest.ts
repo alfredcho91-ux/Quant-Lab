@@ -1,9 +1,9 @@
 // 백테스트 API
 
-import { api } from './config';
+import { api, ensureApiSuccess, toApiClientError } from './config';
 import type { BacktestParams, BacktestResult, AdvancedBacktestResult } from '../types';
 
-export async function runBacktest(params: BacktestParams): Promise<BacktestResult | null> {
+export async function runBacktest(params: BacktestParams): Promise<BacktestResult> {
   try {
     const res = await api.post<{
       success: boolean;
@@ -11,27 +11,25 @@ export async function runBacktest(params: BacktestParams): Promise<BacktestResul
       trades: BacktestResult['trades'];
       summary: BacktestResult['summary'];
       error?: string;
+      error_code?: string | null;
+      details?: unknown;
     }>('/backtest', params);
-    
-    if (res.data.success) {
-      return {
-        chart_data: res.data.chart_data,
-        trades: res.data.trades,
-        summary: res.data.summary,
-      };
-    }
-    console.error('Backtest error:', res.data.error);
-    return null;
-  } catch (err) {
-    console.error('Backtest request failed:', err);
-    return null;
+
+    const payload = ensureApiSuccess(res, 'Backtest failed.');
+    return {
+      chart_data: payload.chart_data,
+      trades: payload.trades,
+      summary: payload.summary,
+    };
+  } catch (error: unknown) {
+    throw toApiClientError(error, 'Backtest failed.');
   }
 }
 
 export async function runAdvancedBacktest(params: BacktestParams & {
   train_ratio?: number;
   monte_carlo_runs?: number;
-}): Promise<AdvancedBacktestResult | null> {
+}): Promise<AdvancedBacktestResult> {
   try {
     const res = await api.post<{
       success: boolean;
@@ -42,22 +40,20 @@ export async function runAdvancedBacktest(params: BacktestParams & {
       full: AdvancedBacktestResult['full'];
       monte_carlo: AdvancedBacktestResult['monte_carlo'];
       error?: string;
+      error_code?: string | null;
+      details?: unknown;
     }>('/backtest-advanced', params);
-    
-    if (res.data.success) {
-      return {
-        chart_data: res.data.chart_data,
-        trades: res.data.trades,
-        in_sample: res.data.in_sample,
-        out_of_sample: res.data.out_of_sample,
-        full: res.data.full,
-        monte_carlo: res.data.monte_carlo,
-      };
-    }
-    console.error('Advanced Backtest error:', res.data.error);
-    return null;
-  } catch (err) {
-    console.error('Advanced Backtest request failed:', err);
-    return null;
+
+    const payload = ensureApiSuccess(res, 'Advanced backtest failed.');
+    return {
+      chart_data: payload.chart_data,
+      trades: payload.trades,
+      in_sample: payload.in_sample,
+      out_of_sample: payload.out_of_sample,
+      full: payload.full,
+      monte_carlo: payload.monte_carlo,
+    };
+  } catch (error: unknown) {
+    throw toApiClientError(error, 'Advanced backtest failed.');
   }
 }

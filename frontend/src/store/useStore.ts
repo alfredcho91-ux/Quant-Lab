@@ -6,6 +6,8 @@ import type { Language, Coin, MenuPage, BacktestParams } from '../types';
 const INTERVALS = ['15m', '30m', '1h', '2h', '4h', '1d', '3d', '1w', '1M'] as const;
 export type Interval = (typeof INTERVALS)[number];
 export type BackgroundTheme = 'default' | 'white' | 'black';
+const DEFAULT_COIN: Coin = 'BTC';
+const DEFAULT_INTERVAL: Interval = '4h';
 
 interface AppState {
   // UI State
@@ -31,8 +33,8 @@ interface AppState {
 }
 
 const defaultBacktestParams: BacktestParams = {
-  coin: 'BTC',
-  interval: '1h',
+  coin: DEFAULT_COIN,
+  interval: DEFAULT_INTERVAL,
   strategy_id: 'Connors',
   direction: 'Long',
   tp_pct: 2.0,
@@ -65,8 +67,8 @@ export const useStore = create<AppState>()(
       // Initial state
       language: 'ko',
       backgroundTheme: 'default',
-      selectedCoin: 'BTC',
-      selectedInterval: '4h',
+      selectedCoin: DEFAULT_COIN,
+      selectedInterval: DEFAULT_INTERVAL,
       currentPage: 'backtest',
       sidebarCollapsed: false,
       backtestParams: defaultBacktestParams,
@@ -99,7 +101,11 @@ export const useStore = create<AppState>()(
       
       resetBacktestParams: () =>
         set((state) => ({
-          backtestParams: { ...defaultBacktestParams, coin: state.selectedCoin },
+          backtestParams: {
+            ...defaultBacktestParams,
+            coin: state.selectedCoin,
+            interval: state.selectedInterval,
+          },
         })),
     }),
     {
@@ -115,9 +121,13 @@ export const useStore = create<AppState>()(
         const incoming = (persistedState as Partial<AppState>) ?? {};
         const persistedParams =
           (incoming.backtestParams as Partial<BacktestParams> & { ema_len?: number }) ?? {};
+        const selectedCoin = incoming.selectedCoin ?? currentState.selectedCoin;
+        const selectedInterval = incoming.selectedInterval ?? currentState.selectedInterval;
         const normalizedParams: BacktestParams = {
           ...defaultBacktestParams,
           ...persistedParams,
+          coin: selectedCoin,
+          interval: selectedInterval,
           sma_main_len:
             persistedParams.sma_main_len ??
             persistedParams.ema_len ??

@@ -2,8 +2,36 @@
 """공통 데이터 로딩 유틸리티 함수"""
 
 import pandas as pd
+from pathlib import Path
 from typing import Optional, Tuple
+
+from utils.cache import DataCache
 from utils.data_service import fetch_live_data, load_csv_data
+
+LIVE_DATA_CACHE = DataCache(
+    ttl_seconds=30,
+    cache_dir=str(Path(__file__).parent.parent.parent / ".cache" / "live_data"),
+)
+
+
+def _load_live_data_snapshot(
+    coin: str,
+    interval: str,
+    total_candles: int,
+) -> Optional[pd.DataFrame]:
+    """Load live OHLCV data with a short-lived snapshot cache."""
+    effective_total_candles = min(total_candles, 300) if interval == "1w" else total_candles
+    cache_key = f"{coin}:{interval}:{effective_total_candles}"
+    cached_df = LIVE_DATA_CACHE.get(cache_key)
+    if isinstance(cached_df, pd.DataFrame):
+        return cached_df.copy()
+
+    df = fetch_live_data(f"{coin}/USDT", interval, total_candles=effective_total_candles)
+    if df is None or df.empty:
+        return df
+
+    LIVE_DATA_CACHE.set(cache_key, df)
+    return df.copy()
 
 
 def load_data_for_analysis(
@@ -39,9 +67,7 @@ def load_data_for_analysis(
     
     # API에서 로딩
     if df is None or df.empty:
-        if interval == "1w":
-            total_candles = min(total_candles, 300)  # 주봉: 최근 300개 통일
-        df = fetch_live_data(f"{coin}/USDT", interval, total_candles=total_candles)
+        df = _load_live_data_snapshot(coin, interval, total_candles)
         source = "api"
     
     # 데이터 검증

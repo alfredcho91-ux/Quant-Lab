@@ -1,7 +1,6 @@
 // 연속 봉패턴 분석 API
 
-import { api } from './config';
-import type { ApiResponse } from './config';
+import { api, toApiClientError, unwrapApiResponse } from './config';
 import type { StreakAnalysisParams, StreakAnalysisResult } from '../types';
 
 type StreakAnalysisApiPayload = Partial<StreakAnalysisResult>;
@@ -69,26 +68,17 @@ function normalizePartialStreakPayload(
   };
 }
 
-export async function runStreakAnalysis(params: StreakAnalysisParams): Promise<StreakAnalysisResult | null> {
+export async function runStreakAnalysis(params: StreakAnalysisParams): Promise<StreakAnalysisResult> {
   try {
-    const res = await api.post<ApiResponse<StreakAnalysisApiPayload>>('/streak-analysis', params);
-    
-    if (res.data.success && res.data.data) {
-      const payload = res.data.data;
-      if (hasCoreStreakFields(payload)) return payload;
-      console.warn('Streak Analysis partial payload detected, applying defaults.');
-      return normalizePartialStreakPayload(payload, params);
-    }
-
-    if (res.data.data) {
-      console.warn('Streak Analysis error response contained partial data, applying defaults.');
-      return normalizePartialStreakPayload(res.data.data, params);
-    }
-
-    console.error('Streak Analysis error:', res.data.error);
-    return null;
-  } catch (err) {
-    console.error('Streak Analysis request failed:', err);
-    return null;
+    const res = await api.post('/streak-analysis', params);
+    const payload = unwrapApiResponse<StreakAnalysisApiPayload>(
+      res,
+      'Failed to run streak analysis.'
+    );
+    if (hasCoreStreakFields(payload)) return payload;
+    console.warn('Streak Analysis partial payload detected, applying defaults.');
+    return normalizePartialStreakPayload(payload, params);
+  } catch (error: unknown) {
+    throw toApiClientError(error, 'Failed to run streak analysis.');
   }
 }

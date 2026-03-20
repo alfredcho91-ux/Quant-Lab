@@ -14,9 +14,9 @@ Keywords: quant finance, crypto, stocks, stock trading, algorithmic trading, bac
 
 ## Executive Snapshot
 
-- Product scope: 15 frontend pages, 11 backend modules, and 19 backend test files supporting research, scanning, backtesting, and AI-assisted exploration.
+- Product scope: 14 frontend route pages, 11 backend modules, 4 feature-sliced frontend domains, and 20 backend test files supporting research, scanning, backtesting, journaling, and AI-assisted exploration.
 - Quant focus: streak analysis, hybrid filters, MTF trend judgment, pattern scanning, and AI-assisted strategy drafting.
-- Engineering focus: React + TypeScript frontend, FastAPI backend, pure indicator/core layers, and explicit documentation for architecture, install flow, and feature-to-backend mapping.
+- Engineering focus: React + TypeScript frontend, FastAPI backend, pure indicator/core layers, short-lived live OHLCV snapshot caching, and explicit documentation for architecture, install flow, and feature-to-backend mapping.
 
 ## Screenshots
 
@@ -66,8 +66,11 @@ Rule-combination backtest page for composing MA, Bollinger, and pattern-based en
 
 - `core/`: Pure quant primitives and indicator pipelines with no HTTP or UI awareness.
 - `backend/strategy/`: Strategy-specific business logic for streak, hybrid, combo filter, and related domains.
-- `backend/modules/`: API-facing orchestration, schemas, and service boundaries.
+- `backend/modules/`: API-facing orchestration, schemas, and service boundaries, with response envelopes and centralized exception wrapping.
+- `backend/utils/data_loader.py`: Shared OHLCV entry point with CSV fallback and short-lived live-data snapshot caching to avoid redundant market fetches.
+- `frontend/src/api/`: Centralized API clients that normalize envelopes and throw typed errors so React Query can handle failures consistently.
 - `frontend/src/features/`: Feature-sliced UI modules that keep complex workflows localized instead of spreading logic across generic components.
+- `frontend/src/store/`: Persisted Zustand state for shared coin/timeframe context and backtest defaults, kept aligned across pages.
 
 Architecture details live in [ARCHITECTURE.md](./ARCHITECTURE.md).
 
@@ -86,6 +89,7 @@ Architecture details live in [ARCHITECTURE.md](./ARCHITECTURE.md).
 ## Quality Gates
 
 - GitHub Actions runs backend tests, frontend lint/build, and architecture guard scripts on every push to `main`.
+- The current backend suite collects 124 tests across 20 files, covering quant math, AI orchestration, cache behavior, auth flow, and architecture invariants.
 - The repository includes explicit import guards to prevent `core/` and router layers from accumulating cross-layer coupling.
 - Public repo hygiene is enforced via ignore rules that exclude logs, local caches, agent artifacts, and large market data files.
 
@@ -105,6 +109,17 @@ cd Quant-Lab
 chmod +x start.sh
 ./start.sh
 ```
+
+- Frontend: `http://localhost:5173`
+- Backend API: `http://localhost:8000`
+- API docs: `http://localhost:8000/docs`
+- Local development bypasses HTTP Basic auth by default. Basic auth is enforced only when `APP_ENV=production`.
+
+## Runtime Notes
+
+- Market data can come from local CSV files under `binance_klines/` or live Binance fetches through the backend data loader.
+- Live OHLCV requests are snapshot-cached briefly in the backend so repeated multi-page analysis runs do not refetch the same candles immediately.
+- Frontend analysis mutations now rely on typed API errors instead of silent `null` returns, so error UI and retry flows stay consistent.
 
 ## Delivery Principles
 

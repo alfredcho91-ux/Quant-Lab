@@ -15,7 +15,6 @@ from strategy.bb_mid import (
     add_bb_indicators,
     analyze_bb_mid_touch,
     collect_event_returns,
-    quartile_reach_stats,
 )
 from strategy.combo_filter import analyze_combo_filter
 from strategy.hybrid import analyze_hybrid_strategy, analyze_live_mode, run_hybrid_backtest
@@ -93,12 +92,6 @@ def run_bb_mid_analysis(
 
         if stats["events"] > 0:
             event_returns = collect_event_returns(
-                df=df,
-                start_side=start_side,
-                max_bars=max_bars,
-                regime=regime,
-            )
-            quartile_reach_stats(
                 df=df,
                 start_side=start_side,
                 max_bars=max_bars,

@@ -21,5 +21,6 @@ backend/backend.log
 backend/.coverage
 backend/.pytest_cache/
 backend/.cache/
+backend/main.py.patch
 frontend/test-results/
 **/AGENTS.md
