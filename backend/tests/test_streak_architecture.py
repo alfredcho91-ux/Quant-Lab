@@ -208,12 +208,39 @@ def test_analysis_cache_key_includes_ema_200_position_for_all_modes():
     assert complex_above != complex_below
 
 
+def test_analysis_cache_key_includes_candle_mode():
+    """캔들 타입이 다르면 동일 조건이어도 캐시 키가 달라져야 한다."""
+    base_kwargs = {
+        "coin": "BTC",
+        "interval": "1h",
+        "n_streak": 3,
+        "direction": "green",
+        "use_complex_pattern": False,
+        "complex_pattern": None,
+        "rsi_threshold": 60.0,
+        "min_total_body_pct": None,
+    }
+
+    standard_key = generate_analysis_cache_key(
+        AnalysisContext(candle_mode="standard", **base_kwargs)
+    )
+    heikin_ashi_key = generate_analysis_cache_key(
+        AnalysisContext(candle_mode="heikin_ashi", **base_kwargs)
+    )
+
+    assert "_standard_" in standard_key
+    assert "_heikin_ashi_" in heikin_ashi_key
+    assert standard_key != heikin_ashi_key
+
+
 def test_timezone_offset_default_is_not_hardcoded():
     """Legacy timezone_offset 기본값은 None이어야 하며, 실분석은 pytz timezone 설정을 사용한다."""
     params = StreakAnalysisParams()
     assert params.timezone_offset is None
     assert params.ema_200_position is None
+    assert params.candle_mode == "standard"
 
     context = AnalysisContext.from_params({})
     assert context.timezone_offset is None
     assert context.ema_200_position is None
+    assert context.candle_mode == "standard"

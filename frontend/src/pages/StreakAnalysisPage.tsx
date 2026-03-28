@@ -24,11 +24,17 @@ export default function StreakAnalysisPage() {
     setMinTotalBodyPct,
     params,
     setParams,
+    handleCandleModeChange,
     mutation,
     handleRun,
   } = useStreakAnalysisForm();
 
   const result = mutation.data;
+  const activeResultCandleMode = result?.analysis_mode?.parameters.candle_mode ?? params.candle_mode ?? 'standard';
+  const activeResultCandleModeLabel =
+    activeResultCandleMode === 'heikin_ashi'
+      ? (isKo ? '하이킨아시 캔들 기준' : 'Heikin-Ashi Basis')
+      : (isKo ? '일반 캔들 기준' : 'Standard Candle Basis');
   const moveLabel =
     params.direction === 'green' ? (isKo ? '상승' : 'Up') : (isKo ? '하락' : 'Down');
 
@@ -100,6 +106,7 @@ export default function StreakAnalysisPage() {
         condition1={condition1}
         condition2={condition2}
         minTotalBodyPct={minTotalBodyPct}
+        candleMode={params.candle_mode ?? 'standard'}
         ema200Position={params.ema_200_position ?? null}
         isPending={mutation.isPending}
         isKo={isKo}
@@ -107,6 +114,7 @@ export default function StreakAnalysisPage() {
         onCondition1Change={setCondition1}
         onCondition2Change={setCondition2}
         onMinTotalBodyPctChange={setMinTotalBodyPct}
+        onCandleModeChange={handleCandleModeChange}
         onEma200PositionChange={(value) =>
           setParams((prev) => ({ ...prev, ema_200_position: value }))
         }
@@ -121,6 +129,26 @@ export default function StreakAnalysisPage() {
         result &&
         (result.total_cases > 0 || (result.mode === 'complex' && result.complex_pattern_analysis)) && (
           <div className="space-y-6 animate-in fade-in duration-500">
+            <div className="card p-4 border border-sky-500/20 bg-sky-500/5">
+              <div className="flex flex-wrap items-center gap-2 text-xs">
+                <span className="font-semibold text-sky-300">
+                  {isKo ? '계산 기준' : 'Calculation Basis'}
+                </span>
+                <span className="px-2 py-1 rounded-full bg-sky-500/15 border border-sky-500/30 text-sky-200 font-medium">
+                  {activeResultCandleModeLabel}
+                </span>
+              </div>
+              <p className="mt-2 text-xs text-dark-300">
+                {activeResultCandleMode === 'heikin_ashi'
+                  ? isKo
+                    ? '현재 결과는 연속봉과 패턴 판정에만 하이킨아시를 사용하고, RSI/ATR/Disparity/EMA 200은 원본 OHLC 기준으로 계산합니다.'
+                    : 'This result uses Heikin-Ashi candles only for streak and pattern detection, while RSI/ATR/Disparity/EMA 200 stay on the original OHLC prices.'
+                  : isKo
+                    ? '현재 결과는 원본 OHLC 기준으로 연속봉과 지표를 계산합니다.'
+                    : 'This result uses the original OHLC candles for both streak detection and derived indicators.'}
+              </p>
+            </div>
+
             {/* Statistics Summary */}
             <StatisticsSummary result={result} direction={params.direction} isKo={isKo} />
 

@@ -14,6 +14,13 @@ logger = logging.getLogger(__name__)
 DEBUG_MODE = os.getenv('DEBUG_STREAK_ANALYSIS', 'False').lower() in ('true', '1', 'yes')
 DEFAULT_RSI = 50.0
 REQUIRED_INDICATOR_COLUMNS = {"atr_pct", "rsi", "disparity", "ema_200"}
+REQUIRED_OHLCV_COLUMNS = {"open", "high", "low", "close"}
+SOURCE_COLUMN_MAP = {
+    "open": "source_open",
+    "high": "source_high",
+    "low": "source_low",
+    "close": "source_close",
+}
 
 def normalize_datetime_index(df: pd.DataFrame) -> pd.DataFrame:
     """
@@ -74,7 +81,49 @@ def load_data(coin: str, interval: str) -> Tuple[Optional[pd.DataFrame], bool]:
     return df, False
 
 
-def prepare_dataframe(df: pd.DataFrame, direction: str) -> pd.DataFrame:
+def calculate_heikin_ashi(df: pd.DataFrame) -> pd.DataFrame:
+    """표준 OHLC를 Heikin-Ashi OHLC로 변환."""
+    df = df.copy()
+    missing_columns = REQUIRED_OHLCV_COLUMNS.difference(df.columns)
+    if missing_columns:
+        raise KeyError(f"Missing OHLC columns for Heikin-Ashi conversion: {sorted(missing_columns)}")
+
+    ha_close = (df["open"] + df["high"] + df["low"] + df["close"]) / 4.0
+    ha_open = ha_close.copy()
+    if not ha_open.empty:
+        ha_open.iloc[0] = (df["open"].iloc[0] + df["close"].iloc[0]) / 2.0
+        for i in range(1, len(df)):
+            ha_open.iloc[i] = (ha_open.iloc[i - 1] + ha_close.iloc[i - 1]) / 2.0
+
+    ha_high = pd.concat([df["high"], ha_open, ha_close], axis=1).max(axis=1)
+    ha_low = pd.concat([df["low"], ha_open, ha_close], axis=1).min(axis=1)
+
+    df["open"] = ha_open
+    df["high"] = ha_high
+    df["low"] = ha_low
+    df["close"] = ha_close
+    return df
+
+
+def preserve_source_ohlc(df: pd.DataFrame) -> pd.DataFrame:
+    """Keep original OHLC values for indicator calculations."""
+    df = df.copy()
+    missing_columns = REQUIRED_OHLCV_COLUMNS.difference(df.columns)
+    if missing_columns:
+        raise KeyError(f"Missing OHLC columns for source preservation: {sorted(missing_columns)}")
+
+    for base_col, source_col in SOURCE_COLUMN_MAP.items():
+        if source_col not in df.columns:
+            df[source_col] = df[base_col]
+
+    return df
+
+
+def prepare_dataframe(
+    df: pd.DataFrame,
+    direction: str,
+    candle_mode: Literal["standard", "heikin_ashi"] = "standard",
+) -> pd.DataFrame:
     """
     기본 파생 컬럼 추가 (is_green, body_pct 등)
     """
@@ -82,6 +131,10 @@ def prepare_dataframe(df: pd.DataFrame, direction: str) -> pd.DataFrame:
     
     if not isinstance(df.index, pd.DatetimeIndex):
         df = normalize_datetime_index(df)
+    df = preserve_source_ohlc(df)
+
+    if candle_mode == "heikin_ashi":
+        df = calculate_heikin_ashi(df)
     
     df['is_green'] = df['close'] > df['open']
     df['is_red'] = df['close'] < df['open']
@@ -101,19 +154,22 @@ def prepare_dataframe(df: pd.DataFrame, direction: str) -> pd.DataFrame:
 def calculate_indicators(df: pd.DataFrame) -> pd.DataFrame:
     """기술적 지표 계산 (RSI, ATR, Disparity)"""
     df = df.copy()
+    price_high = df["source_high"] if "source_high" in df.columns else df["high"]
+    price_low = df["source_low"] if "source_low" in df.columns else df["low"]
+    price_close = df["source_close"] if "source_close" in df.columns else df["close"]
     
     # ATR
-    df['prev_close'] = df['close'].shift(1)
+    df['prev_close'] = price_close.shift(1)
     df['tr'] = pd.concat([
-        df['high'] - df['low'],
-        (df['high'] - df['prev_close']).abs(),
-        (df['low'] - df['prev_close']).abs()
+        price_high - price_low,
+        (price_high - df['prev_close']).abs(),
+        (price_low - df['prev_close']).abs()
     ], axis=1).max(axis=1)
     df['atr_14'] = df['tr'].rolling(14).mean()
-    df['atr_pct'] = df['atr_14'] / df['close'] * 100
+    df['atr_pct'] = df['atr_14'] / price_close * 100
     
     # RSI
-    delta = df['close'].diff()
+    delta = price_close.diff()
     gain = delta.where(delta > 0, 0).rolling(14).mean()
     loss = (-delta.where(delta < 0, 0)).rolling(14).mean()
     rs = gain / loss
@@ -121,11 +177,11 @@ def calculate_indicators(df: pd.DataFrame) -> pd.DataFrame:
     
     # Disparity
     df['vol_change'] = df['volume'].pct_change() * 100
-    df['ma20'] = df['close'].rolling(20).mean()
-    df['disparity'] = (df['close'] / df['ma20']) * 100
+    df['ma20'] = price_close.rolling(20).mean()
+    df['disparity'] = (price_close / df['ma20']) * 100
 
     # EMA 200 (일봉 고정): 분석 interval과 무관하게 1D 종가 기준으로 계산
-    daily_close = df['close'].resample('1D').last().dropna()
+    daily_close = price_close.resample('1D').last().dropna()
     if daily_close.empty:
         df['ema_200'] = np.nan
     else:
@@ -135,9 +191,15 @@ def calculate_indicators(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def get_or_calculate_indicators(coin: str, interval: str, df: pd.DataFrame) -> pd.DataFrame:
+def get_or_calculate_indicators(
+    coin: str,
+    interval: str,
+    df: pd.DataFrame,
+    candle_mode: Literal["standard", "heikin_ashi"] = "standard",
+) -> pd.DataFrame:
     """지표 계산 (캐싱 적용)"""
-    cache_key = f"indicators_{coin}_{interval}"
+    # Cache the full prepared dataframe, so candle-specific pattern columns remain aligned.
+    cache_key = f"indicators_{coin}_{interval}_{candle_mode}"
     
     cached = indicators_cache.get(cache_key)
     if cached is not None and REQUIRED_INDICATOR_COLUMNS.issubset(cached.columns):
@@ -166,14 +228,15 @@ def filter_rows_by_ema_200_position(
         logger.warning("EMA 200 filter requested but ema_200 column is missing")
         return rows.iloc[0:0].copy()
 
-    eval_df = df.loc[rows.index, ["close", "ema_200"]].dropna()
+    close_col = "source_close" if "source_close" in df.columns else "close"
+    eval_df = df.loc[rows.index, [close_col, "ema_200"]].dropna()
     if eval_df.empty:
         return rows.iloc[0:0].copy()
 
     if ema_200_position == "above":
-        matched_index = eval_df.index[eval_df["close"] >= eval_df["ema_200"]]
+        matched_index = eval_df.index[eval_df[close_col] >= eval_df["ema_200"]]
     else:
-        matched_index = eval_df.index[eval_df["close"] <= eval_df["ema_200"]]
+        matched_index = eval_df.index[eval_df[close_col] <= eval_df["ema_200"]]
 
     if len(matched_index) == 0:
         return rows.iloc[0:0].copy()

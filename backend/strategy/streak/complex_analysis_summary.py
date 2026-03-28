@@ -137,7 +137,10 @@ def calculate_complex_analysis(
             "c1_analysis": c1_summary,
             "c2_analysis": c2_summary,
         },
-        "filters_applied": {"rsi_threshold": context.rsi_threshold},
+        "filters_applied": {
+            "rsi_threshold": context.rsi_threshold,
+            "candle_mode": context.candle_mode,
+        },
         "short_signal": short_signal,
         "volatility_stats": volatility_stats,
         "rsi_by_interval": rsi_by_interval,

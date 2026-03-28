@@ -32,6 +32,7 @@ export function useStreakAnalysisForm() {
     interval: selectedInterval,
     n_streak: 3,
     direction: 'green',
+    candle_mode: 'standard',
     use_complex_pattern: false,
     complex_pattern: null,
     rsi_threshold: 60.0,
@@ -45,6 +46,11 @@ export function useStreakAnalysisForm() {
     mutationFn: runStreakAnalysis,
   });
   const resetMutation = mutation.reset;
+
+  const handleCandleModeChange = (candleMode: NonNullable<StreakAnalysisParams['candle_mode']>) => {
+    setParams((prev) => ({ ...prev, candle_mode: candleMode }));
+    resetMutation();
+  };
 
   // 코인·타임프레임(사이드바) 변경 시 동기화
   useEffect(() => {
@@ -80,6 +86,7 @@ export function useStreakAnalysisForm() {
         interval: params.interval,
         n_streak: useComplexPattern ? params.n_streak : condition1.count,
         direction: useComplexPattern ? params.direction : condition1.direction,
+        candle_mode: params.candle_mode ?? 'standard',
         use_complex_pattern: useComplexPattern,
         complex_pattern: pattern,
         rsi_threshold: params.rsi_threshold || 60.0,
@@ -130,6 +137,7 @@ export function useStreakAnalysisForm() {
     setMinTotalBodyPct,
     params,
     setParams,
+    handleCandleModeChange,
     // API
     mutation,
     handleRun,

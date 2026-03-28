@@ -26,9 +26,12 @@ indicators_cache = DataCache(ttl_minutes=30, cache_dir=str(cache_base / "indicat
 def generate_analysis_cache_key(context: AnalysisContext) -> str:
     """
     분석 결과 캐시 키 생성
-    Format: coin_interval_n_streak_direction[_complex_hash|_rsiXX_bodyYY]_emaZZ
+    Format: coin_interval_n_streak_direction_candle[_complex_hash|_rsiXX_bodyYY]_emaZZ
     """
-    base_key = f"{context.coin}_{context.interval}_{context.n_streak}_{context.direction}"
+    base_key = (
+        f"{context.coin}_{context.interval}_{context.n_streak}_{context.direction}"
+        f"_{context.candle_mode}"
+    )
     ema_key = f"_ema{context.ema_200_position or 'any'}"
     
     # complex_pattern이 있으면 해시값 포함

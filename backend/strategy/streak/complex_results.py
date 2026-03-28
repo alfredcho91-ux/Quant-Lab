@@ -94,6 +94,7 @@ def build_filtered_out_complex_result(
             "type": "complex",
             "description": "Complex Pattern with Pullback",
             "parameters": {
+                "candle_mode": context.candle_mode,
                 "complex_pattern": complex_pattern,
                 "filters": {
                     "rsi_threshold": context.rsi_threshold,
@@ -197,6 +198,7 @@ def build_complex_success_result(
             "type": "complex",
             "description": "Complex Pattern with Pullback",
             "parameters": {
+                "candle_mode": context.candle_mode,
                 "complex_pattern": complex_pattern,
                 "filters": {
                     "rsi_threshold": context.rsi_threshold,

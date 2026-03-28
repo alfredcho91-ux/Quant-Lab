@@ -37,7 +37,7 @@ def run_simple_analysis(df: pd.DataFrame, context: AnalysisContext, from_cache: 
         if target_cases.empty:
             return _empty_simple_result(context, from_cache)
 
-        df = get_or_calculate_indicators(context.coin, context.interval, df)
+        df = get_or_calculate_indicators(context.coin, context.interval, df, context.candle_mode)
         total_matches = len(target_cases)
         target_cases = filter_rows_by_ema_200_position(
             df=df,
@@ -70,6 +70,7 @@ def run_simple_analysis(df: pd.DataFrame, context: AnalysisContext, from_cache: 
                 "parameters": {
                     "n_streak": n,
                     "direction": context.direction,
+                    "candle_mode": context.candle_mode,
                     "filters": {
                         "ema_200_position": context.ema_200_position,
                         "min_total_body_pct": context.min_total_body_pct,
@@ -130,6 +131,7 @@ def _empty_simple_result(
             "parameters": {
                 "n_streak": context.n_streak,
                 "direction": context.direction,
+                "candle_mode": context.candle_mode,
                 "filters": {
                     "ema_200_position": context.ema_200_position,
                     "min_total_body_pct": context.min_total_body_pct,

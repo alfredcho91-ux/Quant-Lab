@@ -15,6 +15,7 @@ RSI_THRESHOLD_DEFAULT = 60.0
 
 # 지원되는 interval 목록 (정규화용)
 VALID_INTERVALS = {"1d", "12h", "4h", "1h", "15m", "30m", "2h", "3d", "1w", "8h", "1M"}
+VALID_CANDLE_MODES = {"standard", "heikin_ashi"}
 
 # 요일 이름 (월요일=0, 일요일=6)
 WEEKDAY_NAMES_KO = ['월요일', '화요일', '수요일', '목요일', '금요일', '토요일', '일요일']
@@ -33,6 +34,7 @@ class AnalysisContext:
     interval: str
     n_streak: int
     direction: str
+    candle_mode: str = "standard"
     use_complex_pattern: bool = False
     complex_pattern: Optional[List[int]] = None
     rsi_threshold: float = RSI_THRESHOLD_DEFAULT
@@ -59,12 +61,18 @@ class AnalysisContext:
         if interval not in VALID_INTERVALS:
             logger.warning(f"Invalid interval '{interval}', using default '1d'")
             interval = '1d'
+
+        candle_mode = params.get('candle_mode', 'standard')
+        if candle_mode not in VALID_CANDLE_MODES:
+            logger.warning(f"Invalid candle_mode '{candle_mode}', using default 'standard'")
+            candle_mode = 'standard'
         
         return cls(
             coin=params.get('coin', 'SOL'),
             interval=interval,
             n_streak=params.get('n_streak', 6),
             direction=params.get('direction', 'green'),
+            candle_mode=candle_mode,
             use_complex_pattern=params.get('use_complex_pattern', False),
             complex_pattern=params.get('complex_pattern'),
             rsi_threshold=params.get('rsi_threshold', RSI_THRESHOLD_DEFAULT),

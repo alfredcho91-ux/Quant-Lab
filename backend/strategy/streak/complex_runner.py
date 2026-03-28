@@ -37,7 +37,7 @@ def run_complex_analysis(
     from_cache: bool = False,
 ) -> Dict[str, Any]:
     try:
-        df = get_or_calculate_indicators(context.coin, context.interval, df)
+        df = get_or_calculate_indicators(context.coin, context.interval, df, context.candle_mode)
 
         pattern_profile = build_pattern_profile(context.complex_pattern)
         if pattern_profile is None:

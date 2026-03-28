@@ -4,7 +4,7 @@
  */
 import { RefreshCw, BarChart2 } from 'lucide-react';
 import type { PatternCondition } from '../utils/patternHelper';
-import type { Ema200Position } from '../../../types';
+import type { CandleMode, Ema200Position } from '../../../types';
 import { getPatternPreview } from '../utils/patternHelper';
 
 interface AnalysisControlsProps {
@@ -13,6 +13,7 @@ interface AnalysisControlsProps {
   condition1: PatternCondition;
   condition2: PatternCondition;
   minTotalBodyPct: number | null;
+  candleMode: CandleMode;
   ema200Position: Ema200Position | null;
   isPending: boolean;
   isKo: boolean;
@@ -21,6 +22,7 @@ interface AnalysisControlsProps {
   onCondition1Change: (condition: PatternCondition) => void;
   onCondition2Change: (condition: PatternCondition) => void;
   onMinTotalBodyPctChange: (value: number | null) => void;
+  onCandleModeChange: (value: CandleMode) => void;
   onEma200PositionChange: (value: Ema200Position | null) => void;
   onRun: () => void;
 }
@@ -30,6 +32,7 @@ export default function AnalysisControls({
   condition1,
   condition2,
   minTotalBodyPct,
+  candleMode,
   ema200Position,
   isPending,
   isKo,
@@ -37,6 +40,7 @@ export default function AnalysisControls({
   onCondition1Change,
   onCondition2Change,
   onMinTotalBodyPctChange,
+  onCandleModeChange,
   onEma200PositionChange,
   onRun,
 }: AnalysisControlsProps) {
@@ -44,6 +48,44 @@ export default function AnalysisControls({
     <div className="card p-6 space-y-5">
       {/* 패턴 분석 설정 */}
       <div className="space-y-5">
+        <div className="bg-dark-800/50 rounded-lg p-4 border border-dark-700">
+          <h4 className="text-sm font-semibold text-sky-400 mb-3">
+            {isKo ? '캔들 타입' : 'Candle Type'}
+          </h4>
+          <div className="space-y-2">
+            <label className="block text-xs text-dark-400">
+              {isKo
+                ? '연속봉/패턴 판정에 사용할 봉 기준입니다. 지표 계산은 항상 원본 OHLC를 사용합니다'
+                : 'This candle basis is used for streak and pattern detection. Indicators always use the original OHLC prices'}
+            </label>
+            <select
+              value={candleMode}
+              onChange={(e) =>
+                onCandleModeChange(
+                  e.target.value === 'heikin_ashi' ? 'heikin_ashi' : 'standard'
+                )
+              }
+              className="w-full bg-dark-700 border border-dark-600 rounded-lg px-3 py-2 text-white text-sm focus:border-sky-500"
+            >
+              <option value="standard">
+                {isKo ? '일반 캔들' : 'Standard Candles'}
+              </option>
+              <option value="heikin_ashi">
+                {isKo ? '하이킨아시 캔들' : 'Heikin-Ashi Candles'}
+              </option>
+            </select>
+            <p className="text-xs text-dark-500">
+              {candleMode === 'heikin_ashi'
+                ? isKo
+                  ? '하이킨아시는 연속봉과 패턴 방향만 바꾸고, RSI/ATR/Disparity/EMA 200 필터는 원본 가격 기준으로 유지합니다.'
+                  : 'Heikin-Ashi changes streak and pattern direction detection only, while RSI/ATR/Disparity/EMA 200 remain on the original price series.'
+                : isKo
+                  ? '일반 캔들은 원본 OHLC를 그대로 사용합니다.'
+                  : 'Standard mode uses the original OHLC candles.'}
+            </p>
+          </div>
+        </div>
+
         <div className="bg-dark-800/50 rounded-lg p-4 border border-dark-700">
           <h4 className="text-sm font-semibold text-emerald-400 mb-3">
             {isKo ? 'EMA 200 필터 (일봉 고정, 선택)' : 'EMA 200 Filter (Daily Fixed, Optional)'}

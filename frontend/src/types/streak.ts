@@ -1,12 +1,14 @@
 // 연속 봉패턴 분석 타입
 
 export type Ema200Position = 'above' | 'below';
+export type CandleMode = 'standard' | 'heikin_ashi';
 
 export interface StreakAnalysisParams {
   coin: string;
   interval: string;
   n_streak: number;
   direction: 'green' | 'red';
+  candle_mode?: CandleMode;
   use_complex_pattern?: boolean;
   complex_pattern?: number[] | null;
   rsi_threshold?: number;
@@ -166,6 +168,7 @@ export interface StreakAnalysisResult {
     parameters: {
       n_streak?: number;
       direction?: string;
+      candle_mode?: CandleMode;
       complex_pattern?: number[];
       filters?: {
         rsi_threshold?: number;
@@ -195,6 +198,7 @@ export interface ComplexPatternAnalysis {
   filters_applied?: {
     rsi_threshold: number;
     ema_200_position?: Ema200Position | null;
+    candle_mode?: CandleMode;
   };
   short_signal?: ShortSignal | null;
   volatility_stats?: VolatilityStats;

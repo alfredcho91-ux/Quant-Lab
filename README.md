@@ -28,7 +28,7 @@ Natural-language strategy drafting, indicator selection, and execution parameter
 
 ### Streak Analysis
 
-Pattern-driven streak analysis workflow with EMA filtering, conditional breakdowns, and execution-ready controls.
+Pattern-driven streak analysis workflow with selectable standard or Heikin-Ashi streak detection, while RSI/ATR/Disparity/EMA filters remain anchored to the original OHLC prices.
 
 ![Streak Analysis](./docs/screenshots/streak-analysis.png)
 
@@ -49,6 +49,7 @@ Rule-combination backtest page for composing MA, Bollinger, and pattern-based en
 ### 1. Streak And Conditional Probability Analysis
 - Evaluates bullish and bearish streak behavior with follow-through statistics.
 - Surfaces confidence intervals, conditional splits, and significance-aware reporting rather than raw hit rates alone.
+- Supports standard-candle or Heikin-Ashi streak detection without changing the indicator baseline used for RSI, ATR, Disparity, and EMA 200 filters.
 
 ### 2. Multi-Timeframe Trend Judgment
 - Aggregates directional evidence across multiple intervals to reduce single-timeframe bias.
@@ -89,7 +90,7 @@ Architecture details live in [ARCHITECTURE.md](./ARCHITECTURE.md).
 ## Quality Gates
 
 - GitHub Actions runs backend tests, frontend lint/build, and architecture guard scripts on every push to `main`.
-- The current backend suite collects 124 tests across 20 files, covering quant math, AI orchestration, cache behavior, auth flow, and architecture invariants.
+- The current backend suite collects 129 tests across 20 files, covering quant math, AI orchestration, cache behavior, auth flow, and architecture invariants.
 - The repository includes explicit import guards to prevent `core/` and router layers from accumulating cross-layer coupling.
 - Public repo hygiene is enforced via ignore rules that exclude logs, local caches, agent artifacts, and large market data files.
 
@@ -120,6 +121,7 @@ chmod +x start.sh
 - Market data can come from local CSV files under `binance_klines/` or live Binance fetches through the backend data loader.
 - Live OHLCV requests are snapshot-cached briefly in the backend so repeated multi-page analysis runs do not refetch the same candles immediately.
 - Frontend analysis mutations now rely on typed API errors instead of silent `null` returns, so error UI and retry flows stay consistent.
+- In streak analysis, `Heikin-Ashi` mode changes only streak/pattern candle interpretation. RSI, ATR, Disparity, and EMA 200 filters continue to use the original OHLC series.
 
 ## Delivery Principles
 

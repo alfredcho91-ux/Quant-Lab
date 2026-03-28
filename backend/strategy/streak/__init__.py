@@ -68,7 +68,7 @@ def analyze_streak_pattern(params: Dict[str, Any]) -> Dict[str, Any]:
             return {"success": False, "error": "Failed to load data"}
         
         # 5. DataFrame 준비
-        df = prepare_dataframe(df, context.direction)
+        df = prepare_dataframe(df, context.direction, context.candle_mode)
         
         # 6. Mode 분기 및 분석 실행
         if mode == "complex":

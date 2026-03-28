@@ -18,6 +18,7 @@ class StreakAnalysisParams(BaseModel):
     interval: str = Field(default="1d", min_length=2, max_length=4)
     n_streak: int = Field(default=6, ge=1, le=50)
     direction: Literal["green", "red"] = "green"
+    candle_mode: Literal["standard", "heikin_ashi"] = "standard"
     use_complex_pattern: bool = False
     complex_pattern: Optional[list[int]] = Field(default=None, min_length=2, max_length=20)
     rsi_threshold: float = Field(default=60.0, ge=0.0, le=100.0)

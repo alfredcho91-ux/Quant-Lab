@@ -33,6 +33,7 @@ The backend is structured using Domain-Driven Design (DDD) principles to prevent
 *   **`backend/strategy/` (The Business Logic Layer):**
     *   *Responsibility:* Contains the specific rules for trading strategies (e.g., `streak`, `hybrid`, `bb_mid`).
     *   *Design Choice:* Strategies are isolated. The `streak` module does not know about the `hybrid` module.
+    *   *Current streak rule:* `Heikin-Ashi` is available as a streak/pattern interpretation mode, but derived indicators such as RSI, ATR, Disparity, and EMA 200 remain on the original OHLC series to avoid changing the indicator baseline.
 *   **`core/` (The Pure Math Layer):**
     *   *Responsibility:* Stateless calculation of financial indicators (RSI, MACD, ATR) and core backtesting loops.
     *   *Design Choice:* Functions here take Pandas DataFrames and return DataFrames. They have zero knowledge of APIs or HTTP requests.
@@ -63,6 +64,7 @@ The frontend uses a Feature-Sliced Design (FSD) approach to manage complexity.
 
 *   **Market Helpers:** `DataCache` backs fear-greed, ticker, and AI response caching with diskcache or in-memory fallback.
 *   **Live OHLCV Snapshots:** `utils/data_loader.py` keeps a short-lived snapshot cache for repeated live-candle requests, which reduces duplicate exchange calls during multi-page analysis workflows.
+*   **Streak Analysis:** cache keys include the selected candle mode because the prepared streak dataframe carries candle-specific pattern columns, even though RSI, ATR, Disparity, and EMA 200 are still derived from preserved source OHLC columns.
 
 ## 🔄 Data Flow Example: AI Quant Lab
 
@@ -81,7 +83,7 @@ To demonstrate the architecture in action, here is the flow when a user asks the
 ## 🛡️ Quality Assurance & Testing
 
 As a PM, ensuring reliability in financial software is paramount.
-*   **Backend Test Suite:** `pytest` currently collects 124 tests across 20 files in `backend/tests/`, covering core math, AI orchestration, caching, auth flow, and architecture contracts.
+*   **Backend Test Suite:** `pytest` currently collects 129 tests across 20 files in `backend/tests/`, covering core math, AI orchestration, caching, auth flow, and architecture contracts.
 *   **Type Safety:** Strict TypeScript on the frontend and Pydantic models on the backend ensure data contracts are honored.
 *   **Architecture Guards:** `scripts/check_core_imports.py` and `scripts/check_route_imports.py` prevent forbidden layer coupling from creeping into the codebase.
 *   **Error Handling:** Centralized decorators (`utils/decorators.py`) catch and format exceptions before they reach the client, while frontend API helpers preserve those failures as actionable query/mutation errors.
