@@ -7,7 +7,7 @@ import logging
 from typing import Optional, Tuple, Any, List, Literal
 import os
 
-from utils.data_service import fetch_live_data, load_csv_data
+from backend.utils.data_service import fetch_live_data, load_csv_data
 from .cache_ops import data_cache, indicators_cache
 
 logger = logging.getLogger(__name__)

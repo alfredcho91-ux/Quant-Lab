@@ -1,6 +1,6 @@
 """Pydantic response models for API schema stability."""
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict
 
@@ -56,17 +56,15 @@ class StreakAnalysisEnvelope(BaseModel):
 
 
 class TrendIndicatorsLatest(BaseModel):
-    """Latest trend-indicator values.
-
-    Note:
-    - Trend Judgment API exposes Slow Stochastic with `slow_stoch_*` only.
-    - Stoch RSI is a separate indicator family and uses `stoch_rsi_*`
-      in other analysis paths (e.g. quant lab), not in trend judgment payloads.
-    """
+    """Latest momentum and trend-indicator values."""
 
     close: Optional[float] = None
     rsi: Optional[float] = None
+    macd: Optional[float] = None
+    macd_signal: Optional[float] = None
     macd_hist: Optional[float] = None
+    macd_cross: Optional[Literal["golden", "dead"]] = None
+    macd_hist_direction: Optional[Literal["rising", "falling", "flat"]] = None
     adx: Optional[float] = None
     atr: Optional[float] = None
     atr_pct: Optional[float] = None
@@ -79,6 +77,8 @@ class TrendIndicatorsLatest(BaseModel):
     slow_stoch_10d: Optional[float] = None
     slow_stoch_20k: Optional[float] = None
     slow_stoch_20d: Optional[float] = None
+    stoch_rsi_k: Optional[float] = None
+    stoch_rsi_d: Optional[float] = None
     vwap_20: Optional[float] = None
     supertrend: Optional[float] = None
     supertrend_dir: Optional[float] = None

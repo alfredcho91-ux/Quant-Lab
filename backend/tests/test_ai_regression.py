@@ -1,16 +1,9 @@
-import sys
-from pathlib import Path
 from unittest.mock import patch, MagicMock
 
 import pytest
 
-# Add backend to sys.path
-backend_path = Path(__file__).parent.parent
-sys.path.insert(0, str(backend_path))
-sys.path.insert(0, str(backend_path.parent))
-
-from modules.ai_lab import service as ai_service
-from config import settings
+from backend.modules.ai_lab import service as ai_service
+from backend.config import settings
 
 @pytest.fixture(autouse=True)
 def clear_ai_response_cache():
@@ -29,7 +22,7 @@ def test_process_ai_research_uses_settings_key_when_no_key_provided():
     # Mock settings.GEMINI_API_KEY
     with patch.object(settings, 'GEMINI_API_KEY', mock_settings_key):
         # Mock _call_gemini to avoid real API calls
-        with patch('modules.ai_lab.service._call_gemini') as mock_call:
+        with patch('backend.modules.ai_lab.service._call_gemini') as mock_call:
             mock_call.return_value = {
                 "thought": "Mocked thought",
                 "params": {"symbol": "BTCUSDT", "timeframe": "1h"},
@@ -38,9 +31,15 @@ def test_process_ai_research_uses_settings_key_when_no_key_provided():
             }
             
             # Mock _run_conditional_probability_analysis to return None so it proceeds to _call_gemini
-            with patch('modules.ai_lab.service._run_conditional_probability_analysis', return_value=None):
+            with patch(
+                'backend.modules.ai_lab.service._run_conditional_probability_analysis',
+                return_value=None,
+            ):
                 # Mock _validate_gemini_key to return None (success)
-                with patch('modules.ai_lab.service._validate_gemini_key', return_value=None):
+                with patch(
+                    'backend.modules.ai_lab.service._validate_gemini_key',
+                    return_value=None,
+                ):
                     
                     ai_service.process_ai_research(prompt=mock_prompt, api_key=None)
                     

@@ -4,10 +4,10 @@ from __future__ import annotations
 
 from typing import Any, Dict
 
-from core.presets import load_presets, save_presets
-from utils.error_handler import NotFoundError
-from utils.response_builder import success_response
-from utils.validators import validate_required_fields
+from backend.modules.preset.repository import load_presets, save_presets
+from backend.utils.error_handler import NotFoundError
+from backend.utils.response_builder import success_response
+from backend.utils.validators import validate_required_fields
 
 
 def get_presets_service() -> Dict[str, Any]:
@@ -45,4 +45,3 @@ def delete_preset_service(name: str) -> Dict[str, Any]:
     del presets[name]
     save_presets(presets)
     return success_response(message="Preset deleted")
-

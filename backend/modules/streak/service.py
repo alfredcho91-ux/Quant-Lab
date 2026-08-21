@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any, Dict
 
-from strategy import analyze_streak_pattern, clear_cache, get_cache_stats
+from backend.strategy import analyze_streak_pattern, clear_cache, get_cache_stats
 
 
 def run_streak_analysis(params: Dict[str, Any]) -> Dict[str, Any]:

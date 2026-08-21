@@ -3,7 +3,7 @@
 Prefer importing from `strategy.shared.common` directly.
 """
 
-from strategy.shared.common import (
+from backend.strategy.shared.common import (
     calculate_max_consecutive_loss,
     calculate_max_drawdown_unified,
     calculate_profit_factor,

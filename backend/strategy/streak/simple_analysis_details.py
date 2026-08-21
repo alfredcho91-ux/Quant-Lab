@@ -6,7 +6,7 @@ from typing import Any, Dict, Optional
 
 import pandas as pd
 
-from strategy.streak.common import RSI_OVERBOUGHT
+from backend.strategy.streak.common import RSI_OVERBOUGHT
 
 
 def calculate_comparative_report(

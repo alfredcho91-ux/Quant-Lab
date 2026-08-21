@@ -1,8 +1,7 @@
 /**
  * AI Lab API Client
  */
-import axios from 'axios';
-import { api } from './config';
+import { api, ensureApiSuccess, toApiClientError } from './config';
 import type { BacktestResult } from '../types';
 
 export interface AIResearchRequest {
@@ -90,27 +89,12 @@ export interface AIResearchResponse {
   error_code?: string | null;
 }
 
-interface AIErrorPayload {
-  error?: string;
-}
-
 export async function runAIResearch(request: AIResearchRequest): Promise<AIResearchResponse> {
   try {
     const res = await api.post<AIResearchResponse>('/ai/research', request);
-    return res.data;
+    return ensureApiSuccess(res, 'AI research failed.');
   } catch (error: unknown) {
-    console.error('AI Research API Error:', error);
-    let message = 'Unknown error';
-    if (axios.isAxiosError<AIErrorPayload>(error)) {
-      message = error.response?.data?.error || error.message || message;
-    } else if (error instanceof Error) {
-      message = error.message;
-    }
-    return {
-      success: false,
-      answer: '',
-      error: message,
-    };
+    throw toApiClientError(error, 'AI research failed.');
   }
 }
 
@@ -136,19 +120,8 @@ export interface AIAnalystResponse {
 export async function runAIAnalyst(request: AIAnalystRequest): Promise<AIAnalystResponse> {
   try {
     const res = await api.post<AIAnalystResponse>('/ai/analyst', request);
-    return res.data;
+    return ensureApiSuccess(res, 'AI analyst request failed.');
   } catch (error: unknown) {
-    console.error('AI Analyst API Error:', error);
-    let message = 'Unknown error';
-    if (axios.isAxiosError<AIErrorPayload>(error)) {
-      message = error.response?.data?.error || error.message || message;
-    } else if (error instanceof Error) {
-      message = error.message;
-    }
-    return {
-      success: false,
-      answer: '',
-      error: message,
-    };
+    throw toApiClientError(error, 'AI analyst request failed.');
   }
 }

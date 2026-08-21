@@ -4,48 +4,48 @@ FastAPI Backend for Quant Master React Application
 Provides REST API endpoints for market data, indicators, backtesting, etc.
 """
 
-import sys
 import os
 import time
 import logging
 import secrets
-from pathlib import Path
 from typing import Optional
-
-# Add project root to Python path (for importing core modules)
-# This ensures core/ can be imported even when running directly with uvicorn
-_project_root = Path(__file__).parent.parent
-if str(_project_root) not in sys.path:
-    sys.path.insert(0, str(_project_root))
 
 from fastapi import FastAPI, Request, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import ORJSONResponse
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.staticfiles import StaticFiles
-from config.settings import CORS_ORIGINS
+from backend.config.settings import (
+    CORS_ORIGINS,
+    PROJECT_ROOT,
+    get_app_environment,
+    get_basic_auth_credentials,
+)
 
 # Import routers
-from modules.streak.router import router as streak_router
-from modules.market.router import router as market_router
-from modules.backtest.router import router as backtest_router
-from modules.scanner.router import router as scanner_router
-from modules.stats.router import router as stats_router
-from modules.preset.router import router as preset_router
-from modules.support_resistance.router import router as support_resistance_router
-from modules.strategy_info.router import router as strategy_router
-from modules.journal.router import router as journal_router
-from modules.ai_lab.router import router as ai_lab_router
-from modules.indicators.router import router as indicators_router
-from core.strategies import STRATS
+from backend.modules.streak.router import router as streak_router
+from backend.modules.market.router import router as market_router
+from backend.modules.backtest.router import router as backtest_router
+from backend.modules.stats.router import router as stats_router
+from backend.modules.preset.router import router as preset_router
+from backend.modules.support_resistance.router import router as support_resistance_router
+from backend.modules.strategy_info.router import router as strategy_router
+from backend.modules.journal.router import router as journal_router
+from backend.modules.ai_lab.router import router as ai_lab_router
+from backend.modules.deepcoin.router import router as deepcoin_router
+from backend.modules.indicators.router import router as indicators_router
 
 security = HTTPBasic(auto_error=False)
+
+# Production credentials must be present before the application can accept traffic.
+if get_app_environment() == "production":
+    get_basic_auth_credentials()
 
 
 def verify_credentials(credentials: Optional[HTTPBasicCredentials] = Depends(security)):
     """Verify HTTP Basic Auth credentials against environment variables."""
     # 로컬 개발 환경(APP_ENV가 production이 아닐 때)에서는 비밀번호 검사를 건너뜁니다.
-    if os.getenv("APP_ENV", "development").lower() != "production":
+    if get_app_environment() != "production":
         return "local_dev"
 
     if credentials is None:
@@ -55,8 +55,7 @@ def verify_credentials(credentials: Optional[HTTPBasicCredentials] = Depends(sec
             headers={"WWW-Authenticate": "Basic"},
         )
 
-    correct_username = os.getenv("DEMO_USERNAME", "demo")
-    correct_password = os.getenv("DEMO_PASSWORD", "demo")
+    correct_username, correct_password = get_basic_auth_credentials()
     is_username_correct = secrets.compare_digest(credentials.username, correct_username)
     is_password_correct = secrets.compare_digest(credentials.password, correct_password)
     if not (is_username_correct and is_password_correct):
@@ -138,28 +137,21 @@ async def request_timing_middleware(request: Request, call_next):
 app.include_router(streak_router)  # /api/streak-analysis
 app.include_router(market_router)  # /api/market/*
 app.include_router(backtest_router)  # /api/backtest*
-app.include_router(scanner_router)  # /api/scanner, /api/pattern-scanner
 app.include_router(stats_router)  # /api/bb-mid, /api/combo-filter, /api/hybrid-*
 app.include_router(preset_router)  # /api/presets
 app.include_router(support_resistance_router)  # /api/support-resistance
 app.include_router(strategy_router)  # /api/strategy-info
 app.include_router(journal_router)  # /api/journal
+app.include_router(deepcoin_router)  # /api/deepcoin/*
 app.include_router(ai_lab_router)  # /api/ai/research
 app.include_router(indicators_router)  # /api/indicators
 
 # Serve frontend static files
-frontend_dist = _project_root / "frontend" / "dist"
+frontend_dist = PROJECT_ROOT / "frontend" / "dist"
 frontend_dist.mkdir(parents=True, exist_ok=True)
 app.mount("/", StaticFiles(directory=str(frontend_dist), html=True), name="frontend")
 
 
-
-@app.get("/api/strategies")
-async def api_strategies():
-    """Get list of available strategies"""
-    return {"success": True, "data": STRATS}
-
-
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("backend.main:app", host="0.0.0.0", port=8000, reload=True)

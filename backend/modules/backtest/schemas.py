@@ -1,6 +1,6 @@
 """Backtest domain schemas."""
 
-from typing import Optional, Literal
+from typing import Any, Dict, List, Optional, Literal
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -105,4 +105,26 @@ class AdvancedBacktestParams(BaseModel):
         return self
 
 
-__all__ = ["BacktestParams", "AdvancedBacktestParams"]
+class BacktestEnvelope(BaseModel):
+    success: bool
+    chart_data: List[Dict[str, Any]]
+    trades: List[Dict[str, Any]]
+    summary: Dict[str, Any]
+
+
+class AdvancedBacktestEnvelope(BaseModel):
+    success: bool
+    chart_data: List[Dict[str, Any]]
+    trades: List[Dict[str, Any]]
+    in_sample: Dict[str, Any]
+    out_of_sample: Dict[str, Any]
+    full: Dict[str, Any]
+    monte_carlo: Dict[str, Any]
+
+
+__all__ = [
+    "AdvancedBacktestEnvelope",
+    "AdvancedBacktestParams",
+    "BacktestEnvelope",
+    "BacktestParams",
+]

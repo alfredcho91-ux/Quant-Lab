@@ -6,7 +6,7 @@ import logging
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
-from models.request import AdvancedBacktestParams, BacktestParams
+from backend.models.request import AdvancedBacktestParams, BacktestParams
 
 from .optimization_analysis import (
     build_optimization_characteristics,

@@ -146,19 +146,6 @@ select:focus {
   color: var(--color-bear);
 }
 
-/* Plotly chart customization */
-.js-plotly-plot .plotly .modebar {
-  background: transparent !important;
-}
-
-.js-plotly-plot .plotly .modebar-btn path {
-  fill: #64748b !important;
-}
-
-.js-plotly-plot .plotly .modebar-btn:hover path {
-  fill: #94a3b8 !important;
-}
-
 /* Tab styles */
 .tab {
   @apply px-4 py-2 text-sm font-medium transition-all duration-200;

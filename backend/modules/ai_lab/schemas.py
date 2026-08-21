@@ -29,3 +29,10 @@ class AIAnalystRequest(BaseModel):
     interval: str
     api_key: Optional[str] = None
     model: str = "gemini-3.0-pro-preview"
+
+
+class AIAnalystResponse(BaseModel):
+    success: bool
+    answer: str
+    execution_path: Optional[str] = None
+    error: Optional[str] = None

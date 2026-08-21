@@ -8,16 +8,16 @@ from typing import Any, Dict
 
 import pandas as pd
 
-from strategy.context import AnalysisContext
-from strategy.streak.analyzer import calculate_complex_analysis
-from strategy.streak.common import (
+from backend.strategy.context import AnalysisContext
+from backend.strategy.streak.analyzer import calculate_complex_analysis
+from backend.strategy.streak.common import (
     analyze_pullback_quality,
     find_complex_pattern,
     get_or_calculate_indicators,
     sanitize_for_json,
 )
-from strategy.streak.complex_processing import filter_and_score_patterns
-from strategy.streak.complex_results import (
+from backend.strategy.streak.complex_processing import filter_and_score_patterns
+from backend.strategy.streak.complex_results import (
     build_complex_filter_status,
     build_complex_success_result,
     build_empty_complex_result,
@@ -25,8 +25,8 @@ from strategy.streak.complex_results import (
     build_no_match_complex_result,
     build_quality_failure_result,
 )
-from strategy.streak.data_ops import filter_rows_by_ema_200_position
-from strategy.streak.patterns import build_pattern_profile
+from backend.strategy.streak.data_ops import filter_rows_by_ema_200_position
+from backend.strategy.streak.patterns import build_pattern_profile
 
 logger = logging.getLogger(__name__)
 

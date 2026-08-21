@@ -2,29 +2,21 @@
 
 from __future__ import annotations
 
-import sys
-from pathlib import Path
-
 import numpy as np
 import pandas as pd
 
-
-backend_path = Path(__file__).parent.parent
-sys.path.insert(0, str(backend_path))
-sys.path.insert(0, str(backend_path.parent))
-
-from strategy import analyze_streak_pattern, clear_cache
-from strategy import streak as streak_module
-from strategy.context import AnalysisContext
-from strategy.streak.common import prepare_dataframe
-from strategy.streak.cache_ops import indicators_cache
-from strategy.streak.complex_strategy import run_complex_analysis
-from strategy.streak.data_ops import (
+from backend.strategy import analyze_streak_pattern, clear_cache
+from backend.strategy import streak as streak_module
+from backend.strategy.context import AnalysisContext
+from backend.strategy.streak.common import prepare_dataframe
+from backend.strategy.streak.cache_ops import indicators_cache
+from backend.strategy.streak.complex_strategy import run_complex_analysis
+from backend.strategy.streak.data_ops import (
     calculate_indicators,
     filter_rows_by_ema_200_position,
     get_or_calculate_indicators,
 )
-from strategy.streak.simple_strategy import run_simple_analysis
+from backend.strategy.streak.simple_strategy import run_simple_analysis
 
 
 def _build_price_df(

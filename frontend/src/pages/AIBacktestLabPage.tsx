@@ -1,5 +1,5 @@
 import { Bot } from 'lucide-react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams } from '../router-context';
 import {
   useBacktestParams,
   useLanguage,

@@ -50,23 +50,6 @@ export interface ComboFilterResult {
   avg_ret: number | null;
 }
 
-export interface PatternScanParams {
-  coin: string;
-  intervals: string[];
-  tp_pct: number;
-  horizon: number;
-  mode: 'natural' | 'position';
-  position: 'long' | 'short';
-  use_csv?: boolean;
-}
-
-export interface PatternStat {
-  direction: 'bull' | 'bear' | null;
-  signals: number;
-  hit_rate: number | null;
-  last_on: boolean;
-}
-
 export interface TrendIndicatorsParams {
   coin: string;
   interval: string;
@@ -76,7 +59,11 @@ export interface TrendIndicatorsParams {
 export interface TrendIndicatorsLatest {
   close: number | null;
   rsi: number | null;
+  macd: number | null;
+  macd_signal: number | null;
   macd_hist: number | null;
+  macd_cross: 'golden' | 'dead' | null;
+  macd_hist_direction: 'rising' | 'falling' | 'flat' | null;
   adx: number | null;
   atr: number | null;
   atr_pct: number | null;
@@ -89,6 +76,8 @@ export interface TrendIndicatorsLatest {
   slow_stoch_10d: number | null;
   slow_stoch_20k: number | null;
   slow_stoch_20d: number | null;
+  stoch_rsi_k: number | null;
+  stoch_rsi_d: number | null;
   vwap_20: number | null;
   supertrend: number | null;
   supertrend_dir: number | null;
@@ -105,10 +94,15 @@ export interface TrendIndicatorsResult {
 
 export interface IndicatorProjection {
   current_price: number;
+  current_rsi: number | null;
+  vwaps: Array<{
+    anchor: 'day' | 'week' | 'month' | 'quarter' | 'year';
+    value: number | null;
+  }>;
+  rolling_vwaps: Array<{
+    window: number;
+    value: number | null;
+  }>;
   rsi_30_price: number;
   rsi_70_price: number;
-  stoch_20_price: number;
-  stoch_80_price: number;
-  stoch_hh?: number;
-  stoch_ll?: number;
 }

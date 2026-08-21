@@ -1,14 +1,20 @@
 // 전략 관련 API
 
-import { api, ApiResponse } from './config';
+import {
+  api,
+  ApiResponse,
+  ensureApiSuccess,
+  toApiClientError,
+  unwrapApiResponse,
+} from './config';
 import type { Strategy, StrategyInfo, Preset, BacktestParams } from '../types';
 
-export async function getStrategies(): Promise<Strategy[] | null> {
+export async function getStrategies(): Promise<Strategy[]> {
   try {
     const res = await api.get<ApiResponse<Strategy[]>>('/strategies');
-    return res.data.success ? res.data.data! : null;
-  } catch {
-    return null;
+    return unwrapApiResponse(res, 'Failed to load strategies.');
+  } catch (error: unknown) {
+    throw toApiClientError(error, 'Failed to load strategies.');
   }
 }
 
@@ -21,23 +27,23 @@ export async function getStrategyInfo(
     sma1_len?: number;
     sma2_len?: number;
   }
-): Promise<StrategyInfo | null> {
+): Promise<StrategyInfo> {
   try {
     const res = await api.get<ApiResponse<StrategyInfo>>(`/strategy-info/${strategyId}`, {
       params: { lang, ...params },
     });
-    return res.data.success ? res.data.data! : null;
-  } catch {
-    return null;
+    return unwrapApiResponse(res, 'Failed to load strategy information.');
+  } catch (error: unknown) {
+    throw toApiClientError(error, 'Failed to load strategy information.');
   }
 }
 
-export async function getPresets(): Promise<Record<string, Preset> | null> {
+export async function getPresets(): Promise<Record<string, Preset>> {
   try {
     const res = await api.get<ApiResponse<Record<string, Preset>>>('/presets');
-    return res.data.success ? res.data.data! : null;
-  } catch {
-    return null;
+    return unwrapApiResponse(res, 'Failed to load presets.');
+  } catch (error: unknown) {
+    throw toApiClientError(error, 'Failed to load presets.');
   }
 }
 
@@ -58,17 +64,19 @@ export async function savePreset(
       direction,
       params,
     });
-    return res.data.success;
-  } catch {
-    return false;
+    ensureApiSuccess(res, 'Failed to save the preset.');
+    return true;
+  } catch (error: unknown) {
+    throw toApiClientError(error, 'Failed to save the preset.');
   }
 }
 
 export async function deletePreset(name: string): Promise<boolean> {
   try {
     const res = await api.delete<ApiResponse<null>>(`/presets/${name}`);
-    return res.data.success;
-  } catch {
-    return false;
+    ensureApiSuccess(res, 'Failed to delete the preset.');
+    return true;
+  } catch (error: unknown) {
+    throw toApiClientError(error, 'Failed to delete the preset.');
   }
 }

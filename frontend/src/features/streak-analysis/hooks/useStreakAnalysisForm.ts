@@ -41,6 +41,7 @@ export function useStreakAnalysisForm() {
 
   // 몸통 총합 필터 (Simple Mode만)
   const [minTotalBodyPct, setMinTotalBodyPct] = useState<number | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
 
   const mutation = useMutation({
     mutationFn: runStreakAnalysis,
@@ -79,6 +80,7 @@ export function useStreakAnalysisForm() {
   // API 호출
   const handleRun = () => {
     try {
+      setFormError(null);
       const pattern = generatePattern(useComplexPattern, condition1, condition2);
 
       const requestParams: StreakAnalysisParams = {
@@ -96,7 +98,7 @@ export function useStreakAnalysisForm() {
 
       // Complex Mode에서 2차 조건 검증
       if (useComplexPattern && !condition2) {
-        alert(
+        setFormError(
           isKo
             ? '복합 패턴 분석은 2차 조건이 필요합니다'
             : 'Complex pattern analysis requires 2nd condition'
@@ -104,24 +106,10 @@ export function useStreakAnalysisForm() {
         return;
       }
 
-      console.log('🚀 Running analysis with params:', requestParams);
-      console.log('📊 Mode:', useComplexPattern ? 'Complex' : 'Simple');
-      console.log('📋 Pattern:', pattern);
-
-      mutation.mutate(requestParams, {
-        onError: (error: unknown) => {
-          console.error('❌ Analysis failed:', error);
-          const msg = getErrorMessage(error);
-          alert(isKo ? `분석 실패: ${msg}` : `Analysis failed: ${msg}`);
-        },
-        onSuccess: (data) => {
-          console.log('✅ Analysis success:', data);
-        },
-      });
+      mutation.mutate(requestParams);
     } catch (error: unknown) {
-      console.error('❌ Error in handleRun:', error);
       const msg = getErrorMessage(error);
-      alert(isKo ? `오류 발생: ${msg}` : `Error: ${msg}`);
+      setFormError(isKo ? `오류 발생: ${msg}` : `Error: ${msg}`);
     }
   };
 
@@ -141,6 +129,7 @@ export function useStreakAnalysisForm() {
     // API
     mutation,
     handleRun,
+    formError,
     // Utils
     isKo,
     safeSelectedCoin,

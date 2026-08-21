@@ -340,7 +340,10 @@ def compute_live_indicators(df: pd.DataFrame) -> pd.DataFrame:
     ema12 = d["close"].ewm(span=12, adjust=False).mean()
     ema26 = d["close"].ewm(span=26, adjust=False).mean()
     macd_line = ema12 - ema26
-    d["macd_hist"] = macd_line - macd_line.ewm(span=9, adjust=False).mean()
+    macd_signal = macd_line.ewm(span=9, adjust=False).mean()
+    d["macd"] = macd_line
+    d["macd_signal"] = macd_signal
+    d["macd_hist"] = macd_line - macd_signal
 
     d["rsi"] = compute_rsi_wilder(d["close"], length=14)
     d["adx"] = compute_adx_wilder(d, length=14)
@@ -397,6 +400,15 @@ def compute_trend_judgment_indicators(df: pd.DataFrame) -> pd.DataFrame:
     d["slow_stoch_20k"], d["slow_stoch_20d"] = k20, d20
     d["slow_stoch_10k"], d["slow_stoch_10d"] = k10, d10
     d["slow_stoch_5k"], d["slow_stoch_5d"] = k5, d5
+
+    stoch_rsi_k, stoch_rsi_d = compute_stoch_rsi(
+        d["close"],
+        rsi_period=14,
+        stoch_period=14,
+        stoch_k=3,
+        stoch_d=3,
+    )
+    d["stoch_rsi_k"], d["stoch_rsi_d"] = stoch_rsi_k, stoch_rsi_d
 
     d["vwap_20"] = compute_vwap_rolling(d, 20)
     st, dr = compute_supertrend(d, 10, 3.0)

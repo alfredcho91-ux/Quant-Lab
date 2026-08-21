@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import pandas as pd
 
-from strategy.streak.common import (
+from backend.strategy.streak.common import (
     DEBUG_MODE,
     DEFAULT_RSI,
     calculate_signal_score,

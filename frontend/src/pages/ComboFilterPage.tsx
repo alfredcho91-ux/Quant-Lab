@@ -62,15 +62,7 @@ export default function ComboFilterPage() {
   }, [params, resetMutation]);
 
   const handleRun = () => {
-    console.log('🚀 Combo Filter 실행:', params);
-    mutation.mutate({ ...params, coin: selectedCoin || 'BTC', interval: selectedInterval }, {
-      onSuccess: (data) => {
-        console.log('✅ Combo Filter 성공:', data);
-      },
-      onError: (error) => {
-        console.error('❌ Combo Filter 실패:', error);
-      }
-    });
+    mutation.mutate({ ...params, coin: selectedCoin || 'BTC', interval: selectedInterval });
   };
 
   const renderFilterConfig = (
@@ -146,19 +138,6 @@ export default function ComboFilterPage() {
   };
 
   const result = mutation.data;
-
-  // 디버깅: 결과 확인
-  useEffect(() => {
-    if (mutation.isSuccess) {
-      console.log('✅ Combo Filter 성공:', result);
-      if (!result) {
-        console.warn('⚠️ Combo Filter: API 성공했지만 결과가 null입니다');
-      }
-    }
-    if (mutation.isError) {
-      console.error('❌ Combo Filter 에러:', mutation.error);
-    }
-  }, [mutation.isSuccess, mutation.isError, result, mutation.error]);
 
   return (
     <div className="space-y-6">

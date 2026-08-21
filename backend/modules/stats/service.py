@@ -11,15 +11,21 @@ from typing import Any, Dict, List, Optional
 import numpy as np
 
 from core.indicators import build_indicator_adapter
-from strategy.bb_mid import (
+from backend.strategy.bb_mid import (
     add_bb_indicators,
     analyze_bb_mid_touch,
     collect_event_returns,
 )
-from strategy.combo_filter import analyze_combo_filter
-from strategy.hybrid import analyze_hybrid_strategy, analyze_live_mode, run_hybrid_backtest
-from utils.data_loader import load_data_for_analysis
-from utils.stats import safe_float
+from backend.strategy.combo_filter import analyze_combo_filter
+from backend.strategy.hybrid import analyze_hybrid_strategy, analyze_live_mode, run_hybrid_backtest
+from backend.utils.data_loader import load_data_for_analysis
+from backend.utils.stats import safe_float
+
+
+# 200-period averages need a stable warmup period, but Trend Judgment renders
+# only the latest 200 completed bars. 600 candles keeps enough history while
+# avoiding Binance's second 1,000-candle request.
+TREND_INDICATOR_CANDLES = 600
 
 
 def _load_data_for_analysis(
@@ -142,15 +148,24 @@ def run_combo_filter_analysis(params: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def run_trend_indicators_analysis(coin: str, interval: str, use_csv: bool) -> Dict[str, Any]:
-    """Compute latest/chart trend indicators for Trend Judgment (Slow Stochastic profile)."""
-    df = _load_data_for_analysis(coin, interval, use_csv, total_candles=2000)
+    """Compute latest/chart momentum and trend indicators for Trend Judgment."""
+    df = _load_data_for_analysis(
+        coin,
+        interval,
+        use_csv,
+        total_candles=TREND_INDICATOR_CANDLES,
+    )
     if df is None or df.empty:
         return {"success": False, "error": "Failed to load data"}
 
     indicators_df = build_indicator_adapter(df, mode="trend_judgment")
-    # 진행 중인 최신 봉 기준으로 표시한다.
-    idx = -1
+    # Binance 마지막 봉은 진행 중일 수 있으므로, 직전 확정봉만 사용한다.
+    if len(indicators_df) < 2:
+        return {"success": False, "error": "Not enough completed candles"}
+
+    idx = -2
     row = indicators_df.iloc[idx]
+    previous_row = indicators_df.iloc[-3] if len(indicators_df) >= 3 else None
 
     def _row_value(canonical: str, legacy: str) -> Optional[float]:
         value = row.get(canonical)
@@ -165,10 +180,40 @@ def run_trend_indicators_analysis(coin: str, interval: str, use_csv: bool) -> Di
     slow_20k = _row_value("slow_stoch_20k", "stoch_rsi_20k")
     slow_20d = _row_value("slow_stoch_20d", "stoch_rsi_20d")
 
+    macd = safe_float(row.get("macd"))
+    macd_signal = safe_float(row.get("macd_signal"))
+    previous_macd = safe_float(previous_row.get("macd")) if previous_row is not None else None
+    previous_signal = (
+        safe_float(previous_row.get("macd_signal")) if previous_row is not None else None
+    )
+    macd_cross = None
+    if None not in (macd, macd_signal, previous_macd, previous_signal):
+        if previous_macd <= previous_signal and macd > macd_signal:
+            macd_cross = "golden"
+        elif previous_macd >= previous_signal and macd < macd_signal:
+            macd_cross = "dead"
+
+    macd_hist = safe_float(row.get("macd_hist"))
+    previous_hist = (
+        safe_float(previous_row.get("macd_hist")) if previous_row is not None else None
+    )
+    macd_hist_direction = None
+    if macd_hist is not None and previous_hist is not None:
+        if macd_hist > previous_hist:
+            macd_hist_direction = "rising"
+        elif macd_hist < previous_hist:
+            macd_hist_direction = "falling"
+        else:
+            macd_hist_direction = "flat"
+
     latest = {
         "close": safe_float(row.get("close")),
         "rsi": safe_float(row.get("rsi")),
-        "macd_hist": safe_float(row.get("macd_hist")),
+        "macd": macd,
+        "macd_signal": macd_signal,
+        "macd_hist": macd_hist,
+        "macd_cross": macd_cross,
+        "macd_hist_direction": macd_hist_direction,
         "adx": safe_float(row.get("adx")),
         "atr": safe_float(row.get("atr")),
         "atr_pct": safe_float(row.get("atr_pct")),
@@ -181,13 +226,16 @@ def run_trend_indicators_analysis(coin: str, interval: str, use_csv: bool) -> Di
         "slow_stoch_10d": slow_10d,
         "slow_stoch_20k": slow_20k,
         "slow_stoch_20d": slow_20d,
+        "stoch_rsi_k": safe_float(row.get("stoch_rsi_k")),
+        "stoch_rsi_d": safe_float(row.get("stoch_rsi_d")),
         "vwap_20": safe_float(row.get("vwap_20")),
         "supertrend": safe_float(row.get("supertrend")),
         "supertrend_dir": safe_float(row.get("supertrend_dir")),
     }
 
-    chart_len = min(200, len(indicators_df))
-    chart_df = indicators_df.iloc[-chart_len:]
+    completed_df = indicators_df.iloc[:-1]
+    chart_len = min(200, len(completed_df))
+    chart_df = completed_df.iloc[-chart_len:]
     series = {}
 
     def _series_payload(canonical: str, legacy: Optional[str] = None) -> Optional[Dict[str, List[Any]]]:
@@ -197,9 +245,22 @@ def run_trend_indicators_analysis(coin: str, interval: str, use_csv: bool) -> Di
         if source_col not in chart_df.columns:
             return None
         s = chart_df[source_col].dropna()
-        return {"t": s.index.astype(str).tolist(), "v": s.tolist()}
+        timestamps = chart_df.loc[s.index, "open_dt"] if "open_dt" in chart_df.columns else s.index
+        return {"t": timestamps.astype(str).tolist(), "v": s.tolist()}
 
-    plain_series_columns = ["close", "rsi", "macd_hist", "atr_pct", "vwap_20", "supertrend"]
+    plain_series_columns = [
+        "close",
+        "volume",
+        "rsi",
+        "macd",
+        "macd_signal",
+        "macd_hist",
+        "atr_pct",
+        "stoch_rsi_k",
+        "stoch_rsi_d",
+        "vwap_20",
+        "supertrend",
+    ]
     for col in plain_series_columns:
         payload = _series_payload(col)
         if payload is not None:

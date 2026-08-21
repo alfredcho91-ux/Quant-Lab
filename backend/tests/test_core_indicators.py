@@ -100,6 +100,8 @@ def test_compute_trend_indicators_contains_expected_columns():
         "sma100",
         "sma200",
         "rsi",
+        "macd",
+        "macd_signal",
         "macd_hist",
         "adx",
         "stoch_rsi_5k",
@@ -187,6 +189,33 @@ def test_compute_stoch_rsi_matches_reference_formula():
     assert np.allclose(d_out[d_mask], d_ref[d_mask], rtol=1e-10, atol=1e-10)
 
 
+def test_compute_stoch_rsi_supports_independent_stochastic_lookback():
+    steps = np.array([1.2, -0.8, 0.9, -0.6, 1.1, -0.7, 0.5, -0.4] * 50)
+    close = pd.Series(100.0 + np.cumsum(steps))
+
+    k_out, d_out = compute_stoch_rsi(
+        close,
+        rsi_period=14,
+        stoch_period=10,
+        stoch_k=3,
+        stoch_d=3,
+    )
+
+    rsi = compute_rsi(close, length=14)
+    rsi_min = rsi.rolling(window=10, min_periods=10).min()
+    rsi_max = rsi.rolling(window=10, min_periods=10).max()
+    stoch = 100 * (rsi - rsi_min) / (rsi_max - rsi_min + 1e-10)
+    k_ref = stoch.rolling(window=3, min_periods=3).mean()
+    d_ref = k_ref.rolling(window=3, min_periods=3).mean()
+
+    k_mask = k_out.notna() & k_ref.notna()
+    d_mask = d_out.notna() & d_ref.notna()
+    assert k_mask.any()
+    assert d_mask.any()
+    assert np.allclose(k_out[k_mask], k_ref[k_mask], rtol=1e-10, atol=1e-10)
+    assert np.allclose(d_out[d_mask], d_ref[d_mask], rtol=1e-10, atol=1e-10)
+
+
 def test_compute_slow_stochastic_matches_pine_formula():
     df = _build_ohlcv(rows=220)
     k_out, d_out = compute_slow_stochastic(df, length=20, smooth_k=12, smooth_d=12)
@@ -216,6 +245,8 @@ def test_compute_trend_judgment_indicators_exposes_slow_stochastic_fields():
         "slow_stoch_10d",
         "slow_stoch_5k",
         "slow_stoch_5d",
+        "stoch_rsi_k",
+        "stoch_rsi_d",
     ]
     for col in expected_cols:
         assert col in out.columns

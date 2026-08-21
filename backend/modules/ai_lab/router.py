@@ -3,10 +3,15 @@
 from fastapi import APIRouter
 from fastapi.concurrency import run_in_threadpool
 
-from modules.ai_lab.schemas import AIResearchRequest, AIResearchResponse, AIAnalystRequest
-from modules.ai_lab.service import process_ai_research, run_data_analyst_agent
-from utils.decorators import handle_api_errors
-from config import settings
+from backend.modules.ai_lab.schemas import (
+    AIAnalystRequest,
+    AIAnalystResponse,
+    AIResearchRequest,
+    AIResearchResponse,
+)
+from backend.modules.ai_lab.service import process_ai_research, run_data_analyst_agent
+from backend.utils.decorators import handle_api_errors
+from backend.config import settings
 
 router = APIRouter(prefix="/api/ai", tags=["ai-lab"])
 
@@ -39,7 +44,7 @@ async def api_ai_research(request: AIResearchRequest):
         "error_code": result.get("error_code"),
     }
 
-@router.post("/analyst")
+@router.post("/analyst", response_model=AIAnalystResponse)
 @handle_api_errors()
 async def api_ai_analyst(request: AIAnalystRequest):
     """Process natural language request -> LLM -> Python REPL -> Answer."""

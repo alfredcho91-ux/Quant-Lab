@@ -6,7 +6,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import pandas as pd
 
-from strategy.streak.common import (
+from backend.strategy.streak.common import (
     ATR_BINS,
     CONFIDENCE_LEVEL,
     DEFAULT_RSI,
@@ -17,13 +17,13 @@ from strategy.streak.common import (
     safe_get_rsi,
     safe_round,
 )
-from strategy.streak.matcher import build_chart_positions
-from strategy.streak.statistics import (
+from backend.strategy.streak.matcher import build_chart_positions
+from backend.strategy.streak.statistics import (
     analyze_2d_interval_heatmap,
     analyze_interval_statistics,
     trimmed_stats,
 )
-from utils.stats import safe_float
+from backend.utils.stats import safe_float
 
 
 def calculate_volatility_stats(

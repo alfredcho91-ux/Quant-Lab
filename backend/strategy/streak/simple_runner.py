@@ -7,7 +7,7 @@ from typing import List
 
 import pandas as pd
 
-from strategy.streak.common import DEBUG_MODE, normalize_indices
+from backend.strategy.streak.common import DEBUG_MODE, normalize_indices
 
 logger = logging.getLogger(__name__)
 

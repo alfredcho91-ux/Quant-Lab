@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import List
+from typing import List, Literal, Optional
 
 import numpy as np
 import pandas as pd
@@ -128,14 +128,16 @@ def compute_stoch_rsi(
     rsi_period: int = 14,
     stoch_k: int = 3,
     stoch_d: int = 3,
+    stoch_period: int | None = None,
 ) -> tuple[pd.Series, pd.Series]:
     """
     Stochastic RSI 계산 (RSI에 Stochastic 적용)
     Returns: (stoch_k, stoch_d)
     """
+    lookback = stoch_period or rsi_period
     rsi = compute_rsi(series, length=rsi_period)
-    rsi_min = rsi.rolling(window=rsi_period, min_periods=rsi_period).min()
-    rsi_max = rsi.rolling(window=rsi_period, min_periods=rsi_period).max()
+    rsi_min = rsi.rolling(window=lookback, min_periods=lookback).min()
+    rsi_max = rsi.rolling(window=lookback, min_periods=lookback).max()
     stoch = 100 * (rsi - rsi_min) / (rsi_max - rsi_min + 1e-10)
     stoch_k_series = stoch.rolling(window=stoch_k, min_periods=stoch_k).mean()
     stoch_d_series = stoch_k_series.rolling(window=stoch_d, min_periods=stoch_d).mean()
@@ -169,6 +171,49 @@ def compute_vwap_rolling(df: pd.DataFrame, window: int = 20) -> pd.Series:
         return typical.rolling(window).mean()
     tp_vol = typical * df["volume"]
     return tp_vol.rolling(window).sum() / (df["volume"].rolling(window).sum() + 1e-10)
+
+
+def compute_vwap_anchored(
+    df: pd.DataFrame,
+    anchor: Literal["day", "week", "month", "quarter", "year"],
+    timestamp_column: str = "open_dt",
+) -> Optional[float]:
+    """Calculate HLC3 VWAP from the selected UTC calendar anchor to the latest bar."""
+    if df.empty or not {"high", "low", "close", "volume"}.issubset(df.columns):
+        return None
+
+    timestamps = pd.to_datetime(
+        df[timestamp_column] if timestamp_column in df.columns else df.index,
+        errors="coerce",
+        utc=True,
+    )
+    if len(timestamps) == 0 or pd.isna(timestamps.iloc[-1] if isinstance(timestamps, pd.Series) else timestamps[-1]):
+        return None
+
+    reference = timestamps.iloc[-1] if isinstance(timestamps, pd.Series) else timestamps[-1]
+    if anchor == "day":
+        start = reference.normalize()
+    elif anchor == "week":
+        start = reference.normalize() - pd.Timedelta(days=reference.weekday())
+    elif anchor == "month":
+        start = reference.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    elif anchor == "quarter":
+        quarter_month = ((reference.month - 1) // 3) * 3 + 1
+        start = reference.replace(month=quarter_month, day=1, hour=0, minute=0, second=0, microsecond=0)
+    elif anchor == "year":
+        start = reference.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
+    else:
+        raise ValueError(f"Unsupported VWAP anchor: {anchor}")
+    period = df.loc[timestamps >= start]
+    if period.empty:
+        return None
+
+    typical_price = (period["high"] + period["low"] + period["close"]) / 3
+    volume = period["volume"].clip(lower=0.0)
+    total_volume = float(volume.sum())
+    if total_volume <= 0:
+        return None
+    return float((typical_price * volume).sum() / total_volume)
 
 
 def compute_supertrend(
@@ -255,6 +300,7 @@ __all__ = [
     "compute_slow_stochastic",
     "compute_stoch_rsi",
     "compute_supertrend",
+    "compute_vwap_anchored",
     "compute_vwap_rolling",
     "get_latest_indicator_values",
     "set_bollinger_columns",

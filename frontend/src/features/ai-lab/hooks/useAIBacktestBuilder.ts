@@ -10,6 +10,8 @@ import {
   AI_BUILDER_PROMPT_SAMPLES_KO,
 } from '../builderConfig';
 import type { Direction } from '../types';
+import { getErrorMessage } from '../../../utils/error';
+import { MARKET_INTERVALS } from '../../../constants/market';
 
 interface UseAIBacktestBuilderOptions {
   isKo: boolean;
@@ -24,7 +26,6 @@ interface UseAIBacktestBuilderOptions {
   };
 }
 
-const DEFAULT_INTERVALS = ['1h', '4h', '1d'];
 const EMPTY_STRATEGIES: Strategy[] = [];
 
 export function useAIBacktestBuilder({
@@ -74,7 +75,7 @@ export function useAIBacktestBuilder({
     queryFn: () => getTimeframes(selectedCoin),
   });
 
-  const intervals = tfData?.all ?? DEFAULT_INTERVALS;
+  const intervals = tfData?.all ?? [...MARKET_INTERVALS];
 
   useEffect(() => {
     setRunInterval(selectedInterval);
@@ -266,6 +267,8 @@ export function useAIBacktestBuilder({
       if (response.backtest_result) {
         setResult(response.backtest_result);
       }
+    } catch (error: unknown) {
+      setRunError(getErrorMessage(error));
     } finally {
       setAiDraftPending(false);
     }

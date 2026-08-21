@@ -5,17 +5,22 @@ from typing import Annotated
 from fastapi import APIRouter, Depends
 from fastapi.concurrency import run_in_threadpool
 
-from modules.support_resistance.schemas import (
+from backend.modules.support_resistance.schemas import (
+    SupportResistanceEnvelope,
     SupportResistancePathParams,
     SupportResistanceQueryParams,
 )
-from modules.support_resistance.service import run_support_resistance_service
-from utils.decorators import handle_api_errors
+from backend.modules.support_resistance.service import run_support_resistance_service
+from backend.utils.decorators import handle_api_errors
 
 router = APIRouter(prefix="/api", tags=["support-resistance"])
 
 
-@router.get("/support-resistance/{coin}/{interval}", operation_id="get_support_resistance_levels")
+@router.get(
+    "/support-resistance/{coin}/{interval}",
+    operation_id="get_support_resistance_levels",
+    response_model=SupportResistanceEnvelope,
+)
 @handle_api_errors()
 async def api_support_resistance(
     path: Annotated[SupportResistancePathParams, Depends()],
@@ -32,4 +37,3 @@ async def api_support_resistance(
         query.show_pivots,
         query.htf_option,
     )
-

@@ -23,14 +23,14 @@ RETRACEMENT_BINS = [0, 20, 30, 40, 50, 60, 70, 80, 100]
 ATR_BINS = [0, 0.5, 1.0, 1.5, 2.0, 3.0, 5.0, 10.0, 100.0]
 
 # ========== Context & Data Service (Re-exports) ==========
-from strategy.context import (
+from backend.strategy.context import (
     AnalysisContext,
     VALID_INTERVALS,
     WEEKDAY_NAMES_KO,
     WEEKDAY_NAMES_EN,
 )
-from utils.data_service import fetch_live_data, load_csv_data
-from utils.cache import DataCache
+from backend.utils.data_service import fetch_live_data, load_csv_data
+from backend.utils.cache import DataCache
 
 # ========== 모듈별 기능 Re-exports (Facade) ==========
 from .json_utils import (

@@ -1,7 +1,9 @@
+import type { MarketCoin } from '../constants/market';
+
 // 공통 타입 정의
 
 export type Language = 'ko' | 'en';
 
-export type Coin = 'BTC' | 'ETH' | 'SOL' | 'XRP';
+export type Coin = MarketCoin;
 
-export type MenuPage = 'backtest' | 'pattern' | 'journal' | 'scanner' | 'pattern-scanner' | 'bb-mid' | 'combo-filter' | 'strategy-scanner' | 'backtest-advanced' | 'streak-analysis' | 'trend-judgment' | 'hybrid-analysis' | 'ai-backtest-lab';
+export type MenuPage = 'backtest' | 'journal' | 'bb-mid' | 'combo-filter' | 'streak-analysis' | 'trend-judgment' | 'ai-backtest-lab';

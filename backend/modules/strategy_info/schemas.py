@@ -1,6 +1,8 @@
 """Strategy info domain schemas."""
 
-from pydantic import BaseModel, Field
+from typing import Any, Dict, List
+
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class StrategyInfoQueryParams(BaseModel):
@@ -11,5 +13,30 @@ class StrategyInfoQueryParams(BaseModel):
     sma2_len: int = Field(default=60, ge=1, le=5000)
 
 
-__all__ = ["StrategyInfoQueryParams"]
+class StrategyPayload(BaseModel):
+    id: str
+    logic: str
+    name_en: str
+    name_ko: str
+    prefix: str
 
+
+class StrategiesEnvelope(BaseModel):
+    success: bool
+    data: List[StrategyPayload]
+
+
+class StrategyInfoPayload(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+
+class StrategyInfoEnvelope(BaseModel):
+    success: bool
+    data: Dict[str, Any]
+
+
+__all__ = [
+    "StrategiesEnvelope",
+    "StrategyInfoEnvelope",
+    "StrategyInfoQueryParams",
+]

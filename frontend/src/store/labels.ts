@@ -7,23 +7,20 @@ export interface Labels {
   coin_select: string;
   menu_title: string;
   menu_backtest: string;
-  menu_backtest_advanced: string;
-  menu_strategy_scanner: string;
-  menu_pattern: string;
+  menu_compound_calculator: string;
+  menu_hold_reentry: string;
   menu_bb_mid: string;
   menu_combo_filter: string;
   menu_multi_tf_squeeze: string;
   menu_journal: string;
-  menu_scanner: string;
-  menu_pattern_scanner: string;
+  menu_trade_analysis: string;
   menu_streak_analysis: string;
   menu_trend_judgment: string;
+  menu_trend_chart: string;
   menu_ai_backtest_lab: string;
   menu_ai_backtest_builder: string;
-  menu_hybrid_analysis: string;
   menu_weekly_pattern: string;
   title_backtest: string;
-  title_pattern: string;
   title_journal: string;
   price_help: string;
   interval: string;
@@ -76,23 +73,20 @@ const labels_ko: Labels = {
   coin_select: '코인 선택',
   menu_title: '메뉴',
   menu_backtest: '🚀 백테스트',
-  menu_backtest_advanced: '🔬 고급 백테스트',
-  menu_strategy_scanner: '📡 전략 스캐너',
-  menu_pattern: '📈 패턴/캔들 통계',
+  menu_compound_calculator: '🧮 복리 계산기',
+  menu_hold_reentry: '홀딩 / 재진입',
   menu_bb_mid: '📊 볼밴 중단 터치',
   menu_combo_filter: '🧪 통합 필터 테스트',
   menu_multi_tf_squeeze: '📐 멀티 TF 스퀴즈',
   menu_journal: '📝 매매 일지',
-  menu_scanner: '📊 전략 스캐너',
-  menu_pattern_scanner: '🔍 패턴 스캐너',
+  menu_trade_analysis: '매매 분석',
   menu_streak_analysis: '🏹 연속 봉 분석',
   menu_trend_judgment: '📊 추세판단',
+  menu_trend_chart: '추세분석 차트',
   menu_ai_backtest_lab: '🤖 AI 백테스트 랩',
   menu_ai_backtest_builder: '🛠️ AI 전략 빌더',
-  menu_hybrid_analysis: '⚡ 하이브리드 전략',
   menu_weekly_pattern: '📅 주간 패턴 분석',
   title_backtest: '{coin} 8개 전략 백테스트',
-  title_pattern: '📈 패턴/캔들 통계 연구실',
   title_journal: '📝 매매 일지',
   price_help: 'CSV 보유: ',
   interval: '봉 기간',
@@ -152,23 +146,20 @@ const labels_en: Labels = {
   coin_select: 'Select Coin',
   menu_title: 'Menu',
   menu_backtest: '🚀 Backtest',
-  menu_backtest_advanced: '🔬 Advanced Backtest',
-  menu_strategy_scanner: '📡 Strategy Scanner',
-  menu_pattern: '📈 Pattern / Candle Stats',
+  menu_compound_calculator: '🧮 Compound Calculator',
+  menu_hold_reentry: 'Hold / Re-entry',
   menu_bb_mid: '📊 BB Mid Touch',
   menu_combo_filter: '🧪 Combo Filter Test',
   menu_multi_tf_squeeze: '📐 Multi-TF Squeeze',
   menu_journal: '📝 Trading Journal',
-  menu_scanner: '📊 Strategy Scanner',
-  menu_pattern_scanner: '🔍 Pattern Scanner',
+  menu_trade_analysis: 'Trade Analysis',
   menu_streak_analysis: '🏹 Candle Streak',
   menu_trend_judgment: '📊 Trend Judgment',
+  menu_trend_chart: 'Trend Analysis Chart',
   menu_ai_backtest_lab: '🤖 AI Backtest Lab',
   menu_ai_backtest_builder: '🛠️ AI Strategy Builder',
-  menu_hybrid_analysis: '⚡ Hybrid Strategy',
   menu_weekly_pattern: '📅 Weekly Pattern',
   title_backtest: '{coin} 8-Strategy Backtest',
-  title_pattern: '📈 Pattern / Candle Statistics Lab',
   title_journal: '📝 Trading Journal',
   price_help: 'CSV available: ',
   interval: 'Candle Interval',

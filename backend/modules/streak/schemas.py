@@ -1,6 +1,6 @@
 """Streak domain schemas."""
 
-from typing import Literal, Optional
+from typing import Any, Dict, Literal, Optional
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -37,4 +37,25 @@ class StreakAnalysisParams(BaseModel):
         return value
 
 
-__all__ = ["StreakAnalysisParams"]
+class StreakCacheStatsResponse(BaseModel):
+    data_cache: Dict[str, Any]
+    analysis_cache: Dict[str, Any]
+    indicators_cache: Dict[str, Any]
+    per_cache_metrics: Dict[str, Dict[str, Any]]
+    total_cached_items: int
+    total_hits: int
+    total_misses: int
+    total_requests: int
+    total_hit_rate: float
+
+
+class StreakCacheClearResponse(BaseModel):
+    success: bool
+    message: str
+
+
+__all__ = [
+    "StreakAnalysisParams",
+    "StreakCacheClearResponse",
+    "StreakCacheStatsResponse",
+]

@@ -15,7 +15,7 @@ class APIError(Exception):
         self,
         message: str,
         error_code: str = "INTERNAL_ERROR",
-        status_code: int = 200,
+        status_code: int = 500,
         details: Optional[Dict[str, Any]] = None,
     ):
         self.message = message
@@ -31,7 +31,7 @@ class ValidationError(APIError):
         super().__init__(
             message=message,
             error_code="VALIDATION_ERROR",
-            status_code=200,
+            status_code=422,
             details=details,
         )
 
@@ -42,7 +42,7 @@ class DataLoadError(APIError):
         super().__init__(
             message=message,
             error_code="DATA_LOAD_ERROR",
-            status_code=200,
+            status_code=503,
             details=details,
         )
 
@@ -56,7 +56,7 @@ class NotFoundError(APIError):
         super().__init__(
             message=message,
             error_code="NOT_FOUND",
-            status_code=200,
+            status_code=404,
         )
 
 
@@ -66,7 +66,7 @@ class BusinessLogicError(APIError):
         super().__init__(
             message=message,
             error_code=error_code,
-            status_code=200,
+            status_code=400,
             details=details,
         )
 
@@ -89,9 +89,14 @@ def create_error_response(
     """
     # APIError 인스턴스인 경우
     if isinstance(error, APIError):
+        public_message = (
+            error.message
+            if error.status_code < 500
+            else "The service is temporarily unavailable"
+        )
         response = {
             "success": False,
-            "error": error.message,
+            "error": public_message,
             "error_code": error.error_code,
         }
         if error.details:
@@ -114,7 +119,7 @@ def create_error_response(
     # 기타 예외
     response = {
         "success": False,
-        "error": str(error) if error else "An unexpected error occurred",
+        "error": "An unexpected error occurred",
         "error_code": error_code or "INTERNAL_ERROR",
     }
     if include_traceback or sys.flags.debug:

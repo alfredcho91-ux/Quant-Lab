@@ -2,16 +2,21 @@
 
 from fastapi import APIRouter
 from fastapi.concurrency import run_in_threadpool
-from models.response import TrendIndicatorsEnvelope
-from modules.stats.schemas import (
+from backend.models.response import TrendIndicatorsEnvelope
+from backend.modules.stats.schemas import (
+    BBMidEnvelope,
     BBMidParams,
+    ComboFilterEnvelope,
     ComboFilterParams,
+    HybridAnalysisEnvelope,
     TrendIndicatorsParams,
     HybridAnalysisParams,
+    HybridBacktestEnvelope,
     HybridBacktestParams,
+    HybridLiveEnvelope,
     HybridLiveModeParams,
 )
-from modules.stats.service import (
+from backend.modules.stats.service import (
     run_bb_mid_analysis,
     run_combo_filter_analysis,
     run_hybrid_analysis_service,
@@ -19,14 +24,14 @@ from modules.stats.service import (
     run_hybrid_live_service,
     run_trend_indicators_analysis,
 )
-from utils.decorators import handle_api_errors
+from backend.utils.decorators import handle_api_errors
 
 router = APIRouter(prefix="/api", tags=["stats"])
 
 
 # ========== API Endpoints ==========
 
-@router.post("/bb-mid")
+@router.post("/bb-mid", response_model=BBMidEnvelope)
 @handle_api_errors(include_traceback=False)
 async def api_bb_mid(params: BBMidParams):
     """Calculate BB Mid Touch statistics"""
@@ -41,7 +46,7 @@ async def api_bb_mid(params: BBMidParams):
     )
 
 
-@router.post("/combo-filter")
+@router.post("/combo-filter", response_model=ComboFilterEnvelope)
 @handle_api_errors(include_traceback=False)
 async def api_combo_filter(params: ComboFilterParams):
     """Run combo filter backtest"""
@@ -60,7 +65,7 @@ async def api_trend_indicators(params: TrendIndicatorsParams):
     )
 
 
-@router.post("/hybrid-analysis")
+@router.post("/hybrid-analysis", response_model=HybridAnalysisEnvelope)
 @handle_api_errors(include_traceback=False)
 async def api_hybrid_analysis(params: HybridAnalysisParams):
     """
@@ -76,7 +81,7 @@ async def api_hybrid_analysis(params: HybridAnalysisParams):
     )
 
 
-@router.post("/hybrid-backtest")
+@router.post("/hybrid-backtest", response_model=HybridBacktestEnvelope)
 @handle_api_errors(include_traceback=False)
 async def api_hybrid_backtest(params: HybridBacktestParams):
     """
@@ -95,7 +100,7 @@ async def api_hybrid_backtest(params: HybridBacktestParams):
     )
 
 
-@router.post("/hybrid-live")
+@router.post("/hybrid-live", response_model=HybridLiveEnvelope)
 @handle_api_errors(include_traceback=False)
 async def api_hybrid_live(params: HybridLiveModeParams):
     """

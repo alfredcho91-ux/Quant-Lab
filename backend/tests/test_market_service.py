@@ -2,7 +2,7 @@
 
 import pandas as pd
 
-from modules.market import service as market_service
+from backend.modules.market import service as market_service
 
 
 def test_run_market_prices_service_success(monkeypatch):
@@ -93,3 +93,37 @@ def test_run_ohlcv_service(monkeypatch):
     assert result["source"] == "CSV file"
     assert result["count"] == 2
     assert isinstance(result["data"][0]["open_dt"], str)
+
+
+def test_run_ohlcv_service_supports_historical_end_time(monkeypatch):
+    df = pd.DataFrame(
+        {
+            "open_dt": pd.to_datetime(["2025-01-01 00:00:00"]),
+            "open_time": [1735689600000],
+            "open": [1.0],
+            "high": [1.2],
+            "low": [0.8],
+            "close": [1.1],
+            "volume": [10.0],
+        }
+    )
+
+    def _mock_fetch(symbol, interval, total_candles, end_time):
+        assert symbol == "BTCUSDT"
+        assert interval == "4h"
+        assert total_candles == 240
+        assert end_time == 1736000000000
+        return df
+
+    monkeypatch.setattr(market_service, "fetch_binance_klines", _mock_fetch)
+
+    result = market_service.run_ohlcv_service(
+        "BTC",
+        "4h",
+        limit=240,
+        end_time=1736000000000,
+    )
+
+    assert result["success"] is True
+    assert result["source"] == "Binance Spot API"
+    assert result["count"] == 1

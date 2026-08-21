@@ -9,9 +9,9 @@ import pandas as pd
 from core.backtest import run_backtest
 from core.indicators import build_indicator_adapter
 from core.strategies import STRATS
-from models.request import AdvancedBacktestParams, BacktestParams
-from services.statistics import calculate_advanced_stats, run_monte_carlo
-from utils.data_loader import load_data_for_analysis
+from backend.models.request import AdvancedBacktestParams, BacktestParams
+from backend.services.statistics import calculate_advanced_stats, run_monte_carlo
+from backend.utils.data_loader import load_data_for_analysis
 
 
 def _load_and_prepare_data(params: BacktestParams | AdvancedBacktestParams) -> pd.DataFrame:
@@ -125,11 +125,11 @@ def _format_trades(res: pd.DataFrame) -> list[Dict[str, Any]]:
 
 def run_backtest_service(params: BacktestParams) -> Dict[str, Any]:
     """Run standard backtest response flow."""
-    df = _load_and_prepare_data(params)
     strat = _find_strategy(params.strategy_id)
     if strat is None:
         return {"success": False, "error": f"Strategy {params.strategy_id} not found"}
 
+    df = _load_and_prepare_data(params)
     sig_col = f"{strat['prefix']}_{params.direction}"
     df_bt = _apply_warmup(df, params.sma_main_len, params.sma2_len)
     res = _run_backtest_core(df_bt, params, strat["logic"], sig_col)
@@ -178,11 +178,11 @@ def _run_and_summarize(
 
 def run_backtest_advanced_service(params: AdvancedBacktestParams) -> Dict[str, Any]:
     """Run advanced backtest with train/test split and statistics."""
-    df = _load_and_prepare_data(params)
     strat = _find_strategy(params.strategy_id)
     if strat is None:
         return {"success": False, "error": f"Strategy {params.strategy_id} not found"}
 
+    df = _load_and_prepare_data(params)
     sig_col = f"{strat['prefix']}_{params.direction}"
     df_bt = _apply_warmup(df, params.sma_main_len, params.sma2_len)
 

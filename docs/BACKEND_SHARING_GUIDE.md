@@ -1,233 +1,71 @@
-# Backend Sharing Guide
+# 백엔드 작업 가이드
 
-> Summary reference for anyone taking over or extending the Quant-Lab backend.
+이 문서는 백엔드 코드를 수정하거나 새 API를 추가할 때의 현재 경계를 요약합니다. 전체 구조는 [ARCHITECTURE.md](../ARCHITECTURE.md), 활성 API는 [API_SPEC.md](../API_SPEC.md)를 기준으로 합니다.
 
-## Project Overview
-
-Quant-Lab backend is a FastAPI service for crypto market analysis, strategy execution, and quant research workflows.
-
-- Framework: FastAPI 0.109
-- Language: Python 3.9+
-- Key libraries: Pandas, NumPy, SciPy, CCXT, Pydantic
-- Default port: `8000`
-
-## Critical Invariants
-
-### 1. DatetimeIndex normalization
-
-- Location: `backend/strategy/streak/common.py` via `normalize_indices()`
-- Rule: every analysis DataFrame must carry a `DatetimeIndex`
-- Do not remove index validation or allow mixed index types in analytical paths
-
-### 2. C1 extraction logic
-
-- Pattern completion time is not the analysis target
-- The analysis target is the next candle after completion: `C1` (`T+1`)
-- Key locations:
-  - `backend/strategy/streak/simple_strategy.py`
-  - `backend/strategy/streak/complex_strategy.py`
-- Do not rewrite the logic to analyze the completion candle directly
-
-### 3. Wilson score interval
-
-- Location: `backend/strategy/streak/statistics.py` via `wilson_confidence_interval()`
-- Baseline confidence setting: `z = 1.96` for 95% confidence
-- Do not change the formula or remove the low-reliability treatment for small samples
-
-### 4. Bonferroni correction
-
-- Location: `backend/strategy/streak/statistics.py` via `analyze_interval_statistics()`
-- Formula: `alpha_adjusted = alpha / n_comparisons`
-- Default high-probability minimum sample: `DEFAULT_HIGH_PROB_MIN_SAMPLE = 10`
-- Do not remove multiple-comparison correction
-
-### 5. New York timezone conversion
-
-- Location: `backend/strategy/streak/statistics.py` via `calculate_intraday_distribution()`
-- Implementation: `pytz.timezone("America/New_York")` for automatic DST handling
-- Do not replace this with manual EST/EDT offset arithmetic
-
-## Backend Layout
+## 모듈 구조
 
 ```text
 backend/
-├── main.py
-├── modules/
+├── main.py                 FastAPI 생성, 인증, CORS, router 등록, dist mount
+├── config/settings.py      프로젝트 기준 경로와 환경 변수
+├── modules/                HTTP 도메인 경계
 │   ├── ai_lab/
 │   ├── backtest/
+│   ├── indicators/
 │   ├── journal/
 │   ├── market/
 │   ├── preset/
-│   ├── scanner/
 │   ├── stats/
 │   ├── strategy_info/
 │   ├── streak/
 │   └── support_resistance/
-├── services/
-│   ├── ai_clients.py
-│   ├── pattern_logic.py
-│   └── statistics.py
-├── strategy/
+├── strategy/               전략 특화 계산
 │   ├── bb_mid/
 │   ├── combo_filter/
 │   ├── hybrid/
 │   └── streak/
-├── utils/
-│   ├── cache.py
-│   ├── data_loader.py
-│   ├── data_service.py
-│   └── decorators.py
-└── config/
-    ├── settings.py
-    └── strategies.yaml
+├── services/               공용 서비스 및 AI client adapter
+├── utils/                  데이터, 캐시, 오류, 응답, 검증
+└── tests/                  pytest
 ```
 
-Project-root shared logic:
+## API를 추가하는 순서
 
-```text
-core/
-├── backtest.py
-├── indicators.py
-└── strategies.py
-```
+1. 새 도메인 또는 기존 `modules/<domain>/schemas.py`에 요청·응답 Pydantic 모델을 만듭니다.
+2. `service.py`에 FastAPI에 의존하지 않는 use-case 함수를 둡니다.
+3. `router.py`에서 입력을 검증하고 service만 호출합니다.
+4. `backend/main.py`에 router를 등록합니다.
+5. API client, frontend type, 화면, [API_SPEC.md](../API_SPEC.md), [PAGE_BACKEND_MAPPING.md](./PAGE_BACKEND_MAPPING.md)를 함께 갱신합니다.
+6. `python3 scripts/check_route_imports.py`와 관련 테스트를 실행합니다.
 
-## Major APIs
+## 데이터와 계산 경계
 
-### Streak analysis
+- 시장 데이터는 `utils/data_service.py`와 `utils/data_loader.py`를 사용합니다. 전략이나 라우터에서 Binance/CSV를 직접 다시 구현하지 않습니다.
+- 재사용 가능한 수학 계산은 `core/`에 둡니다. HTTP, 파일 I/O, 네트워크 의존성을 넣지 않습니다.
+- 전략별 판단은 `backend/strategy/`에 둡니다.
+- `modules/indicators/`는 기술 지표를 HTTP 화면에 맞게 조합하는 도메인 서비스이며, 수식 자체는 `core/` 또는 `reverse_calc.py`에 둡니다.
+- 진행 중 봉을 쓰지 않는 추세판단·VWAP·VPVR 경로에서는 반드시 마지막 kline을 제거합니다.
 
-- `POST /api/streak-analysis`
-- Parameters include `coin`, `interval`, `n_streak`, `direction`, `use_complex_pattern`, `complex_pattern`, and `rsi_threshold`
-- Main logic lives under `backend/strategy/streak/`
+## 응답과 오류
 
-### Hybrid strategy
+- 성공 응답은 `{ "success": true, ... }` 형태를 유지합니다.
+- `@handle_api_errors()`와 `response_builder.py`를 기존 패턴에 맞춰 사용합니다.
+- 라우터에서 예외를 임의로 `pass` 처리하지 않습니다.
+- 직렬화 가능한 Python primitive만 반환합니다. Pandas/NumPy scalar는 필요한 경우 `safe_float` 같은 기존 유틸로 변환합니다.
 
-- `POST /api/hybrid-analysis`
-- `POST /api/hybrid-backtest`
-- `POST /api/hybrid-live`
-- Main logic lives under `backend/strategy/hybrid/logic.py`
-- Shared indicator path: `core/indicators.py::compute_live_indicators()`
+## 캐시와 파일 경로
 
-### BB mid
+- TTL 캐시는 `DataCache`를 사용합니다. 새 병렬 캐시 구현을 만들지 않습니다.
+- 프리셋은 `PRESETS_FILE`을 통해 프로젝트 기준 `data/presets.json`에 저장하고 임시 파일 replace 방식으로 갱신합니다.
+- 저널 경로는 `JOURNAL_DIR`, `JOURNAL_DB_PATH`, `JOURNAL_CSV_PATH` 환경 변수로 바꿀 수 있습니다.
+- 캐시 TTL은 [CACHE_STRATEGY.md](./CACHE_STRATEGY.md)와 함께 관리합니다.
 
-- `POST /api/bb-mid`
-- Main logic lives under `backend/strategy/bb_mid/`
-
-### Combo filter
-
-- `POST /api/combo-filter`
-- Main logic lives under `backend/strategy/combo_filter/`
-
-### Backtest
-
-- `POST /api/backtest`
-- `POST /api/backtest-advanced`
-- Engine: `core/backtest.py`
-
-## Key Modules
-
-### Data loading
-
-- `backend/utils/data_loader.py`
-- CSV-first with API fallback
-- Includes DataFrame normalization for analysis
-
-### Indicator calculation
-
-- `core/indicators.py`
-- Shared functions such as `compute_live_indicators()`
-- Reused across hybrid and other strategy paths
-
-### Strategy signal generation
-
-- `backend/strategy/hybrid/logic.py`
-- `generate_strategy_signals()` handles multiple strategy templates
-
-### Shared statistics
-
-- `backend/services/statistics.py`
-- Quant helpers for profit factor, Sharpe ratio, drawdown, and related calculations
-
-### Caching
-
-- `backend/utils/cache.py`
-- TTL-based caching for data and analysis reuse
-
-## Dependencies
-
-Core packages from `requirements.txt`:
-
-```text
-fastapi>=0.109.0
-uvicorn[standard]
-pydantic>=2.5.0
-pandas>=2.0.0
-numpy>=1.24.0
-scipy>=1.11.0
-ccxt>=4.0.0
-pytz>=2023.3
-```
-
-## Configuration
-
-Primary environment settings from `config/settings.py`:
-
-- `CORS_ORIGINS`
-- `DEBUG_STREAK_ANALYSIS`
-- `BINANCE_DATA_PATH`
-- `CACHE_TTL`
-- `TIMEZONE_OFFSET`
-
-## Tests
-
-Run the backend suite:
+## 검증
 
 ```bash
-cd backend
-source venv/bin/activate
-pytest tests/ -v
+python3 scripts/check_core_imports.py
+python3 scripts/check_route_imports.py
+backend/venv/bin/python -m pytest -q backend/tests
 ```
 
-Important regression coverage:
-
-- `tests/test_c1_extraction.py`
-- `tests/test_statistics.py`
-
-## Editing Rules
-
-1. Normalize DataFrame indexes before running analytics.
-2. Keep `C1` defined as the candle after pattern completion.
-3. Preserve statistical formulas such as Wilson score and Bonferroni correction.
-4. Preserve timezone conversion through New York timezone handling.
-5. Keep shared indicator code reusable across strategies.
-
-## Recent Changes (2026-01)
-
-### Hybrid live mode
-
-- Added `analyze_live_mode()`
-- Uses the most recently completed candle instead of the still-forming candle
-- Moved reusable indicator work into `core/indicators.py`
-
-### Cleanup
-
-- Removed unused imports
-- Reduced duplicated code via `_prepare_indicators_and_signals()`
-- Consolidated `compute_refined_indicators` into `compute_live_indicators`
-
-## Related Docs
-
-- `README.md`
-- `ARCHITECTURE.md`
-- `API.md`
-- `PROJECT_STRUCTURE.md`
-
-## Run The Backend
-
-```bash
-cd backend
-source venv/bin/activate
-pip install -r requirements.txt
-uvicorn main:app --host 0.0.0.0 --port 8000 --reload
-```
-
-Docs endpoint: `http://localhost:8000/docs`
+AI Lab은 개발 모드에서 인증을 우회하며 Python 도구는 완전한 권한 격리가 아닙니다. 외부 공개 전에는 해당 endpoint 비활성화 또는 컨테이너 격리가 필요합니다.

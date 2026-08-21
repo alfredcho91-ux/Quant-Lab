@@ -1,18 +1,10 @@
 """Tests for streak conditional-breakdown payload fields."""
 
-from pathlib import Path
-import sys
-
 import numpy as np
 import pandas as pd
 
-
-backend_path = Path(__file__).parent.parent
-sys.path.insert(0, str(backend_path))
-sys.path.insert(0, str(backend_path.parent))
-
-from strategy.context import AnalysisContext
-from strategy.streak.simple_analyzer import calculate_simple_metrics
+from backend.strategy.context import AnalysisContext
+from backend.strategy.streak.simple_analyzer import calculate_simple_metrics
 
 
 def _build_df(rows: int = 260) -> pd.DataFrame:

@@ -1,51 +1,42 @@
-import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { getIndicatorProjection } from '../api/stats';
 import { Loader2, AlertCircle } from 'lucide-react';
+import type { IndicatorProjection } from '../types';
 
 interface IndicatorProjectionCardProps {
-  coin: string;
   interval: string;
+  isKo: boolean;
+  data?: IndicatorProjection;
+  isLoading: boolean;
+  isError: boolean;
 }
 
-export function IndicatorProjectionCard({ coin, interval }: IndicatorProjectionCardProps) {
-  const [targetStoch, setTargetStoch] = useState<number>(20);
-  
-  const { data, isLoading, error } = useQuery({
-    queryKey: ['indicatorProjection', coin, interval],
-    queryFn: () => getIndicatorProjection(coin, interval),
-    enabled: !!coin && !!interval,
-    staleTime: 60 * 1000, // 1 minute
-  });
-
+export function IndicatorProjectionCard({ data, interval, isKo, isLoading, isError }: IndicatorProjectionCardProps) {
   if (isLoading) {
     return (
-      <div className="card p-4 flex items-center justify-center min-h-[120px] mt-4">
+      <div className="card flex min-h-[120px] items-center justify-center p-4">
         <Loader2 className="w-6 h-6 animate-spin text-primary-400" />
       </div>
     );
   }
 
-  if (error || !data) {
+  if (isError || !data) {
     return (
-      <div className="card p-4 mt-4 border border-red-500/30 bg-red-500/5">
+      <div className="card border border-red-500/30 bg-red-500/5 p-4">
         <div className="text-red-400 text-sm flex items-center gap-2">
           <AlertCircle className="w-4 h-4" />
-          예측 데이터를 불러오지 못했습니다. (API 에러)
+          {isKo ? '예측 데이터를 불러오지 못했습니다.' : 'Failed to load price projections.'}
         </div>
       </div>
     );
   }
 
-  const { current_price, rsi_30_price, rsi_70_price, stoch_hh, stoch_ll } = data;
-
-  let dynamicStochPrice = 0;
-  if (stoch_hh !== undefined && stoch_ll !== undefined) {
-    dynamicStochPrice = (targetStoch / 100) * (stoch_hh - stoch_ll) + stoch_ll;
-  } else {
-    if (targetStoch === 20) dynamicStochPrice = data.stoch_20_price;
-    else if (targetStoch === 80) dynamicStochPrice = data.stoch_80_price;
-  }
+  const { current_price, current_rsi, vwaps, rolling_vwaps, rsi_30_price, rsi_70_price } = data;
+  const vwapLabels = {
+    day: isKo ? '일간 VWAP' : 'Daily VWAP',
+    week: isKo ? '주간 VWAP' : 'Weekly VWAP',
+    month: isKo ? '월간 VWAP' : 'Monthly VWAP',
+    quarter: isKo ? '분기 VWAP' : 'Quarterly VWAP',
+    year: isKo ? '연간 VWAP' : 'Yearly VWAP',
+  };
 
   const calculateDiff = (target: number, current: number) => {
     if (!current) return 0;
@@ -60,66 +51,48 @@ export function IndicatorProjectionCard({ coin, interval }: IndicatorProjectionC
   
   const formatDiff = (diff: number) => `${diff > 0 ? '+' : ''}${diff.toFixed(2)}%`;
 
-  const renderItem = (label: string, targetPrice: number) => {
+  const renderTargetRow = (key: string, label: string, targetPrice: number) => {
     const diff = calculateDiff(targetPrice, current_price);
-    // Green for positive (price needs to go up), Red for negative (price needs to go down)
     const colorClass = diff > 0 ? 'text-green-400' : 'text-red-400';
     
     return (
-      <div className="flex flex-col items-center p-3 bg-dark-800/50 rounded-lg border border-dark-700 hover:border-dark-600 transition-colors">
-        <span className="text-xs text-dark-400 mb-1.5">{label}</span>
-        <span className="text-sm font-bold text-white mb-1 font-mono">{formatPrice(targetPrice)}</span>
-        <span className={`text-xs font-mono font-medium ${colorClass} px-1.5 py-0.5 rounded bg-dark-900/50`}>
-          {formatDiff(diff)}
+      <div key={key} className="grid grid-cols-[1fr_auto] items-center gap-2 rounded border border-dark-700 bg-dark-800/50 px-2.5 py-2">
+        <span className="text-xs text-dark-400">{label}</span>
+        <span className="text-right font-mono">
+          <span className="text-sm font-bold text-white">{formatPrice(targetPrice)}</span>
+          <span className={`ml-1.5 text-[11px] font-medium ${colorClass}`}>{formatDiff(diff)}</span>
         </span>
       </div>
     );
   };
 
-  const renderDynamicStoch = () => {
-    const diff = calculateDiff(dynamicStochPrice, current_price);
-    const colorClass = diff > 0 ? 'text-green-400' : 'text-red-400';
-
-    return (
-      <div className="col-span-2 flex flex-col p-3 bg-dark-800/50 rounded-lg border border-dark-700 hover:border-dark-600 transition-colors">
-        <div className="flex justify-between items-center mb-2">
-          <span className="text-xs text-dark-400">Stoch Target: <span className="text-primary-400 font-bold">{targetStoch}</span></span>
-          <input 
-            type="range" 
-            min="0" 
-            max="100" 
-            step="1"
-            value={targetStoch} 
-            onChange={(e) => setTargetStoch(Number(e.target.value))}
-            className="w-24 h-1.5 bg-dark-600 rounded-lg appearance-none cursor-pointer accent-primary-500"
-          />
-        </div>
-        <div className="flex justify-between items-end">
-          <span className="text-sm font-bold text-white font-mono">{formatPrice(dynamicStochPrice)}</span>
-          <span className={`text-xs font-mono font-medium ${colorClass} px-1.5 py-0.5 rounded bg-dark-900/50`}>
-            {formatDiff(diff)}
-          </span>
-        </div>
-      </div>
-    );
-  };
-
   return (
-    <div className="card p-4 mt-4 border-t border-dark-700/50">
-      <div className="flex items-center justify-between mb-4">
+    <div className="card p-3">
+      <div className="flex items-start justify-between gap-2 mb-3">
         <h2 className="text-sm font-semibold text-white flex items-center gap-2">
           <span className="w-1 h-4 bg-primary-500 rounded-full"></span>
-          Price Projections ({interval})
+          {isKo ? `가격 예측 (${interval})` : `Price Projections (${interval})`}
         </h2>
-        <div className="text-xs text-dark-400">
-          Current: <span className="text-white font-mono ml-1">{formatPrice(current_price)}</span>
+        <div className="shrink-0 text-[11px] text-dark-400">
+          {isKo ? '현재가' : 'Current'} <span className="text-white font-mono ml-1">{formatPrice(current_price)}</span>
         </div>
       </div>
       
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        {renderItem('RSI 30', rsi_30_price)}
-        {renderItem('RSI 70', rsi_70_price)}
-        {renderDynamicStoch()}
+      <div className="space-y-1.5">
+        <div className="grid grid-cols-[1fr_auto] items-center gap-2 rounded border border-dark-700 bg-dark-800/50 px-2.5 py-2">
+          <span className="text-xs text-dark-400">{isKo ? '현재 RSI(14)' : 'Current RSI(14)'}</span>
+          <span className={`font-mono text-sm font-bold ${current_rsi != null && current_rsi >= 50 ? 'text-primary-400' : 'text-red-400'}`}>
+            {current_rsi != null ? current_rsi.toFixed(1) : '—'}
+          </span>
+        </div>
+        {renderTargetRow('rsi-30', 'RSI 30', rsi_30_price)}
+        {renderTargetRow('rsi-70', 'RSI 70', rsi_70_price)}
+        {vwaps.map(({ anchor, value }) =>
+          value != null ? renderTargetRow(`vwap-${anchor}`, vwapLabels[anchor], value) : null,
+        )}
+        {rolling_vwaps.map(({ window, value }) =>
+          value != null ? renderTargetRow(`rolling-vwap-${window}`, `VWAP(${window})`, value) : null,
+        )}
       </div>
     </div>
   );

@@ -43,10 +43,11 @@ jobs:
       with:
         node-version: "18"
 
-    - name: Frontend CI (Install, Lint, Build)
+    - name: Frontend CI (Install, Test, Lint, Build)
       run: |
         cd frontend
         npm ci
+        npm test
         npm run lint
         npm run build
 

@@ -8,8 +8,8 @@ import pandas as pd
 from typing import Dict, Any, Optional, List
 import logging
 
-from strategy.hybrid.logic import compute_refined_indicators, generate_strategy_signals
-from strategy.shared.common import calculate_profit_factor
+from backend.strategy.hybrid.logic import compute_refined_indicators, generate_strategy_signals
+from backend.strategy.shared.common import calculate_profit_factor
 
 logger = logging.getLogger(__name__)
 

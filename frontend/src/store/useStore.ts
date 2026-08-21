@@ -2,12 +2,17 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { Language, Coin, MenuPage, BacktestParams } from '../types';
+import {
+  DEFAULT_MARKET_COIN,
+  DEFAULT_MARKET_INTERVAL,
+  isMarketCoin,
+  type MarketInterval,
+} from '../constants/market';
 
-const INTERVALS = ['15m', '30m', '1h', '2h', '4h', '1d', '3d', '1w', '1M'] as const;
-export type Interval = (typeof INTERVALS)[number];
+export type Interval = MarketInterval;
 export type BackgroundTheme = 'default' | 'white' | 'black';
-const DEFAULT_COIN: Coin = 'BTC';
-const DEFAULT_INTERVAL: Interval = '4h';
+const DEFAULT_COIN: Coin = DEFAULT_MARKET_COIN;
+const DEFAULT_INTERVAL: Interval = DEFAULT_MARKET_INTERVAL;
 
 interface AppState {
   // UI State
@@ -121,7 +126,9 @@ export const useStore = create<AppState>()(
         const incoming = (persistedState as Partial<AppState>) ?? {};
         const persistedParams =
           (incoming.backtestParams as Partial<BacktestParams> & { ema_len?: number }) ?? {};
-        const selectedCoin = incoming.selectedCoin ?? currentState.selectedCoin;
+        const selectedCoin = isMarketCoin(incoming.selectedCoin)
+          ? incoming.selectedCoin
+          : currentState.selectedCoin;
         const selectedInterval = incoming.selectedInterval ?? currentState.selectedInterval;
         const normalizedParams: BacktestParams = {
           ...defaultBacktestParams,

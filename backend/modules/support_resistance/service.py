@@ -11,9 +11,9 @@ from core.support_resistance import (
     compute_daily_pivots,
     compute_htf_sr_levels,
 )
-from utils.data_service import fetch_live_data
-from utils.response_builder import success_response
-from utils.validators import validate_coin_symbol, validate_ohlcv_dataframe, validate_timeframe
+from backend.utils.data_service import fetch_live_data
+from backend.utils.response_builder import success_response
+from backend.utils.validators import validate_coin_symbol, validate_ohlcv_dataframe, validate_timeframe
 
 
 def run_support_resistance_service(

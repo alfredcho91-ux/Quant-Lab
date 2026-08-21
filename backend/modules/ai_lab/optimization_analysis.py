@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 from typing import Any, Dict, List, Optional, Tuple
 
-from models.request import AdvancedBacktestParams, BacktestParams
+from backend.models.request import AdvancedBacktestParams, BacktestParams
 
 
 def score_backtest_summary(summary: Dict[str, Any]) -> float:

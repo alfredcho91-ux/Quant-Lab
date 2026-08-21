@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
-from strategy.context import AnalysisContext
-from strategy.streak.common import safe_round
+from backend.strategy.context import AnalysisContext
+from backend.strategy.streak.common import safe_round
 
 
 def build_empty_complex_result(context: AnalysisContext, from_cache: bool) -> Dict[str, Any]:

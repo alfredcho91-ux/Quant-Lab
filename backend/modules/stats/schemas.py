@@ -78,11 +78,73 @@ class HybridLiveModeParams(BaseModel):
     strategies: Optional[List[str]] = None
 
 
+class BBMidResultPayload(BaseModel):
+    interval: str
+    events: int
+    success: int
+    success_rate: Optional[float] = None
+    avg_bars_to_mid: Optional[float] = None
+    error: Optional[str] = None
+
+
+class BBMidEnvelope(BaseModel):
+    success: bool
+    data: List[BBMidResultPayload]
+    excursions: Dict[str, Dict[str, float]]
+    start_side: str
+
+
+class ComboFilterPayload(BaseModel):
+    events: int
+    tp_hits: int
+    no_tp: int
+    hit_rate: Optional[float] = None
+    avg_ret: Optional[float] = None
+
+
+class ComboFilterEnvelope(BaseModel):
+    success: bool
+    data: ComboFilterPayload
+
+
+class HybridAnalysisEnvelope(BaseModel):
+    success: bool
+    coin: str
+    interval: str
+    total_candles: int
+    strategies: List[Dict[str, Any]]
+
+
+class HybridBacktestEnvelope(BaseModel):
+    success: bool
+    coin: str
+    interval: str
+    strategy: str
+    total_candles: int
+    trades: List[Dict[str, Any]]
+    summary: Dict[str, Any]
+    warnings: Optional[List[str]] = None
+
+
+class HybridLiveEnvelope(BaseModel):
+    success: bool
+    coin: str
+    interval: str
+    timestamp: str
+    current_price: Optional[float] = None
+    strategies: List[Dict[str, Any]]
+
+
 __all__ = [
+    "BBMidEnvelope",
     "BBMidParams",
+    "ComboFilterEnvelope",
     "ComboFilterParams",
-    "TrendIndicatorsParams",
+    "HybridAnalysisEnvelope",
     "HybridAnalysisParams",
+    "HybridBacktestEnvelope",
     "HybridBacktestParams",
+    "HybridLiveEnvelope",
     "HybridLiveModeParams",
+    "TrendIndicatorsParams",
 ]

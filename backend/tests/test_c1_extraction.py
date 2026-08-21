@@ -11,19 +11,12 @@ import pytest
 import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
-import sys
-from pathlib import Path
-
-# Add backend directory to path
-backend_path = Path(__file__).parent.parent
-sys.path.insert(0, str(backend_path))
-sys.path.insert(0, str(backend_path.parent))
 
 # Import strategy modules (경로 수정: strategy.streak 하위로 이동됨)
-from strategy.context import AnalysisContext
-from strategy.streak.common import prepare_dataframe, normalize_indices
-from strategy.streak.simple_strategy import run_simple_analysis
-from strategy.streak.complex_strategy import run_complex_analysis
+from backend.strategy.context import AnalysisContext
+from backend.strategy.streak.common import prepare_dataframe, normalize_indices
+from backend.strategy.streak.simple_strategy import run_simple_analysis
+from backend.strategy.streak.complex_strategy import run_complex_analysis
 
 
 def create_sample_dataframe(n_rows: int = 100, freq: str = 'D') -> pd.DataFrame:

@@ -62,6 +62,16 @@ export function MtfTrendCard({
   const stochState5 = getStochState(stoch5k, stoch5d);
   const stochState10 = getStochState(stoch10k, stoch10d);
   const stochState20 = getStochState(stoch20k, stoch20d);
+  const stochRsiState = getStochState(latest.stoch_rsi_k, latest.stoch_rsi_d);
+  const macdRelation =
+    latest.macd != null && latest.macd_signal != null
+      ? latest.macd > latest.macd_signal
+        ? 'golden'
+        : latest.macd < latest.macd_signal
+          ? 'dead'
+          : null
+      : null;
+  const macdState = latest.macd_cross ?? macdRelation;
 
   const stochCross5 = getStochCross(stochSeries5k?.t, stochSeries5k?.v, stochSeries5d?.t, stochSeries5d?.v);
   const stochCross10 = getStochCross(stochSeries10k?.t, stochSeries10k?.v, stochSeries10d?.t, stochSeries10d?.v);
@@ -86,8 +96,45 @@ export function MtfTrendCard({
       <div className="grid grid-cols-2 gap-1 text-[11px] text-dark-300">
         <div>RSI: <span className="font-mono text-dark-100">{formatNum(latest.rsi, 1)}</span></div>
         <div>ADX: <span className="font-mono text-dark-100">{formatNum(latest.adx, 1)}</span></div>
-        <div>MACD: <span className="font-mono text-dark-100">{formatNum(latest.macd_hist, 2)}</span></div>
+        <div>
+          MACD H:{' '}
+          <span className={latest.macd_hist_direction === 'rising' ? 'font-mono text-primary-300' : latest.macd_hist_direction === 'falling' ? 'font-mono text-red-300' : 'font-mono text-dark-100'}>
+            {formatNum(latest.macd_hist, 2)} {latest.macd_hist_direction === 'rising' ? '↑' : latest.macd_hist_direction === 'falling' ? '↓' : '→'}
+          </span>
+        </div>
         <div>ATR%: <span className="font-mono text-dark-100">{formatNum(latest.atr_pct, 2)}</span></div>
+      </div>
+      <div className="grid grid-cols-2 gap-1 rounded-md border border-dark-700/80 p-2 text-[10px]">
+        <div>
+          <div className="text-dark-500">MACD Line / Signal</div>
+          <div className="font-mono text-dark-100">
+            {formatNum(latest.macd, 2)} / {formatNum(latest.macd_signal, 2)}
+          </div>
+          <div className={macdState === 'golden' ? 'text-primary-300' : macdState === 'dead' ? 'text-red-300' : 'text-dark-400'}>
+            {latest.macd_cross === 'golden'
+              ? (isKo ? '골든크로스' : 'Golden Cross')
+              : latest.macd_cross === 'dead'
+                ? (isKo ? '데드크로스' : 'Dead Cross')
+                : macdState === 'golden'
+                  ? (isKo ? 'Signal 위' : 'Above Signal')
+                  : macdState === 'dead'
+                    ? (isKo ? 'Signal 아래' : 'Below Signal')
+                    : (isKo ? '중립' : 'Neutral')}
+          </div>
+        </div>
+        <div>
+          <div className="text-dark-500">Stoch RSI K / D</div>
+          <div className="font-mono text-dark-100">
+            {formatNum(latest.stoch_rsi_k, 1)} / {formatNum(latest.stoch_rsi_d, 1)}
+          </div>
+          <div className={stochRsiState === 'golden' ? 'text-primary-300' : stochRsiState === 'dead' ? 'text-red-300' : 'text-dark-400'}>
+            {stochRsiState === 'golden'
+              ? (isKo ? 'K 우위' : 'K Above D')
+              : stochRsiState === 'dead'
+                ? (isKo ? 'D 우위' : 'K Below D')
+                : (isKo ? '중립' : 'Neutral')}
+          </div>
+        </div>
       </div>
       <div className="rounded-md border border-dark-700/80 p-2">
         <div className="text-[10px] text-dark-500 mb-1">

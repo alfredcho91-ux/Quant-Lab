@@ -19,8 +19,5 @@ export * from './stats';
 // 연속 봉패턴 분석
 export * from './streak';
 
-// 하이브리드 전략 분석
-export * from './hybrid';
-
 // 매매 일지
 export * from './journal';

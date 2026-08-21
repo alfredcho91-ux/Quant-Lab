@@ -1,56 +1,48 @@
 // 추세판단 페이지 - Slow Stochastic, MACD, ADX, RSI, VWAP, Supertrend (사이드바 코인/타임프레임 연동)
-import { useQuery, useQueries } from '@tanstack/react-query';
+import { useCallback } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { runTrendIndicators } from '../api/client';
 import { useSelectedCoin, useSelectedInterval } from '../store/useStore';
 import { usePageCommon } from '../hooks/usePageCommon';
-import { TrendingUp, RefreshCw } from 'lucide-react';
-import { IndicatorCard } from '../components/IndicatorCard';
+import { RefreshCw, TrendingUp } from 'lucide-react';
 import { MiniChart } from '../components/MiniChart';
 import { StochMiniChart } from '../components/StochMiniChart';
-import { MtfTrendCard } from '../components/MtfTrendCard';
 import { IndicatorProjectionCard } from '../components/IndicatorProjectionCard';
+import { MomentumIndicatorPanels } from '../components/MomentumIndicatorPanels';
+import { VPVRTable } from '../components/VPVRTable';
+import ErrorNotice from '../components/ErrorNotice';
 import type { Coin } from '../types';
+import { PRICE_PROJECTION_INTERVALS, TREND_PRICE_QUERY_OPTIONS, useTrendPriceChart } from '../hooks/useTrendPriceChart';
+import { useHourlyRefresh } from '../hooks/useHourlyRefresh';
 import {
   getStochState,
   getStochStateFromSeries,
   getStochCross,
 } from '../utils/trendAnalyzers';
 
-
-
-
-
-
-const ENABLE_MTF_SNAPSHOT = true;
-const MTF_INTERVALS = ['1h', '4h', '1d', '1w'] as const;
-
-
-
-
 export default function TrendJudgmentPage() {
   const selectedCoin = useSelectedCoin();
   const selectedInterval = useSelectedInterval();
   const { isKo } = usePageCommon();
   const safeCoin = (selectedCoin || 'BTC') as Coin;
+  const trendPriceData = useTrendPriceChart(safeCoin, selectedInterval, { includeChart: false });
 
-  const { data, refetch, isFetching } = useQuery({
+  const { data, refetch: refetchTrendIndicators, isFetching } = useQuery({
     queryKey: ['trendIndicators', safeCoin, selectedInterval],
     queryFn: () => runTrendIndicators({ coin: safeCoin, interval: selectedInterval, use_csv: false }),
-    enabled: true,
-  });
-
-  const mtfQueries = useQueries({
-    queries: MTF_INTERVALS.map((interval) => ({
-      queryKey: ['trendIndicators', safeCoin, interval],
-      queryFn: () => runTrendIndicators({ coin: safeCoin, interval, use_csv: false }),
-      enabled: ENABLE_MTF_SNAPSHOT,
-      staleTime: 30_000,
-    })),
+    ...TREND_PRICE_QUERY_OPTIONS,
   });
 
   const latest = data?.latest;
   const series = data?.series || {};
   const hasData = !!data?.success && !!latest;
+  const {
+    vpvrData,
+    isVPVRLoading,
+    isRefreshing: isTrendPriceRefreshing,
+    projectionQueries,
+    refresh: refreshTrendPriceData,
+  } = trendPriceData;
 
   const stoch5k = latest?.slow_stoch_5k ?? null;
   const stoch5d = latest?.slow_stoch_5d ?? null;
@@ -79,19 +71,17 @@ export default function TrendJudgmentPage() {
   const stochCross5 = getStochCross(stochSeries5k?.t, stochSeries5k?.v, stochSeries5d?.t, stochSeries5d?.v);
   const stochCross10 = getStochCross(stochSeries10k?.t, stochSeries10k?.v, stochSeries10d?.t, stochSeries10d?.v);
   const stochCross20 = getStochCross(stochSeries20k?.t, stochSeries20k?.v, stochSeries20d?.t, stochSeries20d?.v);
-  const isMtfFetching = ENABLE_MTF_SNAPSHOT && mtfQueries.some((query) => query.isFetching);
-
   const stochBlockBg = (state: 'golden' | 'dead' | null) =>
     state === 'golden' ? 'bg-primary-500/10 border-primary-500/20' : state === 'dead' ? 'bg-red-500/10 border-red-500/20' : '';
 
-  const handleRefresh = () => {
-    void refetch();
-    if (ENABLE_MTF_SNAPSHOT) {
-      mtfQueries.forEach((query) => {
-        void query.refetch();
-      });
-    }
-  };
+  const refreshAll = useCallback(() => {
+    void refetchTrendIndicators();
+    refreshTrendPriceData();
+  }, [refetchTrendIndicators, refreshTrendPriceData]);
+
+  const refresh = useHourlyRefresh(refreshAll);
+
+  const isRefreshing = isFetching || isTrendPriceRefreshing;
 
   const stochConfigs = [
     {
@@ -132,7 +122,7 @@ export default function TrendJudgmentPage() {
             {isKo ? '추세판단' : 'Trend Judgment'}
           </h1>
           <p className="text-dark-400 text-sm mt-0.5">
-            {isKo ? 'Slow Stochastic, MACD, ADX, RSI, VWAP, Supertrend 지표 종합' : 'Slow Stochastic, MACD, ADX, RSI, VWAP, Supertrend indicators'}
+            {isKo ? 'Slow Stochastic, Stoch RSI, MACD, ADX, RSI, VWAP, Supertrend 지표 종합' : 'Slow Stochastic, Stoch RSI, MACD, ADX, RSI, VWAP, Supertrend indicators'}
           </p>
         </div>
         <div className="flex items-center gap-2 text-dark-400 text-sm">
@@ -140,49 +130,39 @@ export default function TrendJudgmentPage() {
           <span>·</span>
           <span>{selectedInterval}</span>
           <button
-            onClick={handleRefresh}
-            disabled={isFetching || isMtfFetching}
+            onClick={refresh}
+            disabled={isRefreshing}
             className="p-1.5 rounded-lg bg-dark-700 hover:bg-dark-600 disabled:opacity-50"
             title={isKo ? '새로고침' : 'Refresh'}
           >
-            <RefreshCw className={`w-4 h-4 ${isFetching || isMtfFetching ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
           </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
-        <IndicatorProjectionCard coin={safeCoin} interval="1h" />
-        <IndicatorProjectionCard coin={safeCoin} interval="4h" />
-        <IndicatorProjectionCard coin={safeCoin} interval="1d" />
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+        {PRICE_PROJECTION_INTERVALS.map((interval, index) => (
+          <IndicatorProjectionCard
+            key={interval}
+            interval={interval}
+            isKo={isKo}
+            data={projectionQueries[index]?.data}
+            isLoading={projectionQueries[index]?.isLoading ?? false}
+            isError={projectionQueries[index]?.isError ?? false}
+          />
+        ))}
       </div>
 
-      {ENABLE_MTF_SNAPSHOT && (
-        <div className="card p-4">
-          <div className="flex items-center justify-between gap-2 mb-3">
-            <h2 className="text-sm font-semibold text-white">
-              {isKo ? 'MTF 스냅샷 (1h·4h·1d·1w)' : 'MTF Snapshot (1h·4h·1d·1w)'}
-            </h2>
-            <span className="text-[10px] px-2 py-0.5 rounded border border-amber-500/30 text-amber-300 bg-amber-500/10">
-              Beta
-            </span>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-2">
-            {MTF_INTERVALS.map((interval, index) => (
-              <MtfTrendCard
-                key={interval}
-                interval={interval}
-                isKo={isKo}
-                selectedInterval={selectedInterval}
-                payload={interval === selectedInterval ? data : mtfQueries[index]?.data}
-                isFetching={interval === selectedInterval ? isFetching : !!mtfQueries[index]?.isFetching}
-              />
-            ))}
-          </div>
-        </div>
-      )}
+      <VPVRTable data={vpvrData} isLoading={isVPVRLoading} isKo={isKo} />
 
       {!hasData && !isFetching && (
-        <div className="card p-6 text-center text-dark-500 text-sm">{isKo ? '데이터를 불러오지 못했습니다.' : 'Failed to load data.'}</div>
+        <ErrorNotice
+          title={isKo ? '핵심 추세 지표를 불러오지 못했습니다' : 'Trend indicators are unavailable'}
+          message={isKo ? '백엔드 연결 또는 Binance 데이터 응답을 확인할 수 없습니다.' : 'The backend or Binance data source did not respond.'}
+          actionLabel={isKo ? '다시 불러오기' : 'Retry'}
+          actionDisabled={isRefreshing}
+          onAction={refresh}
+        />
       )}
 
       {hasData && (
@@ -196,31 +176,17 @@ export default function TrendJudgmentPage() {
               </span>
             </div>
             <div className="w-full" style={{ minHeight: 96 }}>
-              <MiniChart t={series.rsi?.t ?? []} v={series.rsi?.v ?? []} yRefs={[30, 70]} height={96} />
+              <MiniChart
+                t={series.rsi?.t ?? []}
+                v={series.rsi?.v ?? []}
+                volume={series.volume}
+                yRefs={[30, 70]}
+                height={96}
+              />
             </div>
           </div>
 
-          {/* Indicator Cards (RSI 제외) */}
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-2 w-full">
-            <IndicatorCard label="ADX" value={latest.adx} sub={latest.adx != null && latest.adx > 25 ? (isKo ? '추세강함' : 'Strong') : (isKo ? '약함' : 'Weak')} bullish={null} />
-            <IndicatorCard
-              label="ATR%"
-              value={latest.atr_pct}
-              sub={
-                latest.atr_pct != null
-                  ? latest.atr_pct >= 2
-                    ? (isKo ? '고변동성' : 'High Vol')
-                    : latest.atr_pct >= 1
-                      ? (isKo ? '보통 변동성' : 'Normal Vol')
-                      : (isKo ? '저변동성' : 'Low Vol')
-                  : undefined
-              }
-              bullish={null}
-            />
-            <IndicatorCard label="MACD Hist" value={latest.macd_hist} bullish={latest.macd_hist != null ? latest.macd_hist > 0 : null} />
-            <IndicatorCard label="VWAP(20)" value={latest.vwap_20} bullish={latest.close != null && latest.vwap_20 != null ? latest.close > latest.vwap_20 : null} />
-            <IndicatorCard label="Supertrend" value={latest.supertrend} bullish={latest.supertrend_dir != null ? latest.supertrend_dir > 0 : null} />
-          </div>
+          {data && <MomentumIndicatorPanels isKo={isKo} payload={data} />}
 
           {/* 3 Slow Stochastic 세로 배치 (표시 순서: 5/10/20) */}
           <div className="card p-4">
@@ -254,6 +220,7 @@ export default function TrendJudgmentPage() {
               ))}
             </div>
           </div>
+
         </>
       )}
 

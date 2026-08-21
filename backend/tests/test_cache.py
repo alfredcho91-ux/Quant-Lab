@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from utils import cache as cache_module
+from backend.utils import cache as cache_module
 
 
 def test_data_cache_is_lazy_at_construction(monkeypatch):

@@ -35,7 +35,6 @@ export function useAnalysisMutation<TParams extends { coin?: string; use_csv?: b
     mutationFn,
     onSuccess,
     onError: (error) => {
-      console.error('❌ Mutation error:', error);
       if (onError) {
         onError(error);
       }

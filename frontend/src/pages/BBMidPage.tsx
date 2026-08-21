@@ -5,6 +5,7 @@ import { useBacktestParams, useSelectedInterval } from '../store/useStore';
 import { usePageCommon } from '../hooks/usePageCommon';
 import { useAnalysisMutation } from '../hooks/useAnalysisMutation';
 import { SkeletonChart, SkeletonTable } from '../components/Skeleton';
+import ErrorNotice from '../components/ErrorNotice';
 import type { BBMidParams } from '../types';
 import { getErrorMessage } from '../utils/error';
 
@@ -23,39 +24,26 @@ export default function BBMidPage() {
     regime: null,
     use_csv: backtestParams.use_csv,
   });
+  const [validationError, setValidationError] = useState<string | null>(null);
 
   const { mutation, handleRun: handleRunBase } = useAnalysisMutation({
     mutationFn: runBBMid,
-    onSuccess: (data) => {
-      console.log('✅ BB Mid 분석 성공:', data);
-    },
-    onError: (error: unknown) => {
-      console.error('❌ BB Mid 분석 실패:', error);
-      const msg = getErrorMessage(error) || (isKo ? '알 수 없는 오류' : 'Unknown error');
-      alert(isKo ? `분석 실패: ${msg}` : `Analysis failed: ${msg}`);
-    },
   });
 
   const handleRun = () => {
-    console.log('🚀 BB Mid 분석 시작, 파라미터:', params);
     if (params.intervals.length === 0) {
-      alert(isKo ? '타임프레임을 최소 1개 이상 선택해주세요.' : 'Please select at least one timeframe.');
+      setValidationError(
+        isKo
+          ? '타임프레임을 최소 1개 이상 선택해주세요.'
+          : 'Please select at least one timeframe.'
+      );
       return;
     }
+    setValidationError(null);
     handleRunBase({ ...params } as BBMidParams);
   };
 
   const result = mutation.data;
-  
-  // 디버깅용 로그
-  console.log('BBMidPage 렌더링:', {
-    isPending: mutation.isPending,
-    hasError: !!mutation.error,
-    hasResult: !!result,
-    resultType: typeof result,
-    resultKeys: result ? Object.keys(result) : null,
-    error: mutation.error,
-  });
 
   return (
     <div className="space-y-6">
@@ -118,6 +106,7 @@ export default function BBMidPage() {
                     ? params.intervals.filter((t) => t !== tf)
                     : [...params.intervals, tf];
                   setParams({ ...params, intervals });
+                  setValidationError(null);
                 }}
                 className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
                   params.intervals.includes(tf)
@@ -133,17 +122,20 @@ export default function BBMidPage() {
 
         {/* Run Button */}
         <button
-          onClick={(e) => {
-            e.preventDefault();
-            console.log('🔘 버튼 클릭됨, intervals:', params.intervals);
-            handleRun();
-          }}
+          onClick={handleRun}
           disabled={mutation.isPending || params.intervals.length === 0}
           className="w-full btn-primary py-3 disabled:opacity-50"
         >
           {mutation.isPending ? (isKo ? '계산 중...' : 'Calculating...') : (isKo ? '🚀 통계 계산' : '🚀 Calculate Stats')}
         </button>
       </div>
+
+      {validationError && (
+        <ErrorNotice
+          title={isKo ? '입력값을 확인해주세요' : 'Check your input'}
+          message={validationError}
+        />
+      )}
 
       {/* Loading Skeleton */}
       {mutation.isPending && (
@@ -155,21 +147,10 @@ export default function BBMidPage() {
 
       {/* Error Message */}
       {!mutation.isPending && mutation.error && (
-        <div className="card p-6 bg-red-500/10 border border-red-500/30">
-          <h3 className="text-lg font-semibold text-red-400 mb-2">
-            {isKo ? '❌ 오류 발생' : '❌ Error'}
-          </h3>
-          <p className="text-red-300 text-sm">
-            {isKo 
-              ? '통계 계산 중 오류가 발생했습니다. 브라우저 콘솔을 확인해주세요.'
-              : 'An error occurred while calculating statistics. Please check the browser console.'}
-          </p>
-          {mutation.error instanceof Error && (
-            <p className="text-red-400 text-xs mt-2 font-mono">
-              {mutation.error.message}
-            </p>
-          )}
-        </div>
+        <ErrorNotice
+          title={isKo ? '분석 실패' : 'Analysis failed'}
+          message={getErrorMessage(mutation.error)}
+        />
       )}
 
       {/* No Data Message - 초기 상태 또는 분석 전 */}

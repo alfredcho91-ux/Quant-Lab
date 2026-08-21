@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os
 
-from services.ai_clients import (
+from backend.services.ai_clients import (
     ERROR_CODE_MODEL_HTTP as CLIENT_ERROR_CODE_MODEL_HTTP,
     ERROR_CODE_MODEL_NETWORK as CLIENT_ERROR_CODE_MODEL_NETWORK,
     ERROR_CODE_MODEL_RESPONSE_EMPTY as CLIENT_ERROR_CODE_MODEL_RESPONSE_EMPTY,

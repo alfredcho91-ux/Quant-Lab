@@ -2,6 +2,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { usePageCommon } from '../hooks/usePageCommon';
 import { SkeletonAnalysis } from '../components/Skeleton';
+import ErrorNotice from '../components/ErrorNotice';
 import { Zap, AlertTriangle } from 'lucide-react';
 import { useStreakAnalysisForm } from '../features/streak-analysis/hooks/useStreakAnalysisForm';
 import AnalysisControls from '../features/streak-analysis/components/AnalysisControls';
@@ -27,6 +28,7 @@ export default function StreakAnalysisPage() {
     handleCandleModeChange,
     mutation,
     handleRun,
+    formError,
   } = useStreakAnalysisForm();
 
   const result = mutation.data;
@@ -120,6 +122,13 @@ export default function StreakAnalysisPage() {
         }
         onRun={handleRun}
       />
+
+      {formError && (
+        <ErrorNotice
+          title={isKo ? '입력값을 확인해주세요' : 'Check your input'}
+          message={formError}
+        />
+      )}
 
       {/* Loading Skeleton */}
       {mutation.isPending && <SkeletonAnalysis />}
@@ -223,11 +232,16 @@ export default function StreakAnalysisPage() {
       )}
 
       {mutation.isError && (
-        <div className="card p-6 bg-rose-500/10 border-rose-500/30">
-          <div className="text-rose-400">
-            {isKo ? '분석 중 오류가 발생했습니다.' : 'Error occurred.'}
-          </div>
-        </div>
+        <ErrorNotice
+          title={isKo ? '분석 실패' : 'Analysis failed'}
+          message={
+            mutation.error instanceof Error
+              ? mutation.error.message
+              : isKo
+                ? '분석 중 오류가 발생했습니다.'
+                : 'An error occurred during analysis.'
+          }
+        />
       )}
     </div>
   );

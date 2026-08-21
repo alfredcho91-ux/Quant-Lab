@@ -5,8 +5,6 @@ from __future__ import annotations
 from functools import lru_cache
 from importlib import import_module
 import logging
-import sys
-from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 import pandas as pd
@@ -16,7 +14,7 @@ try:
 except Exception:  # pragma: no cover - fallback for non-standard import contexts
     ANALYSIS_TIMEZONE = "America/New_York"
 
-from utils.stats import safe_float
+from backend.utils.stats import safe_float
 
 logger = logging.getLogger(__name__)
 WEEKDAY_NAMES_EN = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
@@ -25,14 +23,7 @@ WEEKDAY_NAMES_EN = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Sat
 @lru_cache(maxsize=1)
 def _get_data_service_functions() -> Tuple[Any, Any]:
     """Resolve data-service functions without loading a duplicate module object."""
-    try:
-        module = import_module("utils.data_service")
-    except ImportError:
-        backend_path = Path(__file__).resolve().parents[2]
-        backend_path_str = str(backend_path)
-        if backend_path_str not in sys.path:
-            sys.path.insert(0, backend_path_str)
-        module = import_module("utils.data_service")
+    module = import_module("backend.utils.data_service")
     return module.load_csv_data, module.fetch_live_data
 
 

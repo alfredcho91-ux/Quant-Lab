@@ -11,7 +11,7 @@ import numpy as np
 import pandas as pd
 from scipy import stats as scipy_stats
 
-from utils.stats import safe_float
+from backend.utils.stats import safe_float
 
 
 def calculate_sharpe_ratio_unified(

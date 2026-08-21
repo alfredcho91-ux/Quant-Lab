@@ -1,6 +1,12 @@
 // 통계 분석 API
 
-import { api, ensureApiSuccess, toApiClientError, unwrapApiResponse } from './config';
+import {
+  api,
+  ApiResponse,
+  ensureApiSuccess,
+  toApiClientError,
+  unwrapApiResponse,
+} from './config';
 import type {
   BBMidParams,
   BBMidResult,
@@ -9,19 +15,23 @@ import type {
   ComboFilterResult,
   TrendIndicatorsParams,
   TrendIndicatorsResult,
-  TrendIndicatorsLatest,
   IndicatorProjection,
 } from '../types';
 
 interface IndicatorProjectionPayload {
   current_price: number;
+  current_rsi: number | null;
+  vwaps: Array<{
+    anchor: 'day' | 'week' | 'month' | 'quarter' | 'year';
+    value: number | null;
+  }>;
+  rolling_vwaps: Array<{
+    window: number;
+    value: number | null;
+  }>;
   projections: {
     rsi_30: number;
     rsi_70: number;
-    stoch_20: number;
-    stoch_80: number;
-    stoch_hh?: number;
-    stoch_ll?: number;
   };
 }
 
@@ -71,39 +81,8 @@ export async function runComboFilter(params: ComboFilterParams): Promise<ComboFi
 }
 
 export async function runTrendIndicators(params: TrendIndicatorsParams): Promise<TrendIndicatorsResult> {
-  const emptyLatest: TrendIndicatorsLatest = {
-    close: null,
-    rsi: null,
-    macd_hist: null,
-    adx: null,
-    atr: null,
-    atr_pct: null,
-    sma20: null,
-    sma50: null,
-    sma200: null,
-    slow_stoch_5k: null,
-    slow_stoch_5d: null,
-    slow_stoch_10k: null,
-    slow_stoch_10d: null,
-    slow_stoch_20k: null,
-    slow_stoch_20d: null,
-    vwap_20: null,
-    supertrend: null,
-    supertrend_dir: null,
-  };
-
-  const toResult = (
-    data: Partial<Omit<TrendIndicatorsResult, 'success' | 'error'>> | undefined
-  ): TrendIndicatorsResult => ({
-    success: true,
-    latest: data?.latest ?? emptyLatest,
-    series: data?.series ?? {},
-    interval: data?.interval ?? params.interval,
-    coin: data?.coin ?? params.coin,
-  });
-
   try {
-    const res = await api.post(
+    const res = await api.post<ApiResponse<Omit<TrendIndicatorsResult, 'success' | 'error'>>>(
       '/trend-indicators',
       params
     );
@@ -111,32 +90,30 @@ export async function runTrendIndicators(params: TrendIndicatorsParams): Promise
       res,
       'Failed to load trend indicators.'
     );
-    return toResult(payload);
+    return { success: true, ...payload };
   } catch (error: unknown) {
     throw toApiClientError(error, 'Failed to load trend indicators.');
   }
 }
 
-export async function getIndicatorProjection(coin: string, interval: string): Promise<IndicatorProjection | null> {
+export async function getIndicatorProjection(coin: string, interval: string): Promise<IndicatorProjection> {
   try {
-    const res = await api.get<{ success: boolean; data: IndicatorProjectionPayload }>(
+    const res = await api.get<ApiResponse<IndicatorProjectionPayload>>(
       `/indicators/projection?coin=${coin}&interval=${interval}`
     );
-    if (res.data && res.data.success) {
-      const { current_price, projections } = res.data.data;
-      return {
-        current_price,
-        rsi_30_price: projections.rsi_30,
-        rsi_70_price: projections.rsi_70,
-        stoch_20_price: projections.stoch_20,
-        stoch_80_price: projections.stoch_80,
-        stoch_hh: projections.stoch_hh,
-        stoch_ll: projections.stoch_ll
-      };
-    }
-    return null;
-  } catch (err) {
-    console.error('Indicator Projection request failed:', err);
-    return null;
+    const { current_price, current_rsi, vwaps, rolling_vwaps, projections } = unwrapApiResponse(
+      res,
+      'Failed to load indicator projections.'
+    );
+    return {
+      current_price,
+      current_rsi,
+      vwaps,
+      rolling_vwaps,
+      rsi_30_price: projections.rsi_30,
+      rsi_70_price: projections.rsi_70,
+    };
+  } catch (error: unknown) {
+    throw toApiClientError(error, 'Failed to load indicator projections.');
   }
 }

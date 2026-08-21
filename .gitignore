@@ -7,6 +7,10 @@ __pycache__/
 .env
 .DS_Store
 binance_klines/
+data/presets.json
+data/*.db
+data/*.db-*
+data/binance_klines/
 myenv/ # 가상환경 폴더 있으면
 __pycache__/
 .DS_Store
@@ -16,6 +20,7 @@ __pycache__/
 .run/
 .sisyphus/
 server.log
+*.log
 backend/server.log
 backend/backend.log
 backend/.coverage
@@ -23,4 +28,7 @@ backend/.pytest_cache/
 backend/.cache/
 backend/main.py.patch
 frontend/test-results/
+journal/*.db
+journal/*.db-shm
+journal/*.db-wal
 **/AGENTS.md

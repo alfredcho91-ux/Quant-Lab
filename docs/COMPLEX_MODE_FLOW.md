@@ -1,8 +1,10 @@
 # Complex Mode Flow
 
-**Version**: 1.0.0  
-**Last Updated**: 2025-01-17  
-**Status**: Initial public documentation
+**Version**: 1.1.0
+
+**Last Updated**: 2026-08-03
+
+**Status**: Current complex-mode flow reference
 
 ## Overview
 

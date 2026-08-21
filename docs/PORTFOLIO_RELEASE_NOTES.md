@@ -16,7 +16,7 @@ It is the first public cut curated to present the project as an Implementation P
 - Pure quant calculation layer under `core/`
 - AI-assisted research and strategy drafting flows
 - Supporting documentation for architecture, API shape, install/recovery, and feature mapping
-- GitHub Actions workflow covering backend tests, frontend lint/build, and architectural guard scripts
+- GitHub Actions workflow covering backend tests, frontend Vitest, lint/build, and architectural guard scripts
 
 ## Portfolio Signals
 
@@ -28,7 +28,7 @@ It is the first public cut curated to present the project as an Implementation P
 ## Validation Snapshot
 
 - Backend test suite passes locally
-- Frontend lint passes locally
+- Frontend unit tests and lint pass locally
 - Frontend production build passes locally
 - Core and route import guard scripts pass locally
 

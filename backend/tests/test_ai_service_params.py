@@ -2,7 +2,7 @@
 
 import pytest
 
-from modules.ai_lab import service as ai_service
+from backend.modules.ai_lab import service as ai_service
 
 
 @pytest.fixture(autouse=True)

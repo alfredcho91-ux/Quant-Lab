@@ -5,11 +5,11 @@ from typing import Dict, Any, Optional
 import logging
 import traceback
 
-from strategy.context import AnalysisContext
-from strategy.streak.common import get_or_calculate_indicators, sanitize_for_json
-from strategy.streak.data_ops import filter_rows_by_ema_200_position
-from strategy.streak.simple_analyzer import calculate_simple_metrics
-from strategy.streak.simple_runner import collect_simple_target_cases
+from backend.strategy.context import AnalysisContext
+from backend.strategy.streak.common import get_or_calculate_indicators, sanitize_for_json
+from backend.strategy.streak.data_ops import filter_rows_by_ema_200_position
+from backend.strategy.streak.simple_analyzer import calculate_simple_metrics
+from backend.strategy.streak.simple_runner import collect_simple_target_cases
 
 logger = logging.getLogger(__name__)
 

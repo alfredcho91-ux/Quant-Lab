@@ -12,8 +12,8 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-from strategy.context import AnalysisContext
-from strategy.streak.common import (
+from backend.strategy.context import AnalysisContext
+from backend.strategy.streak.common import (
     load_data,
     prepare_dataframe,
     get_cache_stats,
@@ -21,8 +21,8 @@ from strategy.streak.common import (
     generate_analysis_cache_key,
     analysis_cache
 )
-from strategy.streak.simple_strategy import run_simple_analysis
-from strategy.streak.complex_strategy import run_complex_analysis
+from backend.strategy.streak.simple_strategy import run_simple_analysis
+from backend.strategy.streak.complex_strategy import run_complex_analysis
 
 
 def analyze_streak_pattern(params: Dict[str, Any]) -> Dict[str, Any]:

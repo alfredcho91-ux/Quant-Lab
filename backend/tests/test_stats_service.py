@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pandas as pd
 
-from modules.stats import service as stats_service
+from backend.modules.stats import service as stats_service
 
 
 def test_run_bb_mid_analysis_builds_excursions_without_quartile_calculation(monkeypatch):

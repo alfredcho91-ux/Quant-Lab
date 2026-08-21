@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import pandas as pd
 
-from utils import data_loader
+from backend.utils import data_loader
+from backend.utils import data_service
 
 
 def _sample_frame() -> pd.DataFrame:
@@ -53,3 +54,43 @@ def test_load_data_for_analysis_reuses_live_snapshot_cache(monkeypatch):
     assert second_source == "api"
     assert first_df.equals(second_df)
     assert first_df is not second_df
+
+
+def test_fetch_live_data_delegates_to_binance_rest_loader(monkeypatch):
+    captured = {}
+    expected = _sample_frame()
+
+    def fake_fetch(symbol: str, timeframe: str, total_candles: int):
+        captured.update(
+            {
+                "symbol": symbol,
+                "timeframe": timeframe,
+                "total_candles": total_candles,
+            }
+        )
+        return expected
+
+    monkeypatch.setattr(data_service, "fetch_binance_klines", fake_fetch)
+
+    result = data_service.fetch_live_data("BTC/USDT", "4h", limit=500, total_candles=240)
+
+    assert result is expected
+    assert captured == {
+        "symbol": "BTC/USDT",
+        "timeframe": "4h",
+        "total_candles": 240,
+    }
+
+
+def test_fetch_live_data_preserves_weekly_candle_cap(monkeypatch):
+    captured = {}
+
+    def fake_fetch(symbol: str, timeframe: str, total_candles: int):
+        captured["total_candles"] = total_candles
+        return _sample_frame()
+
+    monkeypatch.setattr(data_service, "fetch_binance_klines", fake_fetch)
+
+    data_service.fetch_live_data("BTC/USDT", "1w", total_candles=3_000)
+
+    assert captured["total_candles"] == 300

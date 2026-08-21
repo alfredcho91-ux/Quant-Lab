@@ -1,6 +1,8 @@
 import pandas as pd
 import numpy as np
-from typing import Optional, Dict, Any
+from typing import Any, Dict, Literal, Optional, Sequence
+
+from core.indicator_primitives import compute_rsi_wilder, compute_vwap_anchored, compute_vwap_rolling
 
 def calculate_required_price_for_rsi(closes: pd.Series, target_rsi: float = 30.0, period: int = 14) -> Optional[float]:
     """
@@ -45,40 +47,11 @@ def calculate_required_price_for_rsi(closes: pd.Series, target_rsi: float = 30.0
         
     return current_close
 
-def calculate_required_price_for_stoch(highs: pd.Series, lows: pd.Series, closes: pd.Series, target_k: float = 20.0, k_window: int = 5) -> Optional[float]:
-    """
-    목표 Stochastic %K 값에 도달하기 위해 필요한 다음 캔들의 종가(Close)를 역산합니다.
-    """
-    if len(closes) < k_window:
-        return None
-        
-    # 최근 (k_window - 1)개의 High, Low (다음 캔들이 추가될 것이므로 1개 뺌)
-    recent_highs = highs.iloc[-(k_window - 1):]
-    recent_lows = lows.iloc[-(k_window - 1):]
-    
-    hh = recent_highs.max()
-    ll = recent_lows.min()
-    
-    # 공식: %K = (Close - LL) / (HH - LL) * 100
-    # Close = (%K / 100) * (HH - LL) + LL
-    
-    # 가정 1: 다음 종가가 기존 HH, LL 범위를 벗어나지 않을 때
-    target_ratio = target_k / 100.0
-    projected_close = target_ratio * (hh - ll) + ll
-    
-    # 가정 2: 다음 종가가 새로운 LL을 갱신할 때 (하락 돌파)
-    # Close = LL_new 이고, %K = 0이 됨. target_k가 0이 아니면 모순.
-    if target_k == 0:
-        return float(ll) # LL 이하 아무 가격이나 됨
-        
-    # 가정 3: 다음 종가가 새로운 HH를 갱신할 때 (상승 돌파)
-    # Close = HH_new 이고, %K = 100이 됨. target_k가 100이 아니면 모순.
-    if target_k == 100:
-        return float(hh) # HH 이상 아무 가격이나 됨
-        
-    return float(projected_close)
-
-def get_indicator_projections(df: pd.DataFrame) -> Dict[str, Any]:
+def get_indicator_projections(
+    df: pd.DataFrame,
+    vwap_anchors: Sequence[Literal["day", "week", "month", "quarter", "year"]] = ("day",),
+    rolling_vwap_windows: Sequence[int] = (),
+) -> Dict[str, Any]:
     """
     데이터프레임을 받아 주요 지표들의 도달 예상 가격을 반환합니다.
     """
@@ -86,28 +59,28 @@ def get_indicator_projections(df: pd.DataFrame) -> Dict[str, Any]:
         return {"error": "Not enough data"}
         
     closes = df['close'] # type: ignore
-    highs = df['high'] # type: ignore
-    lows = df['low'] # type: ignore
     current_price = float(closes.iloc[-1])
-    
-    k_window = 5
-    stoch_hh = None
-    stoch_ll = None
-    
-    if len(closes) >= k_window:
-        recent_highs = highs.iloc[-(k_window - 1):]
-        recent_lows = lows.iloc[-(k_window - 1):]
-        stoch_hh = float(recent_highs.max())
-        stoch_ll = float(recent_lows.min())
+    current_rsi_value = compute_rsi_wilder(closes, length=14).iloc[-1]
+    current_rsi = None if pd.isna(current_rsi_value) else float(current_rsi_value)
+    vwaps = [
+        {"anchor": anchor, "value": compute_vwap_anchored(df, anchor=anchor)}
+        for anchor in vwap_anchors
+    ]
+    rolling_vwaps = [
+        {
+            "window": window,
+            "value": (
+                None
+                if pd.isna(value := compute_vwap_rolling(df, window=window).iloc[-1])
+                else float(value)
+            ),
+        }
+        for window in rolling_vwap_windows
+    ]
 
-    # Calculate raw projections
     projections = {
         "rsi_30": calculate_required_price_for_rsi(closes, target_rsi=30.0), # type: ignore
         "rsi_70": calculate_required_price_for_rsi(closes, target_rsi=70.0), # type: ignore
-        "stoch_20": calculate_required_price_for_stoch(highs, lows, closes, target_k=20.0), # type: ignore
-        "stoch_80": calculate_required_price_for_stoch(highs, lows, closes, target_k=80.0), # type: ignore
-        "stoch_hh": stoch_hh,
-        "stoch_ll": stoch_ll,
     }
 
     # Sanitize NaN values to None for valid JSON
@@ -118,5 +91,8 @@ def get_indicator_projections(df: pd.DataFrame) -> Dict[str, Any]:
 
     return {
         "current_price": current_price,
+        "current_rsi": current_rsi,
+        "vwaps": vwaps,
+        "rolling_vwaps": rolling_vwaps,
         "projections": sanitized_projections
     }

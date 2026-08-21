@@ -1,7 +1,7 @@
 # utils/__init__.py
 """Utility modules for backend"""
 
-from utils.error_handler import (
+from backend.utils.error_handler import (
     APIError,
     ValidationError,
     DataLoadError,
@@ -10,13 +10,13 @@ from utils.error_handler import (
     create_error_response,
     handle_error,
 )
-from utils.response_builder import (
+from backend.utils.response_builder import (
     success_response,
     error_response,
     paginated_response,
     wrap_response,
 )
-from utils.validators import (
+from backend.utils.validators import (
     validate_dataframe,
     validate_timeframe,
     validate_coin_symbol,

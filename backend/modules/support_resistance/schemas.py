@@ -1,6 +1,8 @@
 """Support resistance domain schemas."""
 
-from pydantic import BaseModel, Field
+from typing import List
+
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class SupportResistancePathParams(BaseModel):
@@ -16,5 +18,17 @@ class SupportResistanceQueryParams(BaseModel):
     htf_option: str = "none"
 
 
-__all__ = ["SupportResistancePathParams", "SupportResistanceQueryParams"]
+class SupportResistanceLevel(BaseModel):
+    model_config = ConfigDict(extra="allow")
 
+
+class SupportResistanceEnvelope(BaseModel):
+    success: bool
+    data: List[SupportResistanceLevel]
+
+
+__all__ = [
+    "SupportResistanceEnvelope",
+    "SupportResistancePathParams",
+    "SupportResistanceQueryParams",
+]

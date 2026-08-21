@@ -2,10 +2,14 @@
 
 from fastapi import APIRouter
 from fastapi.concurrency import run_in_threadpool
-from modules.streak.schemas import StreakAnalysisParams
-from modules.streak.service import clear_streak_cache, get_streak_cache_stats, run_streak_analysis
-from models.response import StreakAnalysisEnvelope
-from utils.decorators import handle_api_errors
+from backend.modules.streak.schemas import (
+    StreakAnalysisParams,
+    StreakCacheClearResponse,
+    StreakCacheStatsResponse,
+)
+from backend.modules.streak.service import clear_streak_cache, get_streak_cache_stats, run_streak_analysis
+from backend.models.response import StreakAnalysisEnvelope
+from backend.utils.decorators import handle_api_errors
 
 router = APIRouter(prefix="/api", tags=["streak"])
 
@@ -25,13 +29,13 @@ async def api_streak_analysis(params: StreakAnalysisParams):
     return await run_in_threadpool(run_streak_analysis, params.model_dump())
 
 
-@router.get("/streak-cache-stats")
+@router.get("/streak-cache-stats", response_model=StreakCacheStatsResponse)
 async def api_get_cache_stats():
     """캐시 상태 확인"""
     return await run_in_threadpool(get_streak_cache_stats)
 
 
-@router.post("/streak-cache-clear")
+@router.post("/streak-cache-clear", response_model=StreakCacheClearResponse)
 async def api_clear_cache():
     """캐시 초기화"""
     return await run_in_threadpool(clear_streak_cache)

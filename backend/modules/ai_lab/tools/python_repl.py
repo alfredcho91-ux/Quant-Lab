@@ -9,7 +9,7 @@ from typing import Any, Dict, Optional
 import numpy as np
 import pandas as pd
 
-from utils.data_service import fetch_live_data
+from backend.utils.data_service import fetch_live_data
 
 
 def _read_float_env(name: str, default: float) -> float:

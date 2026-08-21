@@ -1,6 +1,6 @@
 """Preset domain schemas."""
 
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from pydantic import BaseModel, Field
 
@@ -14,5 +14,26 @@ class PresetSaveRequest(BaseModel):
     params: Dict[str, Any]
 
 
-__all__ = ["PresetSaveRequest"]
+class PresetPayload(BaseModel):
+    coin: str
+    interval: str
+    strat_id: str
+    direction: str
+    params: Dict[str, Any]
 
+
+class PresetsEnvelope(BaseModel):
+    success: bool
+    data: Dict[str, PresetPayload]
+
+
+class PresetMutationEnvelope(BaseModel):
+    success: bool
+    message: Optional[str] = None
+
+
+__all__ = [
+    "PresetMutationEnvelope",
+    "PresetsEnvelope",
+    "PresetSaveRequest",
+]

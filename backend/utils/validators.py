@@ -3,7 +3,7 @@
 
 from typing import Optional, List, Tuple
 import pandas as pd
-from utils.error_handler import ValidationError, DataLoadError
+from backend.utils.error_handler import ValidationError, DataLoadError
 
 
 def validate_dataframe(

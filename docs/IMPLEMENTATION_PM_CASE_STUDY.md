@@ -43,10 +43,11 @@ Architecture notes, mapping guides, and setup instructions are part of the execu
 
 ## Execution Signals In This Repository
 
-- 15 frontend pages covering analysis, scanning, journaling, and AI-assisted workflows
-- 11 backend modules providing API and orchestration boundaries
-- 19 backend test files supporting repeatability and regression control
-- Multiple supporting docs that explain feature-to-backend mapping and complex analysis flows
+- 9 sidebar-visible analysis workflows plus a retained direct BB Mid route
+- 10 backend domain modules providing API and orchestration boundaries
+- 193 collected backend tests and 4 frontend OHLCV utility tests supporting regression control
+- Trend Judgment uses completed-candle data, Binance-backed VPVR, and an hourly refresh policy to make data freshness and performance explicit
+- Supporting docs explain API, architecture, cache behavior, calculation ownership, and feature-to-backend mapping
 
 ## Risk Controls
 

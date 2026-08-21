@@ -6,10 +6,10 @@ from typing import Any, Dict, List
 
 import pandas as pd
 
-from strategy.context import AnalysisContext
-from strategy.streak.common import DEBUG_MODE
-from strategy.streak.matcher import build_chart_positions
-from utils.stats import wilson_confidence_interval
+from backend.strategy.context import AnalysisContext
+from backend.strategy.streak.common import DEBUG_MODE
+from backend.strategy.streak.matcher import build_chart_positions
+from backend.utils.stats import wilson_confidence_interval
 
 from .complex_analysis_details import (
     calculate_comparative_report,

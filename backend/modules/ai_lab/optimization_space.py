@@ -6,7 +6,7 @@ import hashlib
 import random
 from typing import Any, Dict, List
 
-from models.request import BacktestParams
+from backend.models.request import BacktestParams
 
 
 def build_float_candidates(

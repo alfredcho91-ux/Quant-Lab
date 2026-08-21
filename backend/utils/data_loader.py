@@ -5,8 +5,8 @@ import pandas as pd
 from pathlib import Path
 from typing import Optional, Tuple
 
-from utils.cache import DataCache
-from utils.data_service import fetch_live_data, load_csv_data
+from backend.utils.cache import DataCache
+from backend.utils.data_service import fetch_live_data, load_csv_data
 
 LIVE_DATA_CACHE = DataCache(
     ttl_seconds=30,

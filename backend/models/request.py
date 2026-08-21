@@ -6,16 +6,15 @@ This file keeps backward-compatible imports for legacy call sites.
 
 from pydantic import BaseModel
 
-from modules.backtest.schemas import AdvancedBacktestParams, BacktestParams
-from modules.market.schemas import (
+from backend.modules.backtest.schemas import AdvancedBacktestParams, BacktestParams
+from backend.modules.market.schemas import (
     MarketCoinPathParams,
     MarketOHLCVPathParams,
     MarketOHLCVQueryParams,
 )
-from modules.scanner.schemas import PatternScanParams, ScannerParams
-from modules.preset.schemas import PresetSaveRequest
-from modules.journal.schemas import JournalEntry
-from modules.stats.schemas import (
+from backend.modules.preset.schemas import PresetSaveRequest
+from backend.modules.journal.schemas import JournalEntry
+from backend.modules.stats.schemas import (
     BBMidParams,
     ComboFilterParams,
     HybridAnalysisParams,
@@ -23,7 +22,7 @@ from modules.stats.schemas import (
     HybridLiveModeParams,
     TrendIndicatorsParams,
 )
-from modules.streak.schemas import StreakAnalysisParams
+from backend.modules.streak.schemas import StreakAnalysisParams
 
 
 class WeeklyPatternParams(BaseModel):
@@ -55,8 +54,6 @@ __all__ = [
     "HybridLiveModeParams",
     "PresetSaveRequest",
     "AdvancedBacktestParams",
-    "PatternScanParams",
-    "ScannerParams",
     "MarketCoinPathParams",
     "MarketOHLCVPathParams",
     "MarketOHLCVQueryParams",

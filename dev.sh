@@ -13,6 +13,13 @@ NC='\033[0m'
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
+if [ -f "$SCRIPT_DIR/.env" ]; then
+    set -a
+    # shellcheck disable=SC1091
+    source "$SCRIPT_DIR/.env"
+    set +a
+fi
+
 cleanup() {
     echo ""
     echo "Shutting down servers..."
@@ -24,15 +31,19 @@ cleanup() {
 trap cleanup SIGINT SIGTERM
 
 echo -e "${BLUE}Starting Backend Server...${NC}"
-cd "$SCRIPT_DIR/backend"
+cd "$SCRIPT_DIR"
 
-if [ ! -d "venv" ]; then
+if [ ! -d "backend/venv" ]; then
     echo "Missing backend venv. Run ./bootstrap.sh first."
     exit 1
 fi
 
-source venv/bin/activate
-uvicorn main:app --host 0.0.0.0 --port 8000 --reload --reload-dir . --reload-dir ../core &
+"$SCRIPT_DIR/backend/venv/bin/python" -m uvicorn backend.main:app \
+    --host 0.0.0.0 \
+    --port 8000 \
+    --reload \
+    --reload-dir backend \
+    --reload-dir core &
 BACKEND_PID=$!
 echo -e "${GREEN}Backend started on http://localhost:8000${NC}"
 echo ""

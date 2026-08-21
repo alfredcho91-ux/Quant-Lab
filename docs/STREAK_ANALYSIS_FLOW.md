@@ -1,8 +1,10 @@
 # Streak Analysis Flow
 
-**Version**: 1.1.0  
-**Last Updated**: 2025-01-17  
-**Status**: C1 consistency fix applied
+**Version**: 1.2.0
+
+**Last Updated**: 2026-08-03
+
+**Status**: Current simple/complex module structure and C1 invariant verified
 
 ## Overview
 
@@ -41,10 +43,10 @@ graph TD
 
 1. `backend/modules/streak/router.py` receives the request.
 2. The router validates the payload and forwards it to the streak service.
-3. `backend/strategy/streak/__init__.py::analyze_streak_pattern()` builds `AnalysisContext`.
+3. `backend/strategy/streak/__init__.py::analyze_streak_pattern()` builds `AnalysisContext` and coordinates the selected path.
 4. The context validates parameters and determines whether the request runs in simple or complex mode.
-5. Shared data loaders fetch CSV-backed or API-backed OHLCV data.
-6. The selected strategy module runs analysis.
+5. Shared data loaders fetch CSV-backed or Binance-backed OHLCV data through the shared cache path.
+6. The selected runner and strategy module run analysis.
 7. Statistical helpers compute confidence intervals, p-values, and derived summaries.
 8. The result is serialized and returned to the frontend.
 

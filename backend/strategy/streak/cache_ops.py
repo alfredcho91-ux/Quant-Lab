@@ -5,8 +5,8 @@ from typing import Dict, Any
 import hashlib
 import json
 from pathlib import Path
-from utils.cache import DataCache
-from strategy.context import AnalysisContext
+from backend.utils.cache import DataCache
+from backend.strategy.context import AnalysisContext
 
 # 캐시 디렉토리 설정
 project_root = Path(__file__).parent.parent.parent.parent

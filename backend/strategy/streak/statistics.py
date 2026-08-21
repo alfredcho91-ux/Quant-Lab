@@ -6,14 +6,14 @@ Streak 분석 통계 함수 모듈
 import pandas as pd
 import numpy as np
 from typing import Dict, Any, List, Optional, Tuple
-from utils.stats import (
+from backend.utils.stats import (
     CONFIDENCE_LEVEL,
     P_VALUE_FLOOR,
     safe_float,
     wilson_confidence_interval,
     calculate_binomial_pvalue,
 )
-from strategy.streak.distribution import (
+from backend.strategy.streak.distribution import (
     calculate_intraday_distribution,
     calculate_weekly_distribution,
 )

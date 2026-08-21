@@ -1,291 +1,152 @@
-# Installation Guide
+# 설치 및 운영 가이드
 
-This document explains how to install, run, test, and restore Quant-Lab in a clean environment.
+## 요구사항
 
-## Prerequisites
+- Python 3.9 이상
+- Node.js 18 이상
+- `npm`
+- 선택 사항: `binance_klines/`의 로컬 CSV 데이터
 
-- Node.js 18+
-- Python 3.9+
-- `npm` or `yarn`
-- Git (recommended)
-
-## Option 1: Start With The Unified Script
-
-This is the fastest path for local setup. It bootstraps both the backend and the frontend.
+## 처음 실행
 
 ```bash
-# grant execute permission once
-chmod +x start.sh
-
-# start backend and frontend
+chmod +x bootstrap.sh dev.sh start.sh
 ./start.sh
 ```
 
-The script automatically:
+`start.sh`는 `backend/venv` 또는 `frontend/node_modules`가 없을 때만 `bootstrap.sh`를 실행하고 `dev.sh`로 넘깁니다.
 
-- creates and activates a Python virtual environment
-- installs backend dependencies with `pip install -r requirements.txt`
-- installs frontend dependencies with `npm install`
-- starts the backend on port `8000`
-- starts the frontend on port `5173`
+- `bootstrap.sh`: Python virtualenv 생성, `backend/requirements.txt` 설치, 프런트 의존성 설치
+- `dev.sh`: 백엔드 `8000`, 프런트 `5173` 개발 서버를 함께 실행
+- `start.sh`: 위 두 단계를 연결하는 일상용 진입점
 
-## Option 2: Manual Setup
+강제로 프런트 의존성을 다시 설치하려면 다음을 사용합니다.
+
+```bash
+./bootstrap.sh --force
+```
+
+## 개별 실행
 
 ### Backend
 
 ```bash
-cd backend
-
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-uvicorn main:app --host 0.0.0.0 --port 8000 --reload
-```
-
-Windows activation:
-
-```bash
-venv\Scripts\activate
+./bootstrap.sh
+backend/venv/bin/python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
 ### Frontend
 
 ```bash
 cd frontend
-npm install
 npm run dev
 ```
 
-## Verify The Services
-
-After startup, these URLs should be available:
+접속 주소:
 
 - Frontend: `http://localhost:5173`
-- Backend API: `http://localhost:8000`
-- Swagger: `http://localhost:8000/docs`
+- API: `http://localhost:8000`
+- OpenAPI/Swagger: `http://localhost:8000/docs`
 - ReDoc: `http://localhost:8000/redoc`
 
-## Troubleshooting
+## 데이터 소스
 
-### Backend
+기본적으로 Binance Spot REST API를 사용합니다. API 모드에서는 인터넷 연결이 필요합니다. 화면에서 CSV를 선택하면 `binance_klines/`의 아래 형식 파일을 사용합니다.
 
-Problem: `ModuleNotFoundError` or import errors
+```text
+binance_klines/{COIN}USDT-{interval}-merged.csv
+```
+
+예: `BTCUSDT-4h-merged.csv`. 월봉만 파일명에서 `1M` 대신 `1mo`를 사용합니다.
+
+## 환경 변수
+
+대부분의 로컬 실행에는 환경 변수가 필요 없습니다.
+
+| 변수 | 기본값 | 용도 |
+| --- | --- | --- |
+| `APP_ENV` | `development` | `production`일 때 Basic Auth 활성화 |
+| `DEMO_USERNAME` | 없음 | production Basic Auth 사용자명 |
+| `DEMO_PASSWORD` | 없음 | production Basic Auth 비밀번호 |
+| `CORS_ORIGINS` | localhost 5173, 3000 | 쉼표 구분 CORS 허용 원본 |
+| `ANALYSIS_TIMEZONE` | `America/New_York` | 연속봉 시간 분포 분석 시간대 |
+| `DATA_CACHE_BACKEND` | `disk` | `memory`, `off` 등으로 디스크 캐시 비활성화 |
+| `MEMORY_CACHE_MAX_ITEMS` | `5000` | 메모리 fallback 캐시 상한 |
+| `JOURNAL_DIR` | `<project>/journal` | 저널 파일 디렉터리 |
+| `JOURNAL_DB_PATH` | `<journal>/trade_journal.db` | 저널 SQLite 경로 |
+| `JOURNAL_CSV_PATH` | `<journal>/trade_journal.csv` | 저널 CSV 경로 |
+| `DEEPCOIN_API_KEY` | 없음 | Deepcoin 읽기 전용 API 키 |
+| `DEEPCOIN_SECRET_KEY` | 없음 | Deepcoin API secret. 서버 환경에서만 읽음 |
+| `DEEPCOIN_PASSPHRASE` | 없음 | Deepcoin API passphrase. 서버 환경에서만 읽음 |
+| `DEEPCOIN_API_BASE_URL` | `https://api.deepcoin.com` | Deepcoin REST base URL |
+| `PRESET_DIR` | `<project>/data` | 프리셋 디렉터리 |
+| `PRESETS_FILE` | `<project>/data/presets.json` | 프리셋 파일 경로 |
+| `GEMINI_API_KEY` | 없음 | AI Lab 서버 기본 키 |
+| `APP_LOG_LEVEL` | `INFO` | Uvicorn 로그 레벨 |
+| `SLOW_STREAK_REQUEST_MS` | `1000` | 연속봉 요청 지연 경고 임계값 |
+
+production에서는 `APP_ENV=production`, `DEMO_USERNAME`, `DEMO_PASSWORD`를 함께 설정해야 서버가 시작됩니다.
+
+## Deepcoin 체결 동기화
+
+매매 일지의 Deepcoin 동기화는 읽기 전용 체결·종료 포지션 API만 사용합니다. API 키와 secret, passphrase는 `.env` 또는 운영 환경 변수에만 두며 프런트엔드와 SQLite 저널에는 저장하지 않습니다. `./dev.sh`와 `./start.sh`는 프로젝트 루트의 `.env`를 자동으로 불러옵니다.
 
 ```bash
-which python
-source venv/bin/activate
-pip install -r requirements.txt
+export DEEPCOIN_API_KEY="..."
+export DEEPCOIN_SECRET_KEY="..."
+export DEEPCOIN_PASSPHRASE="..."
 ```
 
-Problem: port `8000` is already in use
+처음 설정할 때는 `.env.example`을 참고합니다. `.env`는 Git 추적에서 제외됩니다.
+
+키에는 조회 권한만 설정하고 거래·출금 권한을 해제합니다. Deepcoin API 키의 IP 허용 목록도 설정합니다. 동기화한 체결마다 Binance Spot의 마지막 확정봉에서 RSI, MACD, 3 Slow Stochastic, Stoch RSI, VPVR를 계산해 SQLite JSON 스냅샷으로 보관합니다.
+
+## 검증
 
 ```bash
-uvicorn main:app --host 0.0.0.0 --port 8001 --reload
-pkill -f uvicorn
+python3 scripts/check_core_imports.py
+python3 scripts/check_route_imports.py
+backend/venv/bin/python -m pytest -q backend/tests
+cd frontend && npm test
+cd frontend && npm run lint
+cd frontend && npm run build
 ```
 
-### Frontend
-
-Problem: `npm install` fails
+특정 테스트 예시:
 
 ```bash
-npm cache clean --force
-rm -rf node_modules package-lock.json
-npm install
+backend/venv/bin/python -m pytest -q backend/tests/test_stats_service_trend.py
+backend/venv/bin/python -m pytest -q backend/tests/test_vpvr.py
+cd frontend && npm test -- ohlcv
 ```
 
-Problem: port `5173` is already in use
+## 자주 보는 문제
+
+### 8000 또는 5173 포트가 이미 사용 중인 경우
+
+다른 포트로 직접 실행합니다.
 
 ```bash
-npm run dev -- --port 3000
+backend/venv/bin/python -m uvicorn backend.main:app --host 0.0.0.0 --port 8001 --reload
+cd frontend && npm run dev -- --port 5174
 ```
 
-### Data
+### Binance 요청이 실패하거나 화면이 느린 경우
 
-Problem: CSV data is missing
+- 인터넷 연결과 Binance API 접근 가능 여부를 확인합니다.
+- 추세판단은 같은 코인/시간대 요청을 프런트와 백엔드에서 TTL 캐시합니다. 수동 새로고침은 필요할 때만 사용합니다.
+- CSV가 있다면 화면의 CSV 모드로 전환해 네트워크 의존성을 줄일 수 있습니다.
+- `DATA_CACHE_BACKEND=memory`는 디스크 권한 문제를 우회할 수 있지만 서버 재시작 시 캐시가 사라집니다.
+
+### 프런트 의존성이 깨진 경우
 
 ```bash
-ls binance_klines/
+./bootstrap.sh --force
 ```
 
-If no CSV files are present, the app can still run in API mode with `use_csv: false`.
+### production 배포 전 확인
 
-## Production Build
-
-### Frontend
-
-```bash
-cd frontend
-npm run build
-```
-
-The compiled output is written to `frontend/dist/`.
-
-### Backend
-
-For production, remove `--reload` and use a process manager.
-
-```bash
-pip install gunicorn
-gunicorn main:app -w 4 -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:8000
-```
-
-## Environment Variables
-
-You can create `.env` files if you want explicit local overrides.
-
-Backend example:
-
-```env
-DEBUG_STREAK_ANALYSIS=false
-BINANCE_DATA_PATH=./binance_klines
-CACHE_TTL=300
-TIMEZONE_OFFSET=-5
-```
-
-Frontend example:
-
-```env
-VITE_API_URL=http://localhost:8000
-```
-
-Defaults are sufficient for most local runs, so environment files are optional.
-
-## Running Tests
-
-```bash
-cd backend
-source venv/bin/activate
-pip install pytest
-pytest tests/ -v
-```
-
-### C1 Extraction Regression Test
-
-This validates that `C1` is always the candle immediately after pattern completion (`T+1`).
-
-```bash
-cd backend
-source venv/bin/activate
-pytest tests/test_c1_extraction.py -v
-```
-
-Run a single assertion path:
-
-```bash
-pytest tests/test_c1_extraction.py::TestC1Extraction::test_c1_is_always_next_candle_simple_mode -v
-pytest tests/test_c1_extraction.py::TestC1Extraction::test_c1_extraction_index_bounds_check -v
-```
-
-Coverage example:
-
-```bash
-pip install pytest-cov
-pytest tests/test_c1_extraction.py --cov=strategy --cov-report=html
-```
-
-This regression must stay green before and after refactors because `C1` extraction is a critical analytical invariant.
-
-## Restoring In A New Environment
-
-This section covers what Git restores automatically and what stays local-only.
-
-### Files Restored By Git
-
-- all source code under `backend/`, `frontend/src/`, and `core/`
-- dependency manifests such as `backend/requirements.txt` and `frontend/package.json`
-- configuration files such as `backend/config/`, `frontend/vite.config.ts`, and `tailwind.config.js`
-- startup scripts such as `start.sh`
-- repository docs such as `README.md`, `ARCHITECTURE.md`, and `INSTALL.md`
-- repo hygiene files such as `.gitignore`
-
-### Files You May Need To Recreate Manually
-
-#### 1. Environment files
-
-- Location: project root or `backend/`
-- Filename: `.env`
-- Optional: yes
-
-Example:
-
-```env
-CORS_ORIGINS=http://localhost:5173,http://localhost:3000
-DEBUG_STREAK_ANALYSIS=false
-BINANCE_DATA_PATH=./binance_klines
-CACHE_TTL=300
-CACHE_MAX_SIZE=100
-API_TIMEOUT=30
-TIMEZONE_OFFSET=-5
-```
-
-#### 2. CSV market data
-
-- Location: `binance_klines/`
-- Size: hundreds of MB to multiple GB depending on coins and intervals
-- Restore options:
-  - keep it outside Git and let the app fetch from the Binance API when needed
-  - copy a local backup back into `binance_klines/`
-
-#### 3. Local environments and package installs
-
-- `backend/venv/` is created automatically by `start.sh`
-- `frontend/node_modules/` is installed automatically by `start.sh`
-
-## Minimal Restore Workflow
-
-```bash
-git clone https://github.com/alfredcho91-ux/Quant-Lab.git
-cd Quant-Lab
-chmod +x start.sh
-./start.sh
-```
-
-If you already have the repository:
-
-```bash
-cd Quant-Lab
-git pull origin main
-```
-
-Optional environment setup:
-
-```bash
-cat > .env << EOF
-CORS_ORIGINS=http://localhost:5173
-DEBUG_STREAK_ANALYSIS=false
-BINANCE_DATA_PATH=./binance_klines
-EOF
-```
-
-Optional CSV restore:
-
-```bash
-cp -r /backup/path/binance_klines ./
-```
-
-## Restore Checklist
-
-Backend:
-
-- [ ] `backend/requirements.txt`
-- [ ] `backend/main.py`
-- [ ] `backend/config/settings.py`
-- [ ] `backend/venv/` if you have already bootstrapped locally
-- [ ] `backend/.env` if you need overrides
-
-Frontend:
-
-- [ ] `frontend/package.json`
-- [ ] `frontend/vite.config.ts`
-- [ ] `frontend/node_modules/` if you have already installed locally
-
-Shared:
-
-- [ ] `start.sh`
-- [ ] `README.md`
-- [ ] `binance_klines/` if you want local CSV caching instead of API-only mode
-
-## Next Step
-
-After installation, start with [README.md](./README.md) for the product overview and feature map.
+- `APP_ENV=production`과 Basic Auth 자격 증명을 설정합니다.
+- `npm run build` 후 FastAPI가 `frontend/dist`를 정적으로 제공합니다.
+- 개발용 `--reload` 없이 process manager나 컨테이너로 실행합니다.
+- AI Lab의 Python 실행 엔드포인트는 외부 노출 전에 별도 격리하거나 비활성화합니다.

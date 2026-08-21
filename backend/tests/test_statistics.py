@@ -10,16 +10,9 @@
 import pytest
 import pandas as pd
 import numpy as np
-import sys
-from pathlib import Path
-
-# Add backend directory to path
-backend_path = Path(__file__).parent.parent
-sys.path.insert(0, str(backend_path))
-sys.path.insert(0, str(backend_path.parent))
 
 # Import statistics functions
-from strategy.streak.statistics import (
+from backend.strategy.streak.statistics import (
     analyze_2d_interval_heatmap,
     analyze_interval_statistics,
     bonferroni_correction,

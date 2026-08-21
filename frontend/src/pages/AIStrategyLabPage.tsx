@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Sparkles, MessageSquareText, SlidersHorizontal, PlugZap, KeyRound } from 'lucide-react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams } from '../router-context';
 import { useLanguage, useSelectedCoin, useSelectedInterval } from '../store/useStore';
 import { getLabels } from '../store/labels';
 import ChatInterface from '../features/ai-lab/components/ChatInterface';

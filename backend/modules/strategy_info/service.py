@@ -4,10 +4,11 @@ from __future__ import annotations
 
 from typing import Any, Dict
 
-from config.metadata_loader import get_strategy_explainer
-from utils.error_handler import NotFoundError
-from utils.response_builder import success_response
-from utils.validators import validate_numeric_range
+from backend.config.metadata_loader import get_strategy_explainer
+from core.strategies import STRATS
+from backend.utils.error_handler import NotFoundError
+from backend.utils.response_builder import success_response
+from backend.utils.validators import validate_numeric_range
 
 
 def run_strategy_info_service(
@@ -37,3 +38,7 @@ def run_strategy_info_service(
         raise NotFoundError("Strategy", strategy_id)
     return success_response(data=explainer)
 
+
+def run_strategies_service() -> Dict[str, Any]:
+    """Return the strategy catalog through the strategy domain boundary."""
+    return success_response(data=STRATS)

@@ -9,11 +9,11 @@ from typing import Any, Dict, List, Optional
 
 import requests
 
-from config import settings
+from backend.config import settings
 from core.indicators import build_indicator_adapter
 from core.strategies import STRATS
-from models.request import BacktestParams
-from modules.ai_lab import (
+from backend.models.request import BacktestParams
+from backend.modules.ai_lab import (
     analyst_agent as ai_analyst_agent,
     analyzer as ai_analyzer,
     constants as ai_constants,
@@ -25,14 +25,14 @@ from modules.ai_lab import (
     research_workflow as ai_research_workflow,
     result_factory as ai_result_factory,
 )
-from modules.ai_lab.prompts import SYSTEM_PROMPT_TEMPLATE, SYSTEM_PROMPT_VERSION
-from modules.ai_lab.tools.python_repl import execute_pandas_code
-from modules.ai_lab.types import AIAnalystResult, AIServiceResult
-from modules.backtest.service import run_backtest_advanced_service, run_backtest_service
-from services.ai_clients import build_llm_client
-from utils.cache import DataCache
-from utils.data_loader import load_data_for_analysis
-from utils.stats import calculate_binomial_pvalue, wilson_confidence_interval
+from backend.modules.ai_lab.prompts import SYSTEM_PROMPT_TEMPLATE, SYSTEM_PROMPT_VERSION
+from backend.modules.ai_lab.tools.python_repl import execute_pandas_code
+from backend.modules.ai_lab.types import AIAnalystResult, AIServiceResult
+from backend.modules.backtest.service import run_backtest_advanced_service, run_backtest_service
+from backend.services.ai_clients import build_llm_client
+from backend.utils.cache import DataCache
+from backend.utils.data_loader import load_data_for_analysis
+from backend.utils.stats import calculate_binomial_pvalue, wilson_confidence_interval
 
 logger = logging.getLogger(__name__)
 STRATEGY_IDS = [str(item["id"]) for item in STRATS if item.get("id")]

@@ -6,140 +6,165 @@
 ![Python](https://img.shields.io/badge/Quant-Python_3.9-3776AB)
 ![TypeScript](https://img.shields.io/badge/Language-TypeScript-3178C6)
 
-Quant-Lab is a quantitative research and strategy analysis platform for crypto and stock markets. The project turns raw hypothesis testing into an operable product: typed APIs, modular quant logic, reusable indicator pipelines, multi-page React workflows, and documentation that makes implementation decisions traceable.
+개인용 암호화폐 기술 분석 및 전략 검증 도구입니다. React/TypeScript SPA와 FastAPI/Python API를 분리하고, 공통 지표 계산은 `core/`에 둡니다. 현재 지원 코인은 BTC, ETH, SOL이며, 기본 진입 화면은 4시간봉 중심의 `추세판단`입니다.
 
-Keywords: quant finance, crypto, stocks, stock trading, algorithmic trading, backtesting, AI-assisted strategy analysis.
+## 현재 범위
 
-> Portfolio lens: this repository is intentionally positioned as an Implementation PM case study. It demonstrates how quant research is translated into a maintainable software system with delivery structure, architecture boundaries, execution artifacts, and a clear roadmap.
+- 추세판단과 전용 차트: Lightweight Charts 기반 캔들·크로스헤어·줌/스크롤, 다중 지표, VWAP, RSI 가격대, VPVR
+- 가격 참고: 1h/2h/4h/1d RSI 30·70 역산 가격, 기간 VWAP, 200봉 Rolling VWAP, 시간대별 기준선 라벨
+- 분석 및 검증: 연속봉 통계, 조합 필터, 기본 백테스트, 복리 계산기, 홀딩 vs 재진입 손익 비교
+- 기록 및 연구: 매매일지, Deepcoin 읽기 전용 체결 동기화, AI 백테스트/리서치 워크벤치
+- 통합 거래 리포트: 종료 거래의 5m/15m/30m/1h/2h/4h/1d Binance Spot 캔들, 진입·종료 마커, 당시 VPVR/VWAP 숫자, RSI·MACD·Stoch RSI·3 Slow Stochastic 그래프를 한 화면에 표시
+- 데이터: Binance Spot kline API 또는 `binance_klines/`의 로컬 CSV
 
-## Executive Snapshot
+스캐너, 패턴 스캐너, 전략 스캐너, 고급 백테스트 UI, 패턴/캔들 통계 UI, 하이브리드 전략 UI는 현재 제품 범위에서 제거되었습니다. `/backtest`와 `/bb-mid`는 직접 접근 경로로만 유지합니다.
 
-- Product scope: 14 frontend route pages, 11 backend modules, 4 feature-sliced frontend domains, and 20 backend test files supporting research, scanning, backtesting, journaling, and AI-assisted exploration.
-- Quant focus: streak analysis, hybrid filters, MTF trend judgment, pattern scanning, and AI-assisted strategy drafting.
-- Engineering focus: React + TypeScript frontend, FastAPI backend, pure indicator/core layers, short-lived live OHLCV snapshot caching, and explicit documentation for architecture, install flow, and feature-to-backend mapping.
+## 추세판단 데이터 기준
 
-## Screenshots
+- 표시값과 보조지표 판단은 진행 중인 마지막 봉을 제외한 **직전 확정봉** 기준입니다.
+- 추세 지표 API는 600봉을 불러와 200기간 지표의 워밍업을 확보하고, 차트에는 최근 200개 확정봉만 표시합니다.
+- 차트의 과매수·과매도선은 1h, 2h, 4h, 1d 각각에서 RSI 70/30에 도달하는 다음 종가를 Wilder RSI 방식으로 역산한 참고선입니다.
+- 자동 갱신은 정각 기준 1시간마다 수행합니다. 탭을 다시 열었을 때도 마지막 갱신 후 1시간이 지난 경우에만 새로 요청합니다.
+- 전용 차트(`/trend-chart`)는 같은 데이터와 기준선을 전체 화면에 표시합니다. 기본 가격축은 현재가 기준 약 ±8%이며, 상단 아이콘으로 세로 축을 확대·초기화할 수 있습니다.
 
-### AI Strategy Lab
+### VWAP 기준
 
-Natural-language strategy drafting, indicator selection, and execution parameter setup in a single workbench.
+| 차트 시간대 | 기간 VWAP | 추가 Rolling VWAP |
+| --- | --- | --- |
+| 1시간 | 일간, 주간 | 200봉 |
+| 2시간 | 일간, 주간 | 200봉 |
+| 4시간 | 주간, 월간 | 200봉 |
+| 일봉 | 월간, 분기, 연간 | 없음 |
 
-![AI Strategy Lab](./docs/screenshots/ai-strategy-lab.png)
+### VPVR 기준과 한계
 
-### Streak Analysis
+VPVR은 Binance kline의 `quote_volume`을 캔들의 고가-저가 구간에 겹치는 가격 bin으로 비례 배분해 계산합니다. kline에는 체결 가격별 실제 거래 분포가 없으므로, TradingView의 tick-by-price VPVR과 동일한 정밀도는 아닙니다. 이 화면에서는 24개 가격 bin, 70% Value Area를 사용합니다.
 
-Pattern-driven streak analysis workflow with selectable standard or Heikin-Ashi streak detection, while RSI/ATR/Disparity/EMA filters remain anchored to the original OHLC prices.
+| 시간대 | 기본 기간 |
+| --- | --- |
+| 1시간 | 최근 240봉, 약 10일 |
+| 2시간 | 최근 240봉, 약 20일 |
+| 4시간 | 최근 240봉, 약 40일 |
+| 일봉 | 최근 180봉, 약 6개월 |
+| 그 외 | 최근 300봉 |
 
-![Streak Analysis](./docs/screenshots/streak-analysis.png)
+VPVR 계산 입력 가격 범위의 상한은 현재가 주변 최대 10,000 USDT입니다. 실제 데이터 범위가 더 좁으면 해당 범위를 약간만 여유 있게 사용합니다.
 
-### Combo Filter
+## Deepcoin 체결 저널
 
-Rule-combination backtest page for composing MA, Bollinger, and pattern-based entry filters.
+`/journal`에서 Deepcoin의 현물 체결과 USDT 무기한 체결·종료 포지션을 읽어 SQLite 저널에 저장할 수 있습니다. 거래 목록에는 종료 포지션만 표시하고, 개별 원시 체결은 진입 시점과 분할 진입을 맞추는 내부 데이터로만 사용합니다. 수동 기록 생성 기능은 제공하지 않습니다. 주문 생성·수정·취소 API는 호출하지 않으며, 외부 거래 ID 기반 고유 키로 재동기화해도 같은 기록을 중복 저장하지 않습니다. 100건으로 포화된 기간은 더 작은 시간 구간으로 자동 분할하고, 그래도 누락 가능성이 있으면 화면에 경고를 표시합니다. 90일 동기화는 신규 지표 스냅샷까지 생성하므로 수분이 걸릴 수 있으며, 저널 전용 요청은 완료 응답을 기다리도록 6분 제한을 사용합니다.
 
-![Combo Filter](./docs/screenshots/combo-filter.png)
+`/trade-analysis`는 저장된 종료 포지션에서 승리·패배를 가르는 진입 조건과 매매 품질을 찾는 분석 화면입니다. 손익 대시보드 대신 차이가 큰 조건과 중요한 결론을 우선 표시합니다. LONG/SHORT 방향 필터는 진입 지표, Regime, 추가 홀딩, 가상 청산, MFE/MAE 분석 전체에 공통 적용됩니다. 투자금 대비 순수익률 절대값 구간은 1% 미만, 1~5%, 5~10%, 10% 이상 거래를 골라 조건 차이를 다시 분석하는 필터로 사용합니다. 진입 지표 비교에는 Deepcoin 최초 진입 체결 직전의 확정봉 스냅샷만 사용하며, 종료 시점 스냅샷은 사용하지 않습니다. MFE/MAE는 15분봉 중 진입 이후부터 종료 이전까지 완전히 포함된 봉과 실제 진입·종료 가격으로 계산합니다.
 
-## What This Repository Proves
+매매 분석 화면은 기본 최근 90일 또는 사용자 지정 기간으로 조회합니다. 열린 상태에서는 매일 로컬 자정 직후 자동 갱신하며, 90일 모드는 새 날짜에 맞춰 기간도 이동하고 사용자 지정 기간은 경계를 유지한 채 데이터를 다시 조회합니다. 자정에 탭이 비활성 상태였다면 다시 표시되는 시점에 누락된 일일 갱신을 수행합니다. 화면 상단의 N% 손절 기대값 계산기는 선택 기간·방향의 실제 15분봉 MAE를 이용해 투자금 또는 가격 기준 손절선을 재적용하고 거래당 기대수익률, 평균 수익·손실률, 승률, Profit Factor를 즉시 비교합니다. 투자금 기준에서 손절이 발동하지 않은 거래는 실제 순수익률을 유지하고, 발동 거래는 -N%에서 저장된 거래 수수료율을 추가 차감합니다. 가상 조기청산 시점의 펀딩·슬리피지와 봉 내부 가격 순서는 계산할 수 없어 포함하지 않습니다.
 
-- I can decompose a quant product into bounded modules instead of growing a monolithic script pile.
-- I can move from research logic to implementation artifacts: API contracts, UI workflows, startup scripts, and validation docs.
-- I can manage technical execution as an Implementation PM, not just write isolated code, by making system decisions explicit and repeatable.
+접이식 SL/TP 기대값 분석은 사용자가 지정한 SL·TP 최소/최대/간격의 최대 800개 조합을 각 종료 거래의 진입~실제 종료 사이 Binance Spot 5분봉에 적용합니다. LONG/SHORT 가격 조건을 반대로 계산하고 최초 도달 봉으로 결과를 결정하며, 같은 5분봉에서 양쪽이 모두 닿으면 `ambiguous`로 기록하고 SL로 보수 처리합니다. 저장된 거래 수수료율을 비용 대용값으로 차감하지만 가상 종료 시점의 펀딩과 슬리피지는 포함하지 않습니다. 추천은 과거 70%에서 기대값·PF·평균 R·Drawdown을 함께 점수화하고 최근 30%로 별도 검증합니다. 최초 경로 조회 결과는 1시간 캐시하며 범위 변경 시 같은 경로의 최초 도달 인덱스를 재사용합니다. 손절 상세 분석은 해당 영역을 열 때만 불러와 초기 화면의 불필요한 시장·거래소 요청을 줄입니다. 동기화나 삭제가 완료되면 MFE/MAE, 매매 품질, 손절, SL/TP, 현재 시장 비교 캐시를 함께 무효화해 이전 분석을 남기지 않습니다.
 
-## Core Capabilities
+Stop-Loss 사후 분석은 Deepcoin에서 실제 발동이 확인된 SL 트리거만 종료 포지션과 연결합니다. 진입가와 SL 가격 간 거리를 1R로 두고 손절 이후 완전히 종료된 최대 3개의 4H 봉에서 원래 방향·반대 방향 움직임, 진입가 회복, R 목표, 4H 추세 전환을 측정합니다. 손절가부터 원래 포지션의 반대 방향으로 1% 이상 진행하면 Good Stop으로 판정하고, 여기에 반대 방향 2R 이상과 4H 추세 전환이 동반되면 Good Stop + Reversal로 구분합니다. 사후 데이터는 이 분석에만 사용하며 진입 지표나 Market Regime의 진입 시점 feature에는 섞지 않습니다.
 
-### 1. Streak And Conditional Probability Analysis
-- Evaluates bullish and bearish streak behavior with follow-through statistics.
-- Surfaces confidence intervals, conditional splits, and significance-aware reporting rather than raw hit rates alone.
-- Supports standard-candle or Heikin-Ashi streak detection without changing the indicator baseline used for RSI, ATR, Disparity, and EMA 200 filters.
+매매 품질 분석은 각 거래 진입 전에 완료된 Weekly/Daily/4H 캔들만으로 EMA20/50/200 배열, 가격 위치, ADX 추세 강도, MACD 모멘텀, 확정된 스윙 고저점 방향을 계산하고 하나의 Market Regime으로 분류합니다. 실제 청산 이후 데이터는 진입 판단에 섞지 않고, 4H 기준 +1/+2/+3/+5/+10봉 추가 홀딩과 RSI·Stoch RSI·3 Slow Stochastic·MACD·ATR 트레일링 가상 청산에만 사용합니다. 가상 청산은 각 시점의 완료봉에서 확인 가능한 신호로만 실행하며 미래 최고점·최저점을 청산 전략으로 사용하지 않습니다. 진입/청산 품질 기준은 선택 기간의 MFE, MAE, 추가 상승 여력, 수익 반납, Capture Ratio 분포에서 산출합니다. Regime 결론은 표본 수를 함께 표시하고 5건 미만은 강한 결론에서 제외합니다. 손절 위험값 또는 저장된 R 배수가 없는 거래는 R을 임의 추정하지 않고 가격 수익률만 표시합니다.
 
-### 2. Multi-Timeframe Trend Judgment
-- Aggregates directional evidence across multiple intervals to reduce single-timeframe bias.
-- Uses indicators such as EMA, MACD, Supertrend, and stochastic context to frame regime-level decisions.
+각 새 체결에는 1h, 2h, 4h, 1d의 마지막 **확정봉** 지표를 함께 보관합니다.
 
-### 3. Hybrid Strategy And Pattern Workflows
-- Supports combined indicator filters, scan-first workflows, and backtest-ready parameterization.
-- Organizes strategy-specific logic under bounded backend modules so features can evolve independently.
+- RSI(14), MACD(12/26/9)와 실제 골든/데드 크로스
+- Slow Stochastic 5-3-3, 10-6-6, 20-12-12와 Stoch RSI
+- 시간대별 VPVR POC, 70% Value Area, 기간 VWAP
 
-### 4. AI Quant Lab
-- Converts natural-language research prompts into structured analysis conditions.
-- Separates LLM parsing, rule normalization, statistical evaluation, and frontend presentation so AI features remain auditable.
+지표 스냅샷의 OHLCV·VPVR 거래량 출처는 Deepcoin 체결 데이터가 아니라 Binance Spot kline입니다. 따라서 Deepcoin SWAP의 체결가와 참조 지표 가격은 약간 다를 수 있으며, 스냅샷에는 이 출처와 체결 직전 확정봉 기준을 함께 저장합니다.
 
-## Architecture Decisions
+종료 포지션의 차트 버튼은 스냅샷 표와 차트 복기를 하나의 거래 리포트로 엽니다. 리포트 헤더에는 Deepcoin 종료 포지션이 제공한 평균 진입가와 종료가만 표시하며, 개별 체결이나 주문 표는 노출하지 않습니다. 가격 차트는 동일 주문의 부분 체결을 가중 평균으로 합치고 종료 포지션의 계약 수량을 채우는 주문까지만 선택해 최초 주문은 `ENTRY`, 이후 진입 주문은 `ADD1`, `ADD2`로 표시합니다. 따라서 같은 방향으로 뒤이어 열린 별도 포지션은 추가 진입으로 섞지 않습니다. 분할 익절은 Deepcoin의 읽기 전용 TPSL 이력에서 실제 발동가가 설정 TP 가격과 일치한 주문만 골라 목표 가격 순서대로 `TP1`, `TP2` 마커와 가격선을 표시합니다. 수동 청산, 미체결 목표가, SL은 TP로 추정하지 않습니다. VPVR의 POC·Value Area·기간 VWAP와 시간대별 앵커/200봉 VWAP는 바로 아래 숫자 리포트로 분리합니다. 주문 체결로 확인되지 않은 진입 시각은 `추정`으로 표시하며, 차트와 저장 스냅샷이 동일한 체결 결정 결과를 사용합니다. 차트 인스턴스는 한 번만 생성하고, 마우스 휠은 가격축 확대·축소, `Shift + 휠`은 시간축 확대·축소, 위아래 드래그는 가격축 이동, 좌우 드래그는 캔들 간격 조정을 수행합니다. 5분봉은 표시와 VPVR 범위를 최대 1,000봉으로 사용하고, 나머지 시간봉은 300봉을 기본으로 거래 기간이 길면 최대 1,000봉까지 자동 확장합니다. RSI, MACD, Stoch RSI, Slow Stochastic 5-3-3/10-6-6/20-12-12 그래프에는 UTC 기준 ENTRY와 EXIT 기준선을 공통으로 표시하며, 선택 시점 수치는 각 그래프 안에 표시합니다. 하단 저장 스냅샷 표는 그래프와 중복되는 모멘텀 수치를 제외하고 VPVR, VWAP 및 기타 저장 지표만 제공합니다. 진입근거와 종료근거를 전환하면 VPVR와 VWAP는 선택 시점보다 먼저 완료된 봉만으로 다시 계산됩니다.
 
-- `core/`: Pure quant primitives and indicator pipelines with no HTTP or UI awareness.
-- `backend/strategy/`: Strategy-specific business logic for streak, hybrid, combo filter, and related domains.
-- `backend/modules/`: API-facing orchestration, schemas, and service boundaries, with response envelopes and centralized exception wrapping.
-- `backend/utils/data_loader.py`: Shared OHLCV entry point with CSV fallback and short-lived live-data snapshot caching to avoid redundant market fetches.
-- `frontend/src/api/`: Centralized API clients that normalize envelopes and throw typed errors so React Query can handle failures consistently.
-- `frontend/src/features/`: Feature-sliced UI modules that keep complex workflows localized instead of spreading logic across generic components.
-- `frontend/src/store/`: Persisted Zustand state for shared coin/timeframe context and backtest defaults, kept aligned across pages.
+매매일지의 `결과 판정` 열과 거래 리포트 상단은 동일한 15분봉 MFE/MAE 계산을 사용해 `진입 양호 · 종료 아쉬움`, `진입 불리`, `균형 종료`와 수치 근거를 표시합니다. 판정은 레버리지·수수료·펀딩을 제외한 가격 움직임 기준이므로 순수익률과 부호가 다를 수 있습니다.
 
-Architecture details live in [ARCHITECTURE.md](./ARCHITECTURE.md).
+매매일지의 순수익률은 Deepcoin 순실현손익을 거래에 실제 투입한 증거금으로 나눈 값입니다. SWAP의 `size`는 코인 수량이 아닌 계약 수이므로 `진입가 × size`를 사용하지 않습니다. 거래소 총손익과 실제 가격 변동률로 포지션 명목금액을 복원하고, 종료 포지션에 기록된 레버리지로 나눠 투자금을 계산합니다. 기간 수익률은 거래별 투자금으로 가중하며, 같은 기간의 순수익금은 수수료·펀딩이 반영된 `realized_pnl` 합계입니다. 레버리지나 투자금을 확인할 수 없는 기록은 잘못된 1배 수익률로 추정하지 않고 수익률 집계에서 제외합니다.
 
-## Implementation PM Evidence
+서버 환경에 아래 세 변수를 설정한 뒤 저널 화면에서 동기화합니다. `./dev.sh`와 `./start.sh`는 프로젝트 루트의 git 제외 파일인 `.env`를 자동으로 읽습니다. API 키에는 읽기 권한만 주고, 거래·출금 권한은 부여하지 않으며 IP 허용 목록도 설정하는 것을 권장합니다.
 
-- [Implementation PM Case Study](./docs/IMPLEMENTATION_PM_CASE_STUDY.md)
-- [GitHub Profile Blurb](./docs/GITHUB_PROFILE_BLURB.md)
-- [Portfolio Release Notes](./docs/PORTFOLIO_RELEASE_NOTES.md)
-- [System Architecture](./ARCHITECTURE.md)
-- [API Specification](./API_SPEC.md)
-- [Install And Recovery Guide](./INSTALL.md)
-- [Page To Backend Mapping](./docs/PAGE_BACKEND_MAPPING.md)
-- [Streak Analysis Flow](./docs/STREAK_ANALYSIS_FLOW.md)
-- [Complex Mode Flow](./docs/COMPLEX_MODE_FLOW.md)
+```bash
+export DEEPCOIN_API_KEY="..."
+export DEEPCOIN_SECRET_KEY="..."
+export DEEPCOIN_PASSPHRASE="..."
+```
 
-## Quality Gates
+영구 로컬 설정은 `.env.example`을 참고해 `.env`에 작성합니다. 셸에서 `export`한 값도 그대로 사용할 수 있습니다.
 
-- GitHub Actions runs backend tests, frontend lint/build, and architecture guard scripts on every push to `main`.
-- The current backend suite collects 129 tests across 20 files, covering quant math, AI orchestration, cache behavior, auth flow, and architecture invariants.
-- The repository includes explicit import guards to prevent `core/` and router layers from accumulating cross-layer coupling.
-- Public repo hygiene is enforced via ignore rules that exclude logs, local caches, agent artifacts, and large market data files.
+## 홀딩 vs 재진입 계산
 
-## Quick Start
+`/hold-reentry`는 기존 포지션을 목표가까지 홀딩하는 경우와 현재가에서 청산한 뒤 예상 가격에 재진입하는 경우를 비교합니다. 한 화면에서 롱 또는 숏을 명시적으로 선택하고, 투입금(USDT)과 1~50배 레버리지를 입력할 수 있습니다.
 
-### Prerequisites
+- 홀딩 손익: `목표가 - 기존 진입가`에 방향과 수량을 반영합니다.
+- 재진입 손익: 현재가 청산 손익과 재진입 후 목표가 손익을 합산합니다. 재진입 수량은 같은 투입금과 레버리지를 재진입가로 나눠 새로 계산합니다.
+- 순 추가이득: 두 시나리오의 손익 차이에서 홀딩 목표 청산 비용과 재진입 시나리오의 현재 청산·재진입·목표 청산 비용 차이를 차감합니다. 명목금액 기준 편도 수수료는 0.04%이며, 레버리지가 올라갈수록 투입금 대비 유효 수수료율도 선형으로 증가합니다.
+
+재진입 가격에서 실제로 체결되고 목표가에 도달한다는 조건부 비교이며, 체결 실패·슬리피지·펀딩비는 포함하지 않습니다.
+
+## 구조
+
+```text
+frontend/          React 18 + TypeScript + Vite + Tailwind
+  src/api/         기능별 HTTP 클라이언트
+  src/pages/       10개 활성 화면의 진입점
+  src/features/    AI Lab, 연속봉, 복리 계산기 등 화면 단위 모듈
+  src/hooks/       전용 차트와 추세판단이 공유하는 데이터 조회 훅
+  src/utils/       OHLCV 정규화, 홀딩/재진입 순수 계산과 단위 테스트
+  src/store/       Zustand 공용 코인·시간대·UI 상태
+backend/           FastAPI + Pydantic
+  modules/         라우터, 스키마, 도메인 서비스 (Deepcoin 읽기 전용 동기화 포함)
+  strategy/        연속봉, 하이브리드, BB Mid, 조합 필터 로직
+  utils/           Binance/CSV 로딩, TTL 캐시, 표준 오류 처리
+core/              순수 지표, VPVR, 백테스트, 지지·저항 계산
+```
+
+더 자세한 경계와 데이터 흐름은 [ARCHITECTURE.md](./ARCHITECTURE.md), 화면별 연결은 [docs/PAGE_BACKEND_MAPPING.md](./docs/PAGE_BACKEND_MAPPING.md)를 봅니다.
+
+## 빠른 실행
+
+### 요구사항
 
 - Python 3.9+
 - Node.js 18+
-- Optional local Binance CSV cache under `binance_klines/`
-
-### Run Locally
+- 선택 사항: 로컬 CSV 데이터 `binance_klines/`
 
 ```bash
 git clone https://github.com/alfredcho91-ux/Quant-Lab.git
 cd Quant-Lab
-chmod +x start.sh
+chmod +x bootstrap.sh dev.sh start.sh
 ./start.sh
 ```
 
+`start.sh`는 의존성이 없을 때만 `bootstrap.sh`를 실행한 뒤 개발 서버를 시작합니다.
+
 - Frontend: `http://localhost:5173`
 - Backend API: `http://localhost:8000`
-- API docs: `http://localhost:8000/docs`
-- Local development bypasses HTTP Basic auth by default. Basic auth is enforced only when `APP_ENV=production`.
+- OpenAPI: `http://localhost:8000/docs`
 
-## Runtime Notes
+개발 환경은 인증을 생략합니다. `APP_ENV=production`에서는 `DEMO_USERNAME`, `DEMO_PASSWORD`가 필수입니다.
 
-- Market data can come from local CSV files under `binance_klines/` or live Binance fetches through the backend data loader.
-- Live OHLCV requests are snapshot-cached briefly in the backend so repeated multi-page analysis runs do not refetch the same candles immediately.
-- Frontend analysis mutations now rely on typed API errors instead of silent `null` returns, so error UI and retry flows stay consistent.
-- In streak analysis, `Heikin-Ashi` mode changes only streak/pattern candle interpretation. RSI, ATR, Disparity, and EMA 200 filters continue to use the original OHLC series.
+자세한 설치, 환경 변수, 운영 복구는 [INSTALL.md](./INSTALL.md)를 봅니다.
 
-## Delivery Principles
+## 품질 검증
 
-- Quant logic is isolated from transport and presentation layers.
-- New features are documented with implementation maps so the repository stays understandable as scope grows.
-- Local startup and recovery are scripted to reduce friction when onboarding or restoring the project.
+```bash
+python3 scripts/check_core_imports.py
+python3 scripts/check_route_imports.py
+backend/venv/bin/python -m pytest -q backend/tests
+cd frontend && npm test
+cd frontend && npm run lint
+cd frontend && npm run build
+```
 
-## Public Release
+GitHub Actions는 아키텍처 가드, 백엔드 테스트, 프런트엔드 테스트·린트·빌드를 실행합니다.
 
-- Repository: [alfredcho91-ux/Quant-Lab](https://github.com/alfredcho91-ux/Quant-Lab)
-- Current CI workflow: [Tests](https://github.com/alfredcho91-ux/Quant-Lab/actions/workflows/test.yml)
-- Portfolio release notes: [docs/PORTFOLIO_RELEASE_NOTES.md](./docs/PORTFOLIO_RELEASE_NOTES.md)
+## 문서
 
-## Roadmap
+- [시스템 아키텍처](./ARCHITECTURE.md)
+- [API 명세](./API_SPEC.md)
+- [설치 및 운영 가이드](./INSTALL.md)
+- [화면-백엔드 매핑](./docs/PAGE_BACKEND_MAPPING.md)
+- [캐시 정책](./docs/CACHE_STRATEGY.md)
+- [계산 코드 맵](./docs/CALCULATION_CODE_MAP.md)
+- [변경 이력](./CHANGELOG.md)
 
-- [x] Phase 1: Core analytics, backtesting workflows, and architectural modularization
-- [ ] Phase 2: Execution-ready live trading integration and portfolio state management
-- [ ] Phase 3: Natural-language indicator customization, user-defined strategy composition, and ML-assisted ranking
-- [ ] Phase 4: CI/CD, containerization, and cloud deployment hardening
+## 주의
 
-Designed and implemented by Geunwoo Cho, focused on the intersection of Quant Finance and Software Implementation.
+이 프로젝트는 개인 분석과 연구용입니다. VPVR, RSI 역산 가격, 전략 통계는 매매 추천이나 수익 보장을 의미하지 않습니다. 외부 공개 또는 터널링 시에는 AI 분석의 Python 실행 기능을 비활성화하거나 별도 컨테이너 격리를 적용해야 합니다.

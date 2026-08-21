@@ -6,8 +6,8 @@ from typing import Any, Dict
 
 import pandas as pd
 
-from strategy.context import AnalysisContext
-from strategy.streak.common import (
+from backend.strategy.context import AnalysisContext
+from backend.strategy.streak.common import (
     ATR_BINS,
     CONFIDENCE_LEVEL,
     DISP_BINS,
@@ -15,12 +15,12 @@ from strategy.streak.common import (
     extract_c1_indices,
     safe_round,
 )
-from strategy.streak.statistics import (
+from backend.strategy.streak.statistics import (
     analyze_2d_interval_heatmap,
     analyze_interval_statistics,
     trimmed_stats,
 )
-from utils.stats import (
+from backend.utils.stats import (
     calculate_binomial_pvalue,
     safe_float,
     wilson_confidence_interval,

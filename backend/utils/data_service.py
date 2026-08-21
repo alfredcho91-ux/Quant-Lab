@@ -15,8 +15,9 @@ import logging
 import hashlib
 import json
 from functools import wraps
+from typing import Optional
 
-from utils.cache import DataCache
+from backend.utils.cache import DataCache
 
 # 로깅 설정
 logger = logging.getLogger(__name__)
@@ -27,6 +28,7 @@ BINANCE_TFS = [
     "1h", "2h", "4h", "6h", "8h",
     "12h", "1d", "3d", "1w", "1M"
 ]
+MARKET_TICKER_SYMBOLS = ("BTC/USDT", "ETH/USDT", "SOL/USDT")
 
 BASE_DIR = Path(__file__).parent.parent.parent / "binance_klines"
 
@@ -112,72 +114,118 @@ def get_market_prices():
     """Get market prices from Binance"""
     try:
         ex = ccxt.binance()
-        return ex.fetch_tickers(["BTC/USDT", "ETH/USDT", "SOL/USDT", "XRP/USDT"])
+        return ex.fetch_tickers(list(MARKET_TICKER_SYMBOLS))
     except ccxt.BaseError as exc:
         logger.debug("Binance ticker API unavailable: %s", exc)
         return None
 
 
 def fetch_live_data(symbol: str, timeframe: str, limit: int = 1000, total_candles: int = 3000):
-    """Fetch live OHLCV data from Binance API with pagination"""
+    """Compatibility wrapper for the single Binance REST OHLCV source.
+
+    ``limit`` used to control CCXT page sizes. Binance REST pagination is
+    bounded internally, so it remains only to avoid breaking existing callers.
+    """
+    _ = limit
+    effective_candles = min(total_candles, 300) if timeframe == "1w" else total_candles
+    return fetch_binance_klines(symbol, timeframe, total_candles=effective_candles)
+
+
+@cached(ttl_seconds=30)
+def fetch_binance_klines(
+    symbol: str,
+    timeframe: str,
+    total_candles: int = 1000,
+    end_time: Optional[int] = None,
+):
+    """Fetch raw Binance Spot klines with bounded, backwards pagination.
+
+    ``end_time`` is a Unix timestamp in milliseconds.  It permits historical
+    point-in-time analyses without changing the recent-candle callers.
+    """
+    if timeframe not in BINANCE_TFS:
+        raise ValueError(f"Unsupported Binance interval: {timeframe}")
+
+    normalized_symbol = symbol.replace("/", "").upper()
+    requested_candles = max(1, int(total_candles))
+    remaining = requested_candles
+    cursor_end_time = int(end_time) if end_time is not None else None
+    rows = []
+
     try:
-        # 주봉(1w): 모든 페이지에서 API 조회 시 최근 300개만 사용
-        if timeframe == "1w":
-            total_candles = min(total_candles, 300)
-        ex = ccxt.binance()
-        tf_ms = ex.parse_timeframe(timeframe) * 1000
-        now = ex.milliseconds()
-        since = now - (total_candles * tf_ms)
-        
-        all_ohlcv = []
-        cur = since
-        
-        for _ in range(15):
-            if cur >= now:
+        while remaining > 0:
+            params = {
+                "symbol": normalized_symbol,
+                "interval": timeframe,
+                "limit": min(1000, remaining),
+            }
+            if cursor_end_time is not None:
+                params["endTime"] = cursor_end_time
+
+            response = requests.get(
+                "https://api.binance.com/api/v3/klines",
+                params=params,
+                timeout=10,
+            )
+            response.raise_for_status()
+            batch = response.json()
+            if not isinstance(batch, list):
+                logger.warning("Unexpected Binance Kline response for %s %s", normalized_symbol, timeframe)
+                return None
+            if not batch:
                 break
-            try:
-                o = ex.fetch_ohlcv(symbol, timeframe, since=cur, limit=limit)
-            except ccxt.BaseError as exc:
-                logger.debug(
-                    "fetch_ohlcv retry for %s %s since=%s failed: %s",
-                    symbol,
-                    timeframe,
-                    cur,
-                    exc,
-                )
-                time.sleep(1)
-                continue
-            
-            if not o:
+
+            rows = batch + rows
+            remaining -= len(batch)
+            cursor_end_time = int(batch[0][0]) - 1
+            if len(batch) < params["limit"]:
                 break
-            
-            all_ohlcv.extend(o)
-            cur = o[-1][0] + 1
-            
-            if len(all_ohlcv) >= total_candles:
-                break
-            
-            time.sleep(0.1)
-        
-        if not all_ohlcv:
+            if remaining > 0:
+                time.sleep(0.1)
+
+        if not rows:
             return None
-        
-        df = pd.DataFrame(
-            all_ohlcv,
-            columns=["open_time", "open", "high", "low", "close", "volume"],
-        )
-        df["open_dt"] = pd.to_datetime(df["open_time"], unit="ms")
-        df.sort_values("open_dt", inplace=True)
+
+        columns = [
+            "open_time",
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume",
+            "close_time",
+            "quote_volume",
+            "trade_count",
+            "taker_buy_base_volume",
+            "taker_buy_quote_volume",
+            "ignore",
+        ]
+        df = pd.DataFrame(rows, columns=columns)
         df.drop_duplicates(subset=["open_time"], inplace=True)
-        df.reset_index(drop=True, inplace=True)
-        if timeframe == "1w" and len(df) > 300:
-            df = df.tail(300).reset_index(drop=True)
+        df.sort_values("open_time", inplace=True)
+        df = df.tail(requested_candles).reset_index(drop=True)
+
+        int_columns = ["open_time", "close_time", "trade_count"]
+        float_columns = [
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume",
+            "quote_volume",
+            "taker_buy_base_volume",
+            "taker_buy_quote_volume",
+        ]
+        for column in int_columns + float_columns:
+            df[column] = pd.to_numeric(df[column], errors="coerce")
+        df.dropna(subset=["open_time", "open", "high", "low", "close", "volume"], inplace=True)
+        df["open_time"] = df["open_time"].astype("int64")
+        df["close_time"] = df["close_time"].astype("int64")
+        df["trade_count"] = df["trade_count"].astype("int64")
+        df["open_dt"] = pd.to_datetime(df["open_time"], unit="ms")
         return df
-    except (ccxt.BaseError, ValueError, TypeError) as exc:
-        logger.error("API Error while loading %s %s: %s", symbol, timeframe, exc)
-        return None
-    except Exception as exc:
-        logger.exception("Unexpected API error while loading %s %s: %s", symbol, timeframe, exc)
+    except (requests.RequestException, ValueError, TypeError) as exc:
+        logger.warning("Binance Kline request failed for %s %s: %s", normalized_symbol, timeframe, exc)
         return None
 
 

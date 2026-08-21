@@ -1,6 +1,6 @@
 // Sidebar component
 import { useState } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation } from '../router-context';
 import { useQuery } from '@tanstack/react-query';
 import {
   ChevronLeft,
@@ -11,16 +11,13 @@ import {
   Activity,
   Palette,
   Globe,
-  Target,
   Layers,
-  Search,
   BookOpen,
-  Radio,
   Flame,
-  Zap,
   Bot,
-  Rocket,
-  FlaskConical,
+  Calculator,
+  CandlestickChart,
+  GitCompareArrows,
 } from 'lucide-react';
 import {
   useBackgroundTheme,
@@ -36,28 +33,23 @@ import {
 } from '../store/useStore';
 import { getLabels } from '../store/labels';
 import { getMarketPrices, getFearGreedIndex } from '../api/client';
-import type { Coin, Language } from '../types';
+import type { Language } from '../types';
 import type { BackgroundTheme, Interval } from '../store/useStore';
-
-const COINS: Coin[] = ['BTC', 'ETH', 'SOL', 'XRP'];
-const INTERVALS: Interval[] = ['15m', '30m', '1h', '2h', '4h', '1d', '3d', '1w', '1M'];
+import { useMediaQuery } from '../hooks/useMediaQuery';
+import { MARKET_COINS, MARKET_INTERVALS } from '../constants/market';
 
 const menuItems = [
   // 주요 분석 페이지 (맨 위)
   { path: '/ai-backtest-lab', icon: Bot, labelKey: 'menu_ai_backtest_lab' as const },
   { path: '/trend-judgment', icon: Activity, labelKey: 'menu_trend_judgment' as const },
+  { path: '/trend-chart', icon: CandlestickChart, labelKey: 'menu_trend_chart' as const },
   { path: '/streak-analysis', icon: Flame, labelKey: 'menu_streak_analysis' as const },
-  { path: '/bb-mid', icon: Target, labelKey: 'menu_bb_mid' as const },
-  { path: '/hybrid-analysis', icon: Zap, labelKey: 'menu_hybrid_analysis' as const },
   // 기타 분석 페이지
   { path: '/combo-filter', icon: Layers, labelKey: 'menu_combo_filter' as const },
-  { path: '/pattern', icon: BarChart3, labelKey: 'menu_pattern' as const },
-  { path: '/pattern-scanner', icon: Search, labelKey: 'menu_pattern_scanner' as const },
-  { path: '/strategy-scanner', icon: Radio, labelKey: 'menu_strategy_scanner' as const },
-  // 백테스트 페이지 복구
-  { path: '/backtest', icon: Rocket, labelKey: 'menu_backtest' as const },
-  { path: '/backtest-advanced', icon: FlaskConical, labelKey: 'menu_backtest_advanced' as const },
+  { path: '/compound-calculator', icon: Calculator, labelKey: 'menu_compound_calculator' as const },
+  { path: '/hold-reentry', icon: GitCompareArrows, labelKey: 'menu_hold_reentry' as const },
   { path: '/journal', icon: BookOpen, labelKey: 'menu_journal' as const },
+  { path: '/trade-analysis', icon: BarChart3, labelKey: 'menu_trade_analysis' as const },
 ];
 
 export default function Sidebar() {
@@ -69,6 +61,8 @@ export default function Sidebar() {
   const selectedCoin = useSelectedCoin();
   const selectedInterval = useSelectedInterval();
   const sidebarCollapsed = useSidebarCollapsed();
+  const isMobile = useMediaQuery('(max-width: 767px)');
+  const isSidebarCollapsed = sidebarCollapsed || isMobile;
   const setLanguage = useSetLanguage();
   const setBackgroundTheme = useSetBackgroundTheme();
   const setSelectedCoin = useSetSelectedCoin();
@@ -105,22 +99,25 @@ export default function Sidebar() {
         flex flex-col transition-all duration-300 z-50 ${
           sidebarThemeClass
         } ${
-          sidebarCollapsed ? 'w-16' : 'w-72'
+          isSidebarCollapsed ? 'w-16' : 'w-72'
         }`}
     >
       {/* Header */}
       <div className="p-4 border-b border-dark-700">
         <div className="flex items-center justify-between">
-          {!sidebarCollapsed && (
+          {isSidebarCollapsed ? (
+            <BarChart3 className="h-6 w-6 text-primary-400" aria-hidden="true" />
+          ) : (
             <h1 className="text-lg font-bold" style={{ color: '#072ac8' }}>
               {labels.sidebar_title}
             </h1>
           )}
           <button
             onClick={toggleSidebar}
-            className="p-2 rounded-lg hover:bg-dark-700 transition-colors"
+            className="hidden rounded-lg p-2 transition-colors hover:bg-dark-700 md:block"
+            aria-label={isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           >
-            {sidebarCollapsed ? (
+            {isSidebarCollapsed ? (
               <ChevronRight className="w-5 h-5 text-dark-400" />
             ) : (
               <ChevronLeft className="w-5 h-5 text-dark-400" />
@@ -130,7 +127,7 @@ export default function Sidebar() {
       </div>
 
       {/* Language Toggle */}
-      {!sidebarCollapsed && (
+      {!isSidebarCollapsed && (
         <div className="px-4 py-3 border-b border-dark-700">
           <div className="flex items-center gap-2">
             <div className="flex items-center gap-1 shrink-0">
@@ -162,10 +159,10 @@ export default function Sidebar() {
       )}
 
       {/* 코인 선택 & 봉 기간 (통합) */}
-      <div className={`border-b border-dark-700 ${sidebarCollapsed ? 'p-2' : 'p-4'}`}>
-        {sidebarCollapsed ? (
+      <div className={`border-b border-dark-700 ${isSidebarCollapsed ? 'p-2' : 'p-4'}`}>
+        {isSidebarCollapsed ? (
           <div className="flex flex-col gap-1.5">
-            {COINS.map((coin) => (
+            {MARKET_COINS.map((coin) => (
               <button
                 key={coin}
                 onClick={() => setSelectedCoin(coin)}
@@ -184,7 +181,7 @@ export default function Sidebar() {
               className="w-full bg-dark-800 border border-dark-600 rounded text-xs py-1.5 mt-0.5"
               title={labels.interval}
             >
-              {INTERVALS.map((tf) => (
+              {MARKET_INTERVALS.map((tf) => (
                 <option key={tf} value={tf}>{tf}</option>
               ))}
             </select>
@@ -195,7 +192,7 @@ export default function Sidebar() {
               {labels.coin_select} · {labels.interval}
             </label>
             <div className="grid grid-cols-4 gap-1">
-              {COINS.map((coin) => (
+              {MARKET_COINS.map((coin) => (
                 <button
                   key={coin}
                   onClick={() => setSelectedCoin(coin)}
@@ -214,7 +211,7 @@ export default function Sidebar() {
               onChange={(e) => setSelectedInterval(e.target.value as Interval)}
               className="w-full bg-dark-800 border border-dark-600 rounded-lg px-3 py-2 text-sm mt-2"
             >
-              {INTERVALS.map((tf) => (
+              {MARKET_INTERVALS.map((tf) => (
                 <option key={tf} value={tf}>{tf}</option>
               ))}
             </select>
@@ -223,7 +220,7 @@ export default function Sidebar() {
       </div>
 
       {/* Price Display */}
-      {!sidebarCollapsed && currentPrice && (
+      {!isSidebarCollapsed && currentPrice && (
         <div className="px-4 py-3 border-b border-dark-700">
           <div className="flex items-baseline justify-between">
             <span className="text-2xl font-bold font-mono">
@@ -242,7 +239,7 @@ export default function Sidebar() {
       )}
 
       {/* Fear & Greed Index */}
-      {!sidebarCollapsed && fng && (
+      {!isSidebarCollapsed && fng && (
         <div className="px-4 py-3 border-b border-dark-700">
           <label className="text-xs text-dark-400 uppercase tracking-wide mb-2 block">
             {labels.fear_greed}
@@ -261,8 +258,8 @@ export default function Sidebar() {
       )}
 
       {/* Trading Principles */}
-      <div className={`border-b border-dark-700 ${sidebarCollapsed ? 'px-2 py-2' : 'px-4 py-3'}`}>
-        {sidebarCollapsed ? (
+      <div className={`border-b border-dark-700 ${isSidebarCollapsed ? 'px-2 py-2' : 'px-4 py-3'}`}>
+        {isSidebarCollapsed ? (
           <div
             className="text-[10px] text-center text-primary-300 bg-primary-500/10 border border-primary-500/20 rounded-md py-1"
             title={labels.trading_principles.join('\n')}
@@ -309,6 +306,8 @@ export default function Sidebar() {
               <button
                 key={item.path}
                 onClick={() => navigate(item.path)}
+                aria-label={labels[item.labelKey]}
+                title={isSidebarCollapsed ? labels[item.labelKey] : undefined}
                 className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl transition-all ${
                   isActive
                     ? 'bg-gradient-to-r from-primary-500/20 to-primary-500/10 text-primary-400 border border-primary-500/20'
@@ -316,7 +315,7 @@ export default function Sidebar() {
                 }`}
               >
                 <Icon className={`w-5 h-5 ${isActive ? 'text-primary-400' : ''}`} />
-                {!sidebarCollapsed && (
+                {!isSidebarCollapsed && (
                   <span className="font-medium">{labels[item.labelKey]}</span>
                 )}
               </button>
@@ -326,7 +325,7 @@ export default function Sidebar() {
       </nav>
 
       {/* Footer */}
-      {!sidebarCollapsed && (
+      {!isSidebarCollapsed && (
         <div className="p-4 border-t border-dark-700">
           <p className="text-xs text-dark-500 text-center">
             {labels.sidebar_caption}

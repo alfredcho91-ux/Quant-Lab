@@ -9,22 +9,16 @@ Streak 아키텍처 계약(SSOT) 테스트.
 
 import ast
 import inspect
-import sys
 from pathlib import Path
 
 import pandas as pd
 
-
-backend_path = Path(__file__).parent.parent
-sys.path.insert(0, str(backend_path))
-sys.path.insert(0, str(backend_path.parent))
-
-from strategy.streak import common as streak_common
-from strategy.streak import statistics as streak_statistics
-from strategy.context import AnalysisContext
-from strategy.streak.cache_ops import generate_analysis_cache_key
-from strategy.streak.statistics import analyze_interval_statistics
-from models.request import StreakAnalysisParams
+from backend.strategy.streak import common as streak_common
+from backend.strategy.streak import statistics as streak_statistics
+from backend.strategy.context import AnalysisContext
+from backend.strategy.streak.cache_ops import generate_analysis_cache_key
+from backend.strategy.streak.statistics import analyze_interval_statistics
+from backend.models.request import StreakAnalysisParams
 
 
 STAT_HELPER_NAMES = {
@@ -60,7 +54,7 @@ def test_no_module_imports_statistics_helpers_from_common():
         for node in ast.walk(tree):
             if not isinstance(node, ast.ImportFrom):
                 continue
-            if node.module != "strategy.streak.common":
+            if node.module != "backend.strategy.streak.common":
                 continue
 
             for alias in node.names:

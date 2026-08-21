@@ -148,8 +148,6 @@ def get_labels(lang: str, csv_tfs: List[str]) -> Dict[str, object]:
             "menu_pattern": "📈 Pattern / Candle Stats",
             "menu_ma_cross": "📊 MA Cross Stats",
             "menu_journal": "📝 Trading Journal",          # ← 매매 일지 메뉴
-            "menu_scanner": "📊 Strategy Scanner",
-            "menu_pattern_scanner": "📡 Pattern Scanner",
 
             "title_backtest": "🚀 {coin} 8-Strategy Backtest",
             "title_pattern": "📈 Pattern / Candle Statistics Lab",
@@ -204,10 +202,6 @@ def get_labels(lang: str, csv_tfs: List[str]) -> Dict[str, object]:
             "equity": "### 📈 Equity Curve",
             "history": "### 📝 Trade History",
 
-            "scanner_title": "📊 Live Strategy Scanner (8)",
-            "scanner_timeframe": "Timeframe",
-            "scanner_update": "Update",
-
             "regime_map_title": "🗺️ Market Regime Map",
             "regime_map_chart_title": "Price & Regime (ADX + SMA filter)",
         }
@@ -222,8 +216,6 @@ def get_labels(lang: str, csv_tfs: List[str]) -> Dict[str, object]:
         "menu_pattern": "📈 패턴/캔들 통계",
         "menu_ma_cross": "📊 MA 크로스 통계",
         "menu_journal": "📝 매매 일지",              # ← 매매 일지 메뉴
-        "menu_scanner": "📊 전략 스캐너",
-        "menu_pattern_scanner": "📡 패턴 스캐너",
 
         "title_backtest": "🚀 {coin} 8개 전략 백테스트",
         "title_pattern": "📈 패턴/캔들 통계 연구실",
@@ -277,10 +269,6 @@ def get_labels(lang: str, csv_tfs: List[str]) -> Dict[str, object]:
         "regime_perf": "### 🗺️ 장세별 성과",
         "equity": "### 📈 누적 수익률",
         "history": "### 📝 거래 내역",
-
-        "scanner_title": "📊 실시간 전략 스캐너 (8)",
-        "scanner_timeframe": "Timeframe",
-        "scanner_update": "Update",
 
         "regime_map_title": "🗺️ Market Regime Map",
         "regime_map_chart_title": "가격과 장세(ADX + SMA 필터)",
