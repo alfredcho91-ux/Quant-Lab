@@ -17,6 +17,7 @@ __pycache__/
 .cache/  # diskcache 영속 캐시 디렉토리
 .cache/
 .codex_backups/
+/journal-free/
 .run/
 .sisyphus/
 server.log
