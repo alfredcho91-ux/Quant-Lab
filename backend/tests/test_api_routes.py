@@ -99,7 +99,6 @@ def test_unhandled_errors_do_not_expose_internal_messages():
         ("get", "/api/indicators/vpvr/{coin}/{interval}"),
         ("get", "/api/indicators/trade-report/{coin}/{interval}"),
         ("post", "/api/bb-mid"),
-        ("post", "/api/combo-filter"),
         ("post", "/api/trend-indicators"),
         ("post", "/api/hybrid-analysis"),
         ("post", "/api/hybrid-backtest"),

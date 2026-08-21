@@ -9,7 +9,6 @@ const TrendJudgmentPage = lazy(() => import('./pages/TrendJudgmentPage'));
 const TrendChartPage = lazy(() => import('./pages/TrendChartPage'));
 const BacktestPage = lazy(() => import('./pages/BacktestPage'));
 const BBMidPage = lazy(() => import('./pages/BBMidPage'));
-const ComboFilterPage = lazy(() => import('./pages/ComboFilterPage'));
 const StreakAnalysisPage = lazy(() => import('./pages/StreakAnalysisPage'));
 const TradingCompoundCalculatorPage = lazy(() => import('./pages/TradingCompoundCalculatorPage'));
 const HoldReentryPage = lazy(() => import('./pages/HoldReentryPage'));
@@ -25,7 +24,6 @@ function AppRoutes() {
     '/trend-judgment': <TrendJudgmentPage />,
     '/trend-chart': <TrendChartPage />,
     '/bb-mid': <BBMidPage />,
-    '/combo-filter': <ComboFilterPage />,
     '/streak-analysis': <StreakAnalysisPage />,
     '/compound-calculator': <TradingCompoundCalculatorPage />,
     '/hold-reentry': <HoldReentryPage />,

@@ -11,7 +11,6 @@ import {
   Activity,
   Palette,
   Globe,
-  Layers,
   BookOpen,
   Flame,
   Bot,
@@ -39,17 +38,16 @@ import { useMediaQuery } from '../hooks/useMediaQuery';
 import { MARKET_COINS, MARKET_INTERVALS } from '../constants/market';
 
 const menuItems = [
-  // 주요 분석 페이지 (맨 위)
-  { path: '/ai-backtest-lab', icon: Bot, labelKey: 'menu_ai_backtest_lab' as const },
+  { path: '/journal', icon: BookOpen, labelKey: 'menu_journal' as const },
+  { path: '/trade-analysis', icon: BarChart3, labelKey: 'menu_trade_analysis' as const },
+  // 주요 분석 페이지
   { path: '/trend-judgment', icon: Activity, labelKey: 'menu_trend_judgment' as const },
   { path: '/trend-chart', icon: CandlestickChart, labelKey: 'menu_trend_chart' as const },
   { path: '/streak-analysis', icon: Flame, labelKey: 'menu_streak_analysis' as const },
   // 기타 분석 페이지
-  { path: '/combo-filter', icon: Layers, labelKey: 'menu_combo_filter' as const },
   { path: '/compound-calculator', icon: Calculator, labelKey: 'menu_compound_calculator' as const },
   { path: '/hold-reentry', icon: GitCompareArrows, labelKey: 'menu_hold_reentry' as const },
-  { path: '/journal', icon: BookOpen, labelKey: 'menu_journal' as const },
-  { path: '/trade-analysis', icon: BarChart3, labelKey: 'menu_trade_analysis' as const },
+  { path: '/ai-backtest-lab', icon: Bot, labelKey: 'menu_ai_backtest_lab' as const },
 ];
 
 export default function Sidebar() {

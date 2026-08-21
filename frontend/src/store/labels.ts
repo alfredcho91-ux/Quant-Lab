@@ -10,7 +10,6 @@ export interface Labels {
   menu_compound_calculator: string;
   menu_hold_reentry: string;
   menu_bb_mid: string;
-  menu_combo_filter: string;
   menu_multi_tf_squeeze: string;
   menu_journal: string;
   menu_trade_analysis: string;
@@ -76,7 +75,6 @@ const labels_ko: Labels = {
   menu_compound_calculator: '🧮 복리 계산기',
   menu_hold_reentry: '홀딩 / 재진입',
   menu_bb_mid: '📊 볼밴 중단 터치',
-  menu_combo_filter: '🧪 통합 필터 테스트',
   menu_multi_tf_squeeze: '📐 멀티 TF 스퀴즈',
   menu_journal: '📝 매매 일지',
   menu_trade_analysis: '매매 분석',
@@ -149,7 +147,6 @@ const labels_en: Labels = {
   menu_compound_calculator: '🧮 Compound Calculator',
   menu_hold_reentry: 'Hold / Re-entry',
   menu_bb_mid: '📊 BB Mid Touch',
-  menu_combo_filter: '🧪 Combo Filter Test',
   menu_multi_tf_squeeze: '📐 Multi-TF Squeeze',
   menu_journal: '📝 Trading Journal',
   menu_trade_analysis: 'Trade Analysis',

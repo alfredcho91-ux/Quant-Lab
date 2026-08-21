@@ -40,7 +40,6 @@
 | --- | --- | --- | --- |
 | POST | `/api/backtest` | 백테스트 파라미터 | 기본 전략 백테스트 |
 | POST | `/api/bb-mid` | `coin`, `intervals`, `start_side`, `max_bars`, `regime`, `use_csv` | BB Mid 통계 |
-| POST | `/api/combo-filter` | 시간대·방향·TP·필터 파라미터 | 조합 필터 분석 |
 | POST | `/api/hybrid-analysis` | `coin`, `interval`, `strategies` | 하이브리드 전략 통계 |
 | POST | `/api/hybrid-backtest` | `coin`, `interval`, `strategy`, `tp`, `sl`, `max_hold` | 하이브리드 백테스트 |
 | POST | `/api/hybrid-live` | `coin`, `interval`, `strategies` | 하이브리드 최신 확정봉 상태 |

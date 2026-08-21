@@ -294,39 +294,6 @@ def add_bb_indicators(
     return df
 
 
-def add_combo_indicators(df: pd.DataFrame, sma_short: int, sma_long: int) -> pd.DataFrame:
-    """
-    Combo Filter를 위한 인디케이터들을 계산하여 DataFrame에 추가
-    (SMA, BB, RSI, 캔들 패턴 특성)
-    """
-    df = df.copy()
-    close = df["close"]
-    o, h, l, c = df["open"], df["high"], df["low"], df["close"]
-
-    df[f"SMA{sma_short}"] = close.rolling(window=sma_short, min_periods=sma_short).mean()
-    df[f"SMA{sma_long}"] = close.rolling(window=sma_long, min_periods=sma_long).mean()
-
-    mid = close.rolling(window=20, min_periods=20).mean()
-    std = close.rolling(window=20, min_periods=20).std()
-    upper = mid + 2.0 * std
-    lower = mid - 2.0 * std
-    set_bollinger_columns(df, mid, upper, lower)
-    df["RSI"] = compute_rsi_wilder(close, length=14)
-
-    df["is_bull"] = c > o
-    df["is_bear"] = c < o
-    df["body"] = (c - o).abs()
-    df["range"] = h - l
-    df["body"] = df["body"].replace(0, 1e-8)
-    df["range"] = df["range"].replace(0, 1e-8)
-    df["body_top"] = np.where(df["is_bull"], c, o)
-    df["body_bottom"] = np.where(df["is_bull"], o, c)
-    df["upper_wick"] = h - df["body_top"]
-    df["lower_wick"] = df["body_bottom"] - l
-    df["body_rel_range"] = df["body"] / df["range"]
-    return df
-
-
 def compute_live_indicators(df: pd.DataFrame) -> pd.DataFrame:
     """
     실시간 지표 계산 (고정밀 지표 계산)
@@ -438,7 +405,6 @@ def build_indicator_adapter(
 
 __all__ = [
     "add_bb_indicators",
-    "add_combo_indicators",
     "build_indicator_adapter",
     "compute_live_indicators",
     "compute_quant_lab_indicators",

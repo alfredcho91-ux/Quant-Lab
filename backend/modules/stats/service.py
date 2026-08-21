@@ -16,7 +16,6 @@ from backend.strategy.bb_mid import (
     analyze_bb_mid_touch,
     collect_event_returns,
 )
-from backend.strategy.combo_filter import analyze_combo_filter
 from backend.strategy.hybrid import analyze_hybrid_strategy, analyze_live_mode, run_hybrid_backtest
 from backend.utils.data_loader import load_data_for_analysis
 from backend.utils.stats import safe_float
@@ -131,20 +130,6 @@ def run_bb_mid_analysis(
         "excursions": excursions,
         "start_side": start_side,
     }
-
-
-def run_combo_filter_analysis(params: Dict[str, Any]) -> Dict[str, Any]:
-    """Run combo filter analysis with loaded market data."""
-    coin = params.get("coin", "BTC")
-    interval = params.get("interval", "1h")
-    use_csv = params.get("use_csv", False)
-
-    df = _load_data_for_analysis(coin, interval, use_csv)
-    if df is None:
-        return {"success": False, "error": "Failed to load data"}
-
-    stats = analyze_combo_filter(params, df)
-    return {"success": True, "data": stats}
 
 
 def run_trend_indicators_analysis(coin: str, interval: str, use_csv: bool) -> Dict[str, Any]:

@@ -21,7 +21,6 @@ backend/
 │   └── support_resistance/
 ├── strategy/               전략 특화 계산
 │   ├── bb_mid/
-│   ├── combo_filter/
 │   ├── hybrid/
 │   └── streak/
 ├── services/               공용 서비스 및 AI client adapter

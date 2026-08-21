@@ -6,18 +6,18 @@
 ![Python](https://img.shields.io/badge/Quant-Python_3.9-3776AB)
 ![TypeScript](https://img.shields.io/badge/Language-TypeScript-3178C6)
 
-개인용 암호화폐 기술 분석 및 전략 검증 도구입니다. React/TypeScript SPA와 FastAPI/Python API를 분리하고, 공통 지표 계산은 `core/`에 둡니다. 현재 지원 코인은 BTC, ETH, SOL이며, 기본 진입 화면은 4시간봉 중심의 `추세판단`입니다.
+개인용 암호화폐 기술 분석 및 전략 검증 도구입니다. React/TypeScript SPA와 FastAPI/Python API를 분리하고, 공통 지표 계산은 `core/`에 둡니다. 현재 지원 코인은 BTC, ETH, SOL이며, 기본 진입 화면은 4시간봉 중심의 `추세판단`입니다. 사이드바는 `매매일지`, `매매분석`을 최상단에 두고 AI 백테스트 랩은 마지막에 배치합니다.
 
 ## 현재 범위
 
 - 추세판단과 전용 차트: Lightweight Charts 기반 캔들·크로스헤어·줌/스크롤, 다중 지표, VWAP, RSI 가격대, VPVR
 - 가격 참고: 1h/2h/4h/1d RSI 30·70 역산 가격, 기간 VWAP, 200봉 Rolling VWAP, 시간대별 기준선 라벨
-- 분석 및 검증: 연속봉 통계, 조합 필터, 기본 백테스트, 복리 계산기, 홀딩 vs 재진입 손익 비교
+- 분석 및 검증: 연속봉 통계, 기본 백테스트, 복리 계산기, 홀딩 vs 재진입 손익 비교
 - 기록 및 연구: 매매일지, Deepcoin 읽기 전용 체결 동기화, AI 백테스트/리서치 워크벤치
 - 통합 거래 리포트: 종료 거래의 5m/15m/30m/1h/2h/4h/1d Binance Spot 캔들, 진입·종료 마커, 당시 VPVR/VWAP 숫자, RSI·MACD·Stoch RSI·3 Slow Stochastic 그래프를 한 화면에 표시
 - 데이터: Binance Spot kline API 또는 `binance_klines/`의 로컬 CSV
 
-스캐너, 패턴 스캐너, 전략 스캐너, 고급 백테스트 UI, 패턴/캔들 통계 UI, 하이브리드 전략 UI는 현재 제품 범위에서 제거되었습니다. `/backtest`와 `/bb-mid`는 직접 접근 경로로만 유지합니다.
+스캐너, 패턴 스캐너, 전략 스캐너, 통합필터 테스트, 고급 백테스트 UI, 패턴/캔들 통계 UI, 하이브리드 전략 UI는 현재 제품 범위에서 제거되었습니다. `/backtest`와 `/bb-mid`는 직접 접근 경로로만 유지합니다.
 
 ## 추세판단 데이터 기준
 
@@ -110,7 +110,7 @@ frontend/          React 18 + TypeScript + Vite + Tailwind
   src/store/       Zustand 공용 코인·시간대·UI 상태
 backend/           FastAPI + Pydantic
   modules/         라우터, 스키마, 도메인 서비스 (Deepcoin 읽기 전용 동기화 포함)
-  strategy/        연속봉, 하이브리드, BB Mid, 조합 필터 로직
+  strategy/        연속봉, 하이브리드, BB Mid 로직
   utils/           Binance/CSV 로딩, TTL 캐시, 표준 오류 처리
 core/              순수 지표, VPVR, 백테스트, 지지·저항 계산
 ```

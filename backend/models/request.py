@@ -16,7 +16,6 @@ from backend.modules.preset.schemas import PresetSaveRequest
 from backend.modules.journal.schemas import JournalEntry
 from backend.modules.stats.schemas import (
     BBMidParams,
-    ComboFilterParams,
     HybridAnalysisParams,
     HybridBacktestParams,
     HybridLiveModeParams,
@@ -47,7 +46,6 @@ __all__ = [
     "StreakAnalysisParams",
     "BacktestParams",
     "BBMidParams",
-    "ComboFilterParams",
     "TrendIndicatorsParams",
     "HybridAnalysisParams",
     "HybridBacktestParams",

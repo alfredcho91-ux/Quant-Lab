@@ -1,6 +1,6 @@
 # Quant-Lab Architecture
 
-이 문서는 2026-08-14 기준의 현재 구조와 의존성 방향을 설명합니다. Quant-Lab은 개인용 암호화폐 분석 도구지만, 데이터 접근·계산·HTTP·UI를 분리해 기능 추가 시 변경 범위를 좁히는 구조를 유지합니다.
+이 문서는 2026-08-21 기준의 현재 구조와 의존성 방향을 설명합니다. Quant-Lab은 개인용 암호화폐 분석 도구지만, 데이터 접근·계산·HTTP·UI를 분리해 기능 추가 시 변경 범위를 좁히는 구조를 유지합니다.
 
 ## 전체 흐름
 
@@ -38,7 +38,7 @@ React 18, TypeScript, Vite, Tailwind 기반 SPA입니다.
 - `src/utils/ohlcv.ts`: OHLCV 정규화와 진행 중 봉 제외 공통 처리
 - `src/utils/holdReentry.ts`: 홀딩과 재진입 시나리오의 순수 손익·추가 수수료 계산
 
-등록 경로는 `/trend-judgment`, `/trend-chart`, `/ai-backtest-lab`, `/streak-analysis`, `/combo-filter`, `/compound-calculator`, `/hold-reentry`, `/backtest`, `/journal`, `/trade-analysis`, `/bb-mid`입니다. `/backtest`와 `/bb-mid`는 직접 접근용이며, 기본 사이드바에서는 숨깁니다. `/ai-backtest-builder`는 AI Lab Builder 탭으로만 호환 리다이렉트됩니다.
+등록 경로는 `/journal`, `/trade-analysis`, `/trend-judgment`, `/trend-chart`, `/streak-analysis`, `/compound-calculator`, `/hold-reentry`, `/ai-backtest-lab`, `/backtest`, `/bb-mid`입니다. 사이드바는 앞의 8개를 이 순서로 노출하며, 매매일지·매매분석을 최상단에 두고 AI 백테스트 랩은 마지막에 둡니다. `/backtest`와 `/bb-mid`는 직접 접근용이며, 기본 사이드바에서는 숨깁니다. `/ai-backtest-builder`는 AI Lab Builder 탭으로만 호환 리다이렉트됩니다.
 
 ### `backend/modules/`
 
@@ -53,7 +53,7 @@ React 18, TypeScript, Vite, Tailwind 기반 SPA입니다.
 | `journal` | 동기화된 매매일지 조회·삭제, SQLite 저장소, MFE/MAE와 시점별 매매 품질 분석 |
 | `market` | 가격, 공포·탐욕 지수, 시간대, OHLCV |
 | `preset` | 백테스트 프리셋 CRUD |
-| `stats` | 추세 지표, BB Mid, 조합 필터, 내부용 하이브리드 API |
+| `stats` | 추세 지표, BB Mid, 내부용 하이브리드 API |
 | `strategy_info` | 전략 메타데이터와 설명 |
 | `streak` | 연속봉 확률 분석과 캐시 제어 |
 | `support_resistance` | 지지·저항 레벨 |
@@ -67,7 +67,6 @@ React 18, TypeScript, Vite, Tailwind 기반 SPA입니다.
 - `streak/`: Simple/Complex 연속봉 분석, C1/C2 통계, 캐시
 - `hybrid/`: SMA, MACD, RSI, ADX 조합의 분석·백테스트·라이브 상태. 현재 프런트 페이지는 제거되었으며 내부 API 계산 경로만 유지
 - `bb_mid/`: 볼린저 밴드 중단 터치 통계
-- `combo_filter/`: 복수 필터 조합의 조건부 결과
 - `shared/`, `common.py`, `context.py`: 전략 공통 로직과 분석 컨텍스트
 
 ### `core/`

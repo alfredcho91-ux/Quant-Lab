@@ -6,4 +6,4 @@ export type Language = 'ko' | 'en';
 
 export type Coin = MarketCoin;
 
-export type MenuPage = 'backtest' | 'journal' | 'bb-mid' | 'combo-filter' | 'streak-analysis' | 'trend-judgment' | 'ai-backtest-lab';
+export type MenuPage = 'backtest' | 'journal' | 'bb-mid' | 'streak-analysis' | 'trend-judgment' | 'ai-backtest-lab';

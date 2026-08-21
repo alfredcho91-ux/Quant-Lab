@@ -51,7 +51,6 @@
 | 기능 | API | 주요 코드 |
 | --- | --- | --- |
 | BB Mid | `POST /api/bb-mid` | `strategy/bb_mid/logic.py` |
-| 조합 필터 | `POST /api/combo-filter` | `strategy/combo_filter/logic.py` |
 | 하이브리드 | `POST /api/hybrid-*` | `strategy/hybrid/logic.py`, `strategy/hybrid/backtest.py` |
 | 기본 백테스트 | `POST /api/backtest` | `modules/backtest/service.py`, `core/backtest.py`, `core/strategies.py` |
 | 지지·저항 | `GET /api/support-resistance/{coin}/{interval}` | `modules/support_resistance/service.py`, `core/support_resistance.py` |

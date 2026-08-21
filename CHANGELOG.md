@@ -1,5 +1,11 @@
 # Changelog
 
+## [2026-08-21] Navigation And Product Scope Cleanup
+
+- Removed the unused Combo Filter Test end to end: sidebar item, page, frontend client/types, `/api/combo-filter` endpoint, schemas, strategy module, and indicator helper.
+- Moved Trading Journal and Trade Analysis to the top of the sidebar, and moved AI Backtest Lab to the final sidebar item.
+- Updated README, architecture, API, page mapping, calculation map, backend guide, and implementation notes to reflect the active product scope.
+
 ## [2026-08-08] Unified Trade Report
 
 - Combined the journal indicator snapshot and position chart review into one trade-report modal.

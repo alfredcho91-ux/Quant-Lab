@@ -6,8 +6,6 @@ from backend.models.response import TrendIndicatorsEnvelope
 from backend.modules.stats.schemas import (
     BBMidEnvelope,
     BBMidParams,
-    ComboFilterEnvelope,
-    ComboFilterParams,
     HybridAnalysisEnvelope,
     TrendIndicatorsParams,
     HybridAnalysisParams,
@@ -18,7 +16,6 @@ from backend.modules.stats.schemas import (
 )
 from backend.modules.stats.service import (
     run_bb_mid_analysis,
-    run_combo_filter_analysis,
     run_hybrid_analysis_service,
     run_hybrid_backtest_service,
     run_hybrid_live_service,
@@ -44,13 +41,6 @@ async def api_bb_mid(params: BBMidParams):
         params.regime,
         params.use_csv,
     )
-
-
-@router.post("/combo-filter", response_model=ComboFilterEnvelope)
-@handle_api_errors(include_traceback=False)
-async def api_combo_filter(params: ComboFilterParams):
-    """Run combo filter backtest"""
-    return await run_in_threadpool(run_combo_filter_analysis, params.model_dump())
 
 
 @router.post("/trend-indicators", response_model=TrendIndicatorsEnvelope)

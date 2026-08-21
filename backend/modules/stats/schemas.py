@@ -14,33 +14,6 @@ class BBMidParams(BaseModel):
     use_csv: bool = False
 
 
-class ComboFilterParams(BaseModel):
-    coin: str = Field(default="BTC", min_length=2, max_length=20)
-    interval: str = Field(default="1h", min_length=2, max_length=4)
-    direction: Literal["long", "short"] = "long"
-    tp_pct: float = Field(default=1.0, ge=0.0, le=100.0)
-    horizon: int = Field(default=5, ge=1, le=500)
-    rsi_min: float = Field(default=40.0, ge=0.0, le=100.0)
-    rsi_max: float = Field(default=60.0, ge=0.0, le=100.0)
-    sma_short: int = Field(default=5, ge=1, le=2000)
-    sma_long: int = Field(default=20, ge=1, le=2000)
-    filter1_type: str = "none"
-    filter1_params: Dict[str, Any] = Field(default_factory=dict)
-    filter2_type: str = "none"
-    filter2_params: Dict[str, Any] = Field(default_factory=dict)
-    filter3_type: str = "none"
-    filter3_params: Dict[str, Any] = Field(default_factory=dict)
-    use_csv: bool = False
-
-    @model_validator(mode="after")
-    def validate_combo_filter_relations(self) -> "ComboFilterParams":
-        if self.sma_short > self.sma_long:
-            raise ValueError("sma_short must be <= sma_long")
-        if self.rsi_min > self.rsi_max:
-            raise ValueError("rsi_min must be <= rsi_max")
-        return self
-
-
 class TrendIndicatorsParams(BaseModel):
     coin: str = Field(default="BTC", min_length=2, max_length=20)
     interval: str = Field(default="4h", min_length=2, max_length=4)
@@ -94,19 +67,6 @@ class BBMidEnvelope(BaseModel):
     start_side: str
 
 
-class ComboFilterPayload(BaseModel):
-    events: int
-    tp_hits: int
-    no_tp: int
-    hit_rate: Optional[float] = None
-    avg_ret: Optional[float] = None
-
-
-class ComboFilterEnvelope(BaseModel):
-    success: bool
-    data: ComboFilterPayload
-
-
 class HybridAnalysisEnvelope(BaseModel):
     success: bool
     coin: str
@@ -138,8 +98,6 @@ class HybridLiveEnvelope(BaseModel):
 __all__ = [
     "BBMidEnvelope",
     "BBMidParams",
-    "ComboFilterEnvelope",
-    "ComboFilterParams",
     "HybridAnalysisEnvelope",
     "HybridAnalysisParams",
     "HybridBacktestEnvelope",

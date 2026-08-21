@@ -1,21 +1,20 @@
 # 화면-백엔드 매핑
 
-문서 기준일: 2026-08-17. 이 표는 현재 `frontend/src/App.tsx`의 경로와 `backend/main.py`의 라우터 등록을 기준으로 합니다.
+문서 기준일: 2026-08-21. 이 표는 현재 `frontend/src/App.tsx`의 경로와 `backend/main.py`의 라우터 등록을 기준으로 합니다. 사이드바 노출 순서는 매매일지, 매매분석부터 시작하고 AI Lab은 마지막입니다.
 
 ## 주요 화면
 
 | 화면/경로 | 프런트 주요 코드 | API | 백엔드 계산 경로 |
 | --- | --- | --- | --- |
-| 추세판단 `/trend-judgment` | `pages/TrendJudgmentPage.tsx`, `components/IndicatorProjectionCard.tsx`, `components/VPVRTable.tsx`, `components/MomentumIndicatorPanels.tsx` | `POST /api/trend-indicators`, `GET /api/indicators/projection`, `GET /api/indicators/vpvr/{coin}/{interval}` | `modules/stats/service.py`, `modules/indicators/service.py`, `core/indicators.py`, `core/vpvr.py` |
-| 전용 차트 `/trend-chart` | `pages/TrendChartPage.tsx`, `components/TrendPriceChart.tsx` | `GET /api/indicators/projection`, `GET /api/indicators/vpvr/{coin}/{interval}`, `GET /api/ohlcv/{coin}/{interval}` | `modules/indicators/service.py`, `core/vpvr.py` |
-| AI Lab `/ai-backtest-lab` | `pages/AIStrategyLabPage.tsx`, `features/ai-lab/` | `POST /api/ai/research`, `POST /api/ai/analyst` | `modules/ai_lab/` |
-| 연속봉 분석 `/streak-analysis` | `pages/StreakAnalysisPage.tsx`, `features/streak-analysis/` | `POST /api/streak-analysis`, cache stats/clear | `modules/streak/`, `strategy/streak/` |
-| 조합 필터 `/combo-filter` | `pages/ComboFilterPage.tsx` | `POST /api/combo-filter` | `modules/stats/service.py`, `strategy/combo_filter/` |
-| 복리 계산기 `/compound-calculator` | `pages/TradingCompoundCalculatorPage.tsx`, `features/compound-calculator/` | 없음 | 브라우저 내 계산 |
-| 홀딩/재진입 `/hold-reentry` | `pages/HoldReentryPage.tsx`, `utils/holdReentry.ts` | 없음 | 브라우저 내 계산 |
-| 기본 백테스트 `/backtest` | `pages/BacktestPage.tsx` | `POST /api/backtest`, 전략 메타데이터 API, 프리셋 API | `modules/backtest/`, `core/backtest.py`, `core/strategies.py` |
 | 매매일지 `/journal` | `pages/JournalPage.tsx` | `GET/POST/DELETE /api/journal`, `GET /api/deepcoin/status`, `GET /api/deepcoin/trade-markers`, `POST /api/deepcoin/sync` | `modules/journal/`, `modules/deepcoin/`, `core/indicator_pipelines.py`, `core/vpvr.py` |
 | 매매 분석 `/trade-analysis` | `pages/TradeAnalysisPage.tsx`, `features/tradeAnalysis/CurrentMarketSimilarityPanel.tsx`, `TradeQualityAnalysis.tsx` | `GET /api/journal`, `GET /api/journal/current-market`, `GET /api/journal/quality-analysis`, `GET /api/journal/stop-loss-analysis` | `modules/journal/current_market.py`, `analysis.py`, `quality_analysis.py`, `quality_market.py`, `stop_loss_analysis.py`, `core/indicator_pipelines.py` |
+| 추세판단 `/trend-judgment` | `pages/TrendJudgmentPage.tsx`, `components/IndicatorProjectionCard.tsx`, `components/VPVRTable.tsx`, `components/MomentumIndicatorPanels.tsx` | `POST /api/trend-indicators`, `GET /api/indicators/projection`, `GET /api/indicators/vpvr/{coin}/{interval}` | `modules/stats/service.py`, `modules/indicators/service.py`, `core/indicators.py`, `core/vpvr.py` |
+| 전용 차트 `/trend-chart` | `pages/TrendChartPage.tsx`, `components/TrendPriceChart.tsx` | `GET /api/indicators/projection`, `GET /api/indicators/vpvr/{coin}/{interval}`, `GET /api/ohlcv/{coin}/{interval}` | `modules/indicators/service.py`, `core/vpvr.py` |
+| 연속봉 분석 `/streak-analysis` | `pages/StreakAnalysisPage.tsx`, `features/streak-analysis/` | `POST /api/streak-analysis`, cache stats/clear | `modules/streak/`, `strategy/streak/` |
+| 복리 계산기 `/compound-calculator` | `pages/TradingCompoundCalculatorPage.tsx`, `features/compound-calculator/` | 없음 | 브라우저 내 계산 |
+| 홀딩/재진입 `/hold-reentry` | `pages/HoldReentryPage.tsx`, `utils/holdReentry.ts` | 없음 | 브라우저 내 계산 |
+| AI Lab `/ai-backtest-lab` | `pages/AIStrategyLabPage.tsx`, `features/ai-lab/` | `POST /api/ai/research`, `POST /api/ai/analyst` | `modules/ai_lab/` |
+| 기본 백테스트 `/backtest` | `pages/BacktestPage.tsx` | `POST /api/backtest`, 전략 메타데이터 API, 프리셋 API | `modules/backtest/`, `core/backtest.py`, `core/strategies.py` |
 
 ## 직접 경로 유지 화면
 

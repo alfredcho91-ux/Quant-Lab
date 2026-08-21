@@ -11,8 +11,6 @@ import type {
   BBMidParams,
   BBMidResult,
   BBMidExcursion,
-  ComboFilterParams,
-  ComboFilterResult,
   TrendIndicatorsParams,
   TrendIndicatorsResult,
   IndicatorProjection,
@@ -60,23 +58,6 @@ export async function runBBMid(params: BBMidParams): Promise<{
     };
   } catch (error: unknown) {
     throw toApiClientError(error, 'Failed to run BB Mid analysis.');
-  }
-}
-
-export async function runComboFilter(params: ComboFilterParams): Promise<ComboFilterResult> {
-  try {
-    const res = await api.post<{
-      success: boolean;
-      data: ComboFilterResult;
-      error?: string;
-      error_code?: string | null;
-      details?: unknown;
-    }>('/combo-filter', params);
-
-    const payload = ensureApiSuccess(res, 'Failed to run combo filter analysis.');
-    return payload.data;
-  } catch (error: unknown) {
-    throw toApiClientError(error, 'Failed to run combo filter analysis.');
   }
 }
 

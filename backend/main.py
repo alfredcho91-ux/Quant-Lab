@@ -137,7 +137,7 @@ async def request_timing_middleware(request: Request, call_next):
 app.include_router(streak_router)  # /api/streak-analysis
 app.include_router(market_router)  # /api/market/*
 app.include_router(backtest_router)  # /api/backtest*
-app.include_router(stats_router)  # /api/bb-mid, /api/combo-filter, /api/hybrid-*
+app.include_router(stats_router)  # /api/bb-mid, /api/hybrid-*
 app.include_router(preset_router)  # /api/presets
 app.include_router(support_resistance_router)  # /api/support-resistance
 app.include_router(strategy_router)  # /api/strategy-info

@@ -23,33 +23,6 @@ export interface BBMidExcursion {
   avg_end: number;
 }
 
-export interface ComboFilterParams {
-  coin: string;
-  interval: string;
-  direction: 'long' | 'short';
-  tp_pct: number;
-  horizon: number;
-  rsi_min: number;
-  rsi_max: number;
-  sma_short: number;
-  sma_long: number;
-  filter1_type: string;
-  filter1_params: Record<string, unknown>;
-  filter2_type: string;
-  filter2_params: Record<string, unknown>;
-  filter3_type: string;
-  filter3_params: Record<string, unknown>;
-  use_csv: boolean;
-}
-
-export interface ComboFilterResult {
-  events: number;
-  tp_hits: number;
-  no_tp: number;
-  hit_rate: number | null;
-  avg_ret: number | null;
-}
-
 export interface TrendIndicatorsParams {
   coin: string;
   interval: string;
