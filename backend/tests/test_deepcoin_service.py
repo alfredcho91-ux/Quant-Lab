@@ -47,6 +47,47 @@ def test_deepcoin_headers_follow_the_documented_hmac_prehash():
     assert headers["DC-ACCESS-PASSPHRASE"] == "passphrase"
 
 
+def test_open_positions_service_returns_only_normalized_live_positions(monkeypatch):
+    credentials = DeepcoinCredentials("key", "secret", "passphrase")
+    monkeypatch.setattr(deepcoin_service, "get_deepcoin_credentials", lambda: credentials)
+    monkeypatch.setattr(
+        deepcoin_service.DeepcoinClient,
+        "get_open_positions",
+        lambda _client: [
+            {
+                "posId": "position-1",
+                "instId": "BTC-USDT-SWAP",
+                "posSide": "short",
+                "pos": "12",
+                "avgPx": "64000.5",
+                "lastPx": "63800",
+                "unrealizedProfit": "4.2",
+                "lever": "10",
+                "uTime": "1722762000000",
+                "cTime": "1722765600000",
+            },
+            {"posId": "closed", "instId": "ETH-USDT-SWAP", "posSide": "long", "pos": "0"},
+        ],
+    )
+
+    result = deepcoin_service.get_deepcoin_open_positions_service()
+
+    assert result["data"] == [
+        {
+            "position_id": "position-1",
+            "symbol": "BTC/USDT",
+            "direction": "Short",
+            "size": 12.0,
+            "average_price": 64000.5,
+            "last_price": 63800.0,
+            "unrealized_pnl": 4.2,
+            "leverage": 10.0,
+            "opened_at": "2024-08-04T09:00:00Z",
+            "updated_at": "2024-08-04T10:00:00Z",
+        }
+    ]
+
+
 def test_deepcoin_fills_split_saturated_time_windows(monkeypatch):
     credentials = DeepcoinCredentials("key", "secret", "passphrase")
     client = deepcoin_service.DeepcoinClient(credentials)

@@ -17,6 +17,7 @@ import {
   Calculator,
   CandlestickChart,
   GitCompareArrows,
+  ShieldAlert,
 } from 'lucide-react';
 import {
   useBackgroundTheme,
@@ -40,6 +41,7 @@ import { MARKET_COINS, MARKET_INTERVALS } from '../constants/market';
 const menuItems = [
   { path: '/journal', icon: BookOpen, labelKey: 'menu_journal' as const },
   { path: '/trade-analysis', icon: BarChart3, labelKey: 'menu_trade_analysis' as const },
+  { path: '/risk-lab', icon: ShieldAlert, labelKey: 'menu_risk_lab' as const },
   // 주요 분석 페이지
   { path: '/trend-judgment', icon: Activity, labelKey: 'menu_trend_judgment' as const },
   { path: '/trend-chart', icon: CandlestickChart, labelKey: 'menu_trend_chart' as const },
@@ -68,6 +70,7 @@ export default function Sidebar() {
   const toggleSidebar = useToggleSidebar();
 
   const labels = getLabels(language);
+  const usesMarketSelection = location.pathname !== '/journal';
 
   // Fetch market prices
   const { data: prices } = useQuery({
@@ -157,7 +160,7 @@ export default function Sidebar() {
       )}
 
       {/* 코인 선택 & 봉 기간 (통합) */}
-      <div className={`border-b border-dark-700 ${isSidebarCollapsed ? 'p-2' : 'p-4'}`}>
+      {usesMarketSelection && <div className={`border-b border-dark-700 ${isSidebarCollapsed ? 'p-2' : 'p-4'}`}>
         {isSidebarCollapsed ? (
           <div className="flex flex-col gap-1.5">
             {MARKET_COINS.map((coin) => (
@@ -215,10 +218,10 @@ export default function Sidebar() {
             </select>
           </>
         )}
-      </div>
+      </div>}
 
       {/* Price Display */}
-      {!isSidebarCollapsed && currentPrice && (
+      {usesMarketSelection && !isSidebarCollapsed && currentPrice && (
         <div className="px-4 py-3 border-b border-dark-700">
           <div className="flex items-baseline justify-between">
             <span className="text-2xl font-bold font-mono">

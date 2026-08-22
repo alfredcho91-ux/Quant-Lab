@@ -109,6 +109,7 @@ class JournalQualityData(BaseModel):
     entry_trend_intervals: List[Literal["1w", "1d", "4h"]]
     exit_interval: Literal["4h"]
     minimum_regime_conclusion_sample: int
+    market_data_sources: List[str] = Field(default_factory=list)
     summary: Dict[str, Any]
     thresholds: Dict[str, Any]
     regimes: List[Dict[str, Any]]

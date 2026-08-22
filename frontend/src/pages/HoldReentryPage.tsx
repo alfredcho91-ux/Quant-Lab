@@ -17,9 +17,10 @@ const DEFAULT_INPUTS: HoldReentryInputs = {
   targetPrice: 65_000,
   marginUsd: 64_000,
   leverage: 1,
+  feePercent: BASE_FEE_PERCENT,
 };
 
-type PriceField = 'entryPrice' | 'currentPrice' | 'reentryPrice' | 'targetPrice' | 'marginUsd' | 'leverage';
+type PriceField = 'entryPrice' | 'currentPrice' | 'reentryPrice' | 'targetPrice' | 'marginUsd' | 'leverage' | 'feePercent';
 
 function formatAmount(value: number): string {
   const absolute = Math.abs(value);
@@ -89,6 +90,7 @@ export default function HoldReentryPage() {
     { field: 'targetPrice', label: isKo ? '목표가' : 'Target price', step: 1 },
     { field: 'marginUsd', label: isKo ? '투입금 (USDT)' : 'Margin (USDT)', step: 1 },
     { field: 'leverage', label: isKo ? '레버리지 (배)' : 'Leverage (x)', step: 1, max: MAX_LEVERAGE },
+    { field: 'feePercent', label: isKo ? '편도 수수료 (%)' : 'One-way fee (%)', step: 0.01, max: 10 },
   ];
 
   return (
@@ -175,22 +177,22 @@ export default function HoldReentryPage() {
                 <div className="mt-0.5 font-mono font-medium text-dark-100">{result.reentryQuantity.toFixed(4)}</div>
               </div>
               <div className="border-t border-dark-700 px-2 py-2 sm:border-t-0 sm:pl-2 sm:pr-0">
-                <div className="text-dark-500">{isKo ? '유효 편도 수수료' : 'Effective one-way fee'}</div>
+                <div className="text-dark-500">{isKo ? '적용 편도 수수료' : 'Applied one-way fee'}</div>
                 <div className="mt-0.5 font-mono font-medium text-dark-100">{result.effectiveFeePercent.toFixed(2)}%</div>
               </div>
             </div>
           )}
           <div className="mt-2 text-[11px] text-dark-500">
             {isKo
-              ? `명목금액 기준 편도 수수료 ${BASE_FEE_PERCENT.toFixed(2)}%`
-              : `${BASE_FEE_PERCENT.toFixed(2)}% one-way fee on notional`}
+              ? '입력한 편도 수수료가 각 청산·재진입 체결 비용에 적용됩니다.'
+              : 'The entered one-way fee is applied to each exit and re-entry fill.'}
           </div>
         </section>
 
         <section className="rounded-lg border border-dark-700 bg-dark-800/30 p-4 sm:p-5">
           {!result.isValid ? (
             <div className="py-12 text-center text-sm text-dark-400">
-              {isKo ? `가격·투입금은 0보다 커야 하고 레버리지는 1~${MAX_LEVERAGE}배여야 합니다.` : `Prices and margin must be positive; leverage must be 1-${MAX_LEVERAGE}x.`}
+              {isKo ? `가격·투입금은 0보다 커야 하고 레버리지는 1~${MAX_LEVERAGE}배, 수수료는 0~10%여야 합니다.` : `Prices and margin must be positive; leverage must be 1-${MAX_LEVERAGE}x and the fee must be 0-10%.`}
             </div>
           ) : (
             <>

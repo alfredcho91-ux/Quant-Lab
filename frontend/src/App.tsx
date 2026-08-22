@@ -14,6 +14,7 @@ const TradingCompoundCalculatorPage = lazy(() => import('./pages/TradingCompound
 const HoldReentryPage = lazy(() => import('./pages/HoldReentryPage'));
 const JournalPage = lazy(() => import('./pages/JournalPage'));
 const TradeAnalysisPage = lazy(() => import('./pages/TradeAnalysisPage'));
+const RiskLabPage = lazy(() => import('./pages/RiskLabPage'));
 
 const routeFallback = <div className="card p-6 text-center text-dark-400">Loading...</div>;
 
@@ -30,6 +31,7 @@ function AppRoutes() {
     '/ai-backtest-lab': <AIStrategyLabPage />,
     '/journal': <JournalPage />,
     '/trade-analysis': <TradeAnalysisPage />,
+    '/risk-lab': <RiskLabPage />,
   };
 
   if (pathname === '/') return <Navigate to="/trend-judgment" replace />;

@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 class DeepcoinStatusData(BaseModel):
     configured: bool
     mode: Literal["read_only"] = "read_only"
+    credential_storage: Literal["local_env", "environment", "not_configured"] = "not_configured"
 
 
 class DeepcoinStatusEnvelope(BaseModel):
@@ -18,6 +19,12 @@ class DeepcoinStatusEnvelope(BaseModel):
 class DeepcoinSyncRequest(BaseModel):
     inst_type: Literal["SWAP", "SPOT"] = "SWAP"
     lookback_days: int = Field(default=7, ge=1, le=90)
+
+
+class DeepcoinCredentialsRequest(BaseModel):
+    api_key: str = Field(min_length=1, max_length=512)
+    secret_key: str = Field(min_length=1, max_length=512)
+    passphrase: str = Field(min_length=1, max_length=512)
 
 
 class DeepcoinSyncData(BaseModel):
@@ -42,6 +49,24 @@ class DeepcoinSyncEnvelope(BaseModel):
     data: DeepcoinSyncData
 
 
+class DeepcoinOpenPosition(BaseModel):
+    position_id: str
+    symbol: str
+    direction: Literal["Long", "Short"]
+    size: float
+    average_price: Optional[float] = None
+    last_price: Optional[float] = None
+    unrealized_pnl: Optional[float] = None
+    leverage: Optional[float] = None
+    opened_at: Optional[str] = None
+    updated_at: Optional[str] = None
+
+
+class DeepcoinOpenPositionsEnvelope(BaseModel):
+    success: bool
+    data: List[DeepcoinOpenPosition] = Field(default_factory=list)
+
+
 class DeepcoinTradeMarker(BaseModel):
     datetime: str
     price: float
@@ -63,7 +88,10 @@ class DeepcoinTradeMarkersEnvelope(BaseModel):
 
 __all__ = [
     "DeepcoinStatusData",
+    "DeepcoinCredentialsRequest",
     "DeepcoinStatusEnvelope",
+    "DeepcoinOpenPosition",
+    "DeepcoinOpenPositionsEnvelope",
     "DeepcoinTradeMarker",
     "DeepcoinTradeMarkersData",
     "DeepcoinTradeMarkersEnvelope",

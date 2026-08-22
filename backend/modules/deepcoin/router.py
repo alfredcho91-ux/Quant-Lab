@@ -7,12 +7,16 @@ from fastapi import APIRouter, Query
 from fastapi.concurrency import run_in_threadpool
 
 from backend.modules.deepcoin.schemas import (
+    DeepcoinCredentialsRequest,
+    DeepcoinOpenPositionsEnvelope,
     DeepcoinStatusEnvelope,
     DeepcoinSyncEnvelope,
     DeepcoinSyncRequest,
     DeepcoinTradeMarkersEnvelope,
 )
 from backend.modules.deepcoin.service import (
+    configure_deepcoin_credentials_service,
+    get_deepcoin_open_positions_service,
     get_deepcoin_status_service,
     get_deepcoin_trade_markers_service,
     sync_deepcoin_fills_service,
@@ -27,6 +31,25 @@ router = APIRouter(prefix="/api/deepcoin", tags=["deepcoin"])
 async def api_deepcoin_status():
     """Return only whether server-side Deepcoin read credentials are configured."""
     return await run_in_threadpool(get_deepcoin_status_service)
+
+
+@router.get("/open-positions", response_model=DeepcoinOpenPositionsEnvelope)
+@handle_api_errors()
+async def api_deepcoin_open_positions():
+    """Return current non-zero positions using server-side credentials only."""
+    return await run_in_threadpool(get_deepcoin_open_positions_service)
+
+
+@router.post("/credentials", response_model=DeepcoinStatusEnvelope)
+@handle_api_errors()
+async def api_configure_deepcoin_credentials(request: DeepcoinCredentialsRequest):
+    """Verify and save local read-only credentials without returning any secret."""
+    return await run_in_threadpool(
+        configure_deepcoin_credentials_service,
+        request.api_key,
+        request.secret_key,
+        request.passphrase,
+    )
 
 
 @router.get("/trade-markers", response_model=DeepcoinTradeMarkersEnvelope)

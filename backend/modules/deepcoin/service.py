@@ -33,9 +33,11 @@ from backend.modules.deepcoin.snapshot import (
     indicator_snapshot_for_event as _indicator_snapshot_for_fill,
     snapshot_candle_count as _snapshot_candle_count,
 )
+from backend.modules.deepcoin.credentials import has_local_deepcoin_credentials, save_local_deepcoin_credentials
 from backend.utils.error_handler import BusinessLogicError, DataLoadError
 
 DEEPCOIN_FILLS_PATH = "/deepcoin/trade/fills"
+DEEPCOIN_POSITIONS_PATH = "/deepcoin/account/positions"
 DEEPCOIN_POSITIONS_HISTORY_PATH = "/deepcoin/account/positions-history"
 DEEPCOIN_TRIGGER_ORDERS_HISTORY_PATH = "/deepcoin/trade/trigger-orders-history"
 DEEPCOIN_FILL_PAGE_SIZE = 100
@@ -138,6 +140,33 @@ class DeepcoinClient:
         if not isinstance(data, list):
             raise DataLoadError("Deepcoin returned an invalid position-history response")
         return [item for item in data if isinstance(item, dict)]
+
+    def get_open_positions(self) -> List[Dict[str, Any]]:
+        """Read the account's current non-zero SWAP positions."""
+        params = {"instType": "SWAP"}
+        query = urlencode(params)
+        request_path = f"{DEEPCOIN_POSITIONS_PATH}?{query}"
+        try:
+            response = requests.get(
+                f"{self._base_url}{DEEPCOIN_POSITIONS_PATH}",
+                params=params,
+                headers=self.build_headers("GET", request_path),
+                timeout=15,
+            )
+            response.raise_for_status()
+            payload = response.json()
+        except (requests.RequestException, ValueError) as exc:
+            raise DataLoadError("Deepcoin open positions are temporarily unavailable") from exc
+
+        if not isinstance(payload, dict) or payload.get("code") not in (None, 0, "0"):
+            raise DataLoadError("Deepcoin open positions are temporarily unavailable")
+        data = payload.get("data", [])
+        if not isinstance(data, list):
+            raise DataLoadError("Deepcoin returned an invalid open-position response")
+        return [
+            item for item in data
+            if isinstance(item, dict) and (_to_float(item.get("pos")) or 0) > 0
+        ]
 
     def _get_trigger_orders_history_page(self, params: Dict[str, str]) -> List[Dict[str, Any]]:
         query = urlencode(params)
@@ -574,13 +603,44 @@ def _closed_position_journal_row(
 
 
 def get_deepcoin_status_service() -> Dict[str, Any]:
+    configured = get_deepcoin_credentials() is not None
     return {
         "success": True,
         "data": {
-            "configured": get_deepcoin_credentials() is not None,
+            "configured": configured,
             "mode": "read_only",
+            "credential_storage": (
+                "local_env" if configured and has_local_deepcoin_credentials()
+                else "environment" if configured
+                else "not_configured"
+            ),
         },
     }
+
+
+def configure_deepcoin_credentials_service(api_key: str, secret_key: str, passphrase: str) -> Dict[str, Any]:
+    """Verify read access before persisting credentials in the local env file."""
+    credentials = DeepcoinCredentials(
+        api_key=api_key.strip(),
+        secret_key=secret_key.strip(),
+        passphrase=passphrase.strip(),
+    )
+    try:
+        DeepcoinClient(credentials).get_fills(inst_type="SWAP", lookback_days=1)
+    except (DataLoadError, ValueError) as exc:
+        raise BusinessLogicError(
+            "Deepcoin connection could not be verified. Check the API key, passphrase, IP allowlist, and read permission.",
+            error_code="DEEPCOIN_CONNECTION_FAILED",
+        ) from exc
+
+    try:
+        save_local_deepcoin_credentials(credentials.api_key, credentials.secret_key, credentials.passphrase)
+    except (OSError, ValueError) as exc:
+        raise BusinessLogicError(
+            "Deepcoin credentials could not be saved locally.",
+            error_code="DEEPCOIN_CREDENTIAL_SAVE_FAILED",
+        ) from exc
+    return get_deepcoin_status_service()
 
 
 def get_deepcoin_trade_markers_service(
@@ -824,9 +884,53 @@ def sync_deepcoin_fills_service(inst_type: str, lookback_days: int) -> Dict[str,
     }
 
 
+def get_deepcoin_open_positions_service() -> Dict[str, Any]:
+    """Return normalized live positions without persisting account state."""
+    credentials = get_deepcoin_credentials()
+    if credentials is None:
+        raise BusinessLogicError(
+            "Deepcoin API credentials are not configured",
+            error_code="DEEPCOIN_NOT_CONFIGURED",
+        )
+
+    positions = []
+    for raw in DeepcoinClient(credentials).get_open_positions():
+        coin = _base_coin(raw.get("instId"))
+        side = str(raw.get("posSide") or "").lower()
+        size = _to_float(raw.get("pos"))
+        if coin is None or side not in {"long", "short"} or size is None or size <= 0:
+            continue
+        raw_times = [
+            value for value in (
+                _timestamp_ms(raw.get("uTime")),
+                _timestamp_ms(raw.get("cTime")),
+            )
+            if value is not None
+        ]
+        # Deepcoin responses have been observed with uTime/cTime semantics reversed
+        # across API versions. Chronological order is stable even when labels are not.
+        opened_ms = min(raw_times) if raw_times else None
+        updated_ms = max(raw_times) if raw_times else None
+        positions.append({
+            "position_id": str(raw.get("posId") or ""),
+            "symbol": f"{coin}/USDT",
+            "direction": "Long" if side == "long" else "Short",
+            "size": size,
+            "average_price": _to_json_number(raw.get("avgPx")),
+            "last_price": _to_json_number(raw.get("lastPx")),
+            "unrealized_pnl": _to_json_number(raw.get("unrealizedProfit")),
+            "leverage": _to_json_number(raw.get("lever")),
+            "opened_at": _timestamp_to_iso(opened_ms) if opened_ms else None,
+            "updated_at": _timestamp_to_iso(updated_ms) if updated_ms else None,
+        })
+    return {"success": True, "data": positions}
+
+
 __all__ = [
     "DeepcoinClient",
     "get_deepcoin_status_service",
+    "get_deepcoin_open_positions_service",
+    "configure_deepcoin_credentials_service",
     "get_deepcoin_trade_markers_service",
     "sync_deepcoin_fills_service",
 ]

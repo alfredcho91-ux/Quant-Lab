@@ -3,6 +3,7 @@
 import { api, ApiResponse, ensureApiSuccess, toApiClientError, unwrapApiResponse } from './config';
 import type {
   DeepcoinStatus,
+  DeepcoinOpenPosition,
   DeepcoinSyncResult,
   DeepcoinTradeMarkers,
   JournalExcursionData,
@@ -131,6 +132,28 @@ export async function getDeepcoinStatus(): Promise<DeepcoinStatus> {
     return unwrapApiResponse(res, 'Failed to load Deepcoin connection status.');
   } catch (error: unknown) {
     throw toApiClientError(error, 'Failed to load Deepcoin connection status.');
+  }
+}
+
+export async function getDeepcoinOpenPositions(): Promise<DeepcoinOpenPosition[]> {
+  try {
+    const res = await api.get<ApiResponse<DeepcoinOpenPosition[]>>('/deepcoin/open-positions');
+    return unwrapApiResponse(res, 'Failed to load Deepcoin open positions.');
+  } catch (error: unknown) {
+    throw toApiClientError(error, 'Failed to load Deepcoin open positions.');
+  }
+}
+
+export async function configureDeepcoinCredentials(params: {
+  api_key: string;
+  secret_key: string;
+  passphrase: string;
+}): Promise<DeepcoinStatus> {
+  try {
+    const res = await api.post<ApiResponse<DeepcoinStatus>>('/deepcoin/credentials', params, { timeout: 30_000 });
+    return unwrapApiResponse(res, 'Failed to verify and save Deepcoin credentials.');
+  } catch (error: unknown) {
+    throw toApiClientError(error, 'Failed to verify and save Deepcoin credentials.');
   }
 }
 

@@ -34,6 +34,7 @@ export interface TradeIndicatorTimeframeSnapshot {
 export interface TradeIndicatorSnapshot {
   version?: number;
   market_source?: string;
+  market_source_fallback?: boolean;
   reference?: string;
   event_type?: 'fill' | 'position_close' | 'current_market';
   event_time?: string;
@@ -139,6 +140,11 @@ export interface TradeQualityGroup extends TradeQualityPerformance {
 
 export interface TradeQualitySummary {
   trade_count: number;
+  total_pnl?: number | null;
+  win_rate_pct?: number | null;
+  average_r?: number | null;
+  average_pnl?: number | null;
+  profit_factor?: number | null;
   best_regime?: TradeQualityRegime | null;
   worst_regime?: TradeQualityRegime | null;
   quality_counts: Record<string, number>;
@@ -162,6 +168,7 @@ export interface JournalQualityAnalysisData extends TradeQualityAnalysisSlice {
   entry_trend_intervals: Array<'1w' | '1d' | '4h'>;
   exit_interval: '4h';
   minimum_regime_conclusion_sample: number;
+  market_data_sources: string[];
   thresholds: Record<string, number | string | null>;
   direction_stats: TradeQualityGroup[];
   direction_breakdown: Record<'Long' | 'Short', TradeQualityAnalysisSlice>;
@@ -452,6 +459,7 @@ export interface TradeQualityItem {
 export interface DeepcoinStatus {
   configured: boolean;
   mode: 'read_only';
+  credential_storage: 'local_env' | 'environment' | 'not_configured';
 }
 
 export interface DeepcoinSyncResult {
@@ -469,6 +477,19 @@ export interface DeepcoinSyncResult {
   positions_skipped: number;
   positions_ignored: number;
   warnings: string[];
+}
+
+export interface DeepcoinOpenPosition {
+  position_id: string;
+  symbol: string;
+  direction: 'Long' | 'Short';
+  size: number;
+  average_price?: number | null;
+  last_price?: number | null;
+  unrealized_pnl?: number | null;
+  leverage?: number | null;
+  opened_at?: string | null;
+  updated_at?: string | null;
 }
 
 export interface TradeExecutionMarker {

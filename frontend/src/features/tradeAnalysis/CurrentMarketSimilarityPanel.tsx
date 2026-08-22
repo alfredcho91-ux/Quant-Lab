@@ -104,7 +104,7 @@ export default function CurrentMarketSimilarityPanel({
           </h2>
           <div className="mt-1 text-[11px] text-dark-500">
             {query.data
-              ? `${query.data.symbol} · ${trendDirectionLabel(query.data.trend_states)} · ${formatDate(query.data.as_of, isKo, true)}`
+              ? `${query.data.symbol} · ${trendDirectionLabel(query.data.trend_states)} · ${formatDate(query.data.as_of, isKo, true)} · ${query.data.indicator_snapshot.market_source_fallback ? (isKo ? 'Binance Spot 대체 데이터 포함' : 'Binance Spot fallback included') : query.data.indicator_snapshot.market_source || '-'}`
               : `${coin}/USDT`}
           </div>
         </div>
@@ -164,7 +164,7 @@ export default function CurrentMarketSimilarityPanel({
                   <th className="py-2 text-right">{isKo ? '일치도' : 'Similarity'}</th>
                   <th className="py-2 text-center">{isKo ? '결과' : 'Result'}</th>
                   <th className="py-2 text-right">{isKo ? '순수익률' : 'Net Return'}</th>
-                  <th className="py-2 text-right">MFE</th>
+                  <th className="py-2 text-right">{isKo ? '진입 후 최대 유리폭' : 'Max favorable move'}</th>
                   <th className="px-4 py-2 text-right">{isKo ? '청산 후 추가폭' : 'Post-exit Move'}</th>
                 </tr>
               </thead>

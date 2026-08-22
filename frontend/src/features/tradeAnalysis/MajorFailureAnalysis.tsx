@@ -65,7 +65,7 @@ function caseConclusion(item: MajorFailureCase): string {
   const excursion = item.trade.excursion;
   const parts = [];
   if (item.reasons.includes('poor_entry') && excursion) {
-    parts.push(`MFE ${number(excursion.mfe_pct)}%보다 MAE ${number(excursion.mae_pct)}%가 큼`);
+    parts.push(`진입 후 최대 유리폭 ${number(excursion.mfe_pct)}%보다 최대 불리폭 ${number(excursion.mae_pct)}%가 큼`);
   }
   if (item.reasons.includes('regime_conflict')) parts.push('진입 당시 상위 프레임 충돌');
   if (item.reasons.includes('leverage_amplified')) {

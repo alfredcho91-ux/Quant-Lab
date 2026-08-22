@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { BarChart3, ChevronDown, Loader2, ShieldAlert, SlidersHorizontal } from 'lucide-react';
+import { BarChart3, ChevronDown, Loader2, SlidersHorizontal } from 'lucide-react';
 
-import { getJournal, getJournalQualityAnalysis, getJournalStopLossAnalysis, getJournalStopOptimization } from '../api/client';
+import { getDeepcoinOpenPositions, getJournal, getJournalQualityAnalysis } from '../api/client';
 import {
   ANALYSIS_TIMEFRAMES,
   buildAnalyzedTrades,
@@ -25,17 +25,19 @@ import {
 } from '../features/journal/journalPeriod';
 import { usePageCommon } from '../hooks/usePageCommon';
 import TradeQualityAnalysis from '../features/tradeAnalysis/TradeQualityAnalysis';
-import StopLossAnalysis from '../features/tradeAnalysis/StopLossAnalysis';
-import StopOptimizationAnalysis from '../features/tradeAnalysis/StopOptimizationAnalysis';
 import CurrentMarketSimilarityPanel from '../features/tradeAnalysis/CurrentMarketSimilarityPanel';
 import MajorFailureAnalysis from '../features/tradeAnalysis/MajorFailureAnalysis';
-import StopLossExpectationTool from '../features/tradeAnalysis/StopLossExpectationTool';
-import SlTpExpectationAnalysis from '../features/tradeAnalysis/SlTpExpectationAnalysis';
+import MajorSuccessAnalysis from '../features/tradeAnalysis/MajorSuccessAnalysis';
+import OngoingPositionFills from '../features/tradeAnalysis/OngoingPositionFills';
+import TradeExitReviewList from '../features/tradeAnalysis/TradeExitReviewList';
+import TradeReportModal from '../features/journal/TradeReportModal';
 import { journalQueryKeys } from '../features/journal/journalQueryKeys';
 import { useSelectedCoin } from '../store/useStore';
+import type { JournalEntry, TradeQualityItem } from '../types';
 
 type AnalysisMode = 'all' | 'wins' | 'losses' | 'compare';
 type DirectionFilter = 'Long' | 'Short';
+type AnalysisSection = 'overview' | 'entry';
 
 const DEFAULT_ANALYSIS_DAYS = 90;
 
@@ -47,6 +49,51 @@ function signed(value: number | null | undefined, digits = 2): string {
 function plain(value: number | null | undefined, digits = 2): string {
   if (value == null || !Number.isFinite(value)) return '-';
   return value.toLocaleString(undefined, { maximumFractionDigits: digits });
+}
+
+function TradeEvidenceList({
+  regimeId,
+  direction,
+  qualityItems,
+  entries,
+  isKo,
+  onClose,
+}: {
+  regimeId: string;
+  direction: DirectionFilter;
+  qualityItems: TradeQualityItem[];
+  entries: JournalEntry[];
+  isKo: boolean;
+  onClose: () => void;
+}) {
+  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const entryById = useMemo(() => new Map(entries.map((entry) => [entry.id, entry])), [entries]);
+  const items = useMemo(() => qualityItems
+    .filter((item) => item.direction === direction && item.market_regime.id === regimeId)
+    .sort((left, right) => new Date(right.exit_datetime || 0).getTime() - new Date(left.exit_datetime || 0).getTime()), [direction, qualityItems, regimeId]);
+  const selectedEntry = selectedId == null ? undefined : entryById.get(selectedId);
+
+  return (
+    <section className="border border-primary-400/30 bg-primary-500/5 p-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h3 className="text-sm font-semibold text-white">{isKo ? '근거 거래' : 'Supporting Trades'}</h3>
+          <div className="mt-0.5 text-[11px] text-dark-500">{isKo ? '행을 누르면 해당 거래의 차트 복기를 엽니다.' : 'Select a row to open the chart review.'}</div>
+        </div>
+        <button type="button" onClick={onClose} className="text-xs text-dark-400 hover:text-white">{isKo ? '닫기' : 'Close'}</button>
+      </div>
+      <div className="mt-3 max-h-72 overflow-y-auto">
+        {items.map((item) => (
+          <button key={item.journal_id} type="button" onClick={() => setSelectedId(item.journal_id)} className="flex w-full items-center justify-between gap-3 border-b border-dark-800 py-2 text-left text-xs hover:bg-dark-900/50">
+            <span className="text-dark-200">{item.symbol} · {item.direction} · {item.exit_datetime ? toDateInputValue(new Date(item.exit_datetime)) : '-'}</span>
+            <span className={(item.realized_pnl || 0) >= 0 ? 'font-mono text-bull' : 'font-mono text-bear'}>{signed(item.realized_pnl)} USDT</span>
+          </button>
+        ))}
+        {items.length === 0 && <div className="py-6 text-center text-xs text-dark-500">{isKo ? '표시할 거래가 없습니다.' : 'No matching trades.'}</div>}
+      </div>
+      {selectedEntry && <TradeReportModal entry={selectedEntry} allEntries={entries} qualityItem={items.find((item) => item.journal_id === selectedId)} isKo={isKo} onClose={() => setSelectedId(null)} />}
+    </section>
+  );
 }
 
 function TradeQuality({ trades, isKo, isLoading }: { trades: AnalyzedTrade[]; isKo: boolean; isLoading: boolean }) {
@@ -67,7 +114,7 @@ function TradeQuality({ trades, isKo, isLoading }: { trades: AnalyzedTrade[]; is
     <section className="border border-dark-700 bg-dark-900/20 p-4">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <h2 className="text-sm font-semibold text-white">MFE / MAE</h2>
+          <h2 className="text-sm font-semibold text-white">진입 후 가격 흐름</h2>
           <div className="mt-0.5 text-[11px] text-dark-500">
             {isKo ? '15분봉 · 진입 이후부터 종료 이전까지 완전히 포함된 봉 기준' : '15m candles fully contained between entry and exit'}
           </div>
@@ -76,8 +123,8 @@ function TradeQuality({ trades, isKo, isLoading }: { trades: AnalyzedTrade[]; is
       </div>
       <div className="mt-3 flex flex-wrap gap-x-6 gap-y-1 border-y border-dark-800 py-2 text-xs text-dark-400">
         <span>{isKo ? '계산 가능' : 'Available'} <strong className="font-mono text-dark-200">{withExcursion.length}/{trades.length}</strong></span>
-        <span>MFE <strong className="font-mono text-bull">+{plain(qualitySummary.averageMfePct)}%</strong></span>
-        <span>MAE <strong className="font-mono text-bear">-{plain(qualitySummary.averageMaePct)}%</strong></span>
+        <span>{isKo ? '진입 후 최대 유리폭' : 'Maximum favorable move'} <strong className="font-mono text-bull">+{plain(qualitySummary.averageMfePct)}%</strong></span>
+        <span>{isKo ? '진입 후 최대 불리폭' : 'Maximum adverse move'} <strong className="font-mono text-bear">-{plain(qualitySummary.averageMaePct)}%</strong></span>
         <span>{isKo ? '종료 아쉬움' : 'Exit Miss'} <strong className="font-mono text-amber-300">{goodEntryPoorExit.length}</strong></span>
         <span>{isKo ? '진입 불리' : 'Poor Entry'} <strong className="font-mono text-bear">{poorEntry.length}</strong></span>
       </div>
@@ -88,8 +135,8 @@ function TradeQuality({ trades, isKo, isLoading }: { trades: AnalyzedTrade[]; is
               <tr className="border-b border-dark-700">
                 <th className="py-2 text-left">{isKo ? '거래' : 'Trade'}</th>
                 <th className="py-2 text-left">{isKo ? '분류' : 'Class'}</th>
-                <th className="py-2 text-right">MFE</th>
-                <th className="py-2 text-right">MAE</th>
+                <th className="py-2 text-right">{isKo ? '최대 유리폭' : 'Max favorable'}</th>
+                <th className="py-2 text-right">{isKo ? '최대 불리폭' : 'Max adverse'}</th>
                 <th className="py-2 text-right">{isKo ? '실제 가격 움직임' : 'Realized Move'}</th>
               </tr>
             </thead>
@@ -125,10 +172,11 @@ export default function TradeAnalysisPage() {
   const [usesRollingPeriod, setUsesRollingPeriod] = useState(true);
   const [mode, setMode] = useState<AnalysisMode>('compare');
   const [direction, setDirection] = useState<DirectionFilter>('Long');
+  const [activeSection, setActiveSection] = useState<AnalysisSection>('overview');
+  const [selectedRegimeId, setSelectedRegimeId] = useState<string | null>(null);
   const [returnRange, setReturnRange] = useState<ReturnRangeId>('all');
   const [timeframe, setTimeframe] = useState<AnalysisTimeframe>('4h');
   const [periodError, setPeriodError] = useState<string | null>(null);
-  const [stopDetailsOpen, setStopDetailsOpen] = useState(false);
 
   const lastDailyRefreshDateRef = useRef(toDateInputValue(new Date()));
   const { data: entries = [], isLoading: isJournalLoading, refetch: refetchJournal } = useQuery({
@@ -147,27 +195,6 @@ export default function TradeAnalysisPage() {
     refetchOnWindowFocus: true,
   });
   const { refetch: refetchQualityAnalysis } = qualityQuery;
-  const stopLossQuery = useQuery({
-    queryKey: journalQueryKeys.stopLossAnalysis(startTime, endTime),
-    queryFn: () => getJournalStopLossAnalysis({ start_time: startTime as number, end_time: endTime as number }),
-    enabled: stopDetailsOpen && startTime != null && endTime != null && startTime <= endTime,
-    staleTime: 30 * 60_000,
-    retry: 2,
-    retryDelay: (attempt) => Math.min(1_500 * 2 ** attempt, 6_000),
-    refetchOnWindowFocus: true,
-  });
-  const { refetch: refetchStopLossAnalysis } = stopLossQuery;
-  const stopOptimizationQuery = useQuery({
-    queryKey: journalQueryKeys.stopOptimization(startTime, endTime),
-    queryFn: () => getJournalStopOptimization({ start_time: startTime as number, end_time: endTime as number }),
-    enabled: stopDetailsOpen && startTime != null && endTime != null && startTime <= endTime,
-    staleTime: 30 * 60_000,
-    retry: 2,
-    retryDelay: (attempt) => Math.min(1_500 * 2 ** attempt, 6_000),
-    refetchOnWindowFocus: true,
-  });
-  const { refetch: refetchStopOptimization } = stopOptimizationQuery;
-
   const refreshDaily = useCallback(() => {
     lastDailyRefreshDateRef.current = toDateInputValue(new Date());
     void refetchJournal();
@@ -177,12 +204,8 @@ export default function TradeAnalysisPage() {
       setPeriod(next);
     } else {
       void refetchQualityAnalysis();
-      if (stopDetailsOpen) {
-        void refetchStopLossAnalysis();
-        void refetchStopOptimization();
-      }
     }
-  }, [refetchJournal, refetchQualityAnalysis, refetchStopLossAnalysis, refetchStopOptimization, stopDetailsOpen, usesRollingPeriod]);
+  }, [refetchJournal, refetchQualityAnalysis, usesRollingPeriod]);
 
   useEffect(() => {
     let timeoutId: number;
@@ -212,6 +235,13 @@ export default function TradeAnalysisPage() {
     () => entries.filter((entry) => isJournalEntryWithinPeriod(entry, period)),
     [entries, period],
   );
+  const openPositionsQuery = useQuery({
+    queryKey: ['deepcoin', 'open-positions'],
+    queryFn: getDeepcoinOpenPositions,
+    refetchInterval: 60_000,
+    staleTime: 30_000,
+    retry: false,
+  });
   const allTrades = useMemo(() => {
     const periodIds = new Set(periodEntries.map((entry) => entry.id));
     const excursions = qualityQuery.data?.items
@@ -271,6 +301,10 @@ export default function TradeAnalysisPage() {
     { id: '5to10', label: '5 ~ 10%' },
     { id: 'gte10', label: '10% +' },
   ];
+  const sections: Array<{ id: AnalysisSection; label: string; description: string }> = [
+    { id: 'overview', label: isKo ? '한눈에 보기' : 'Overview', description: isKo ? '핵심 결론과 극단 거래' : 'Key findings and outliers' },
+    { id: 'entry', label: isKo ? '상세 거래 분석' : 'Detailed Analysis', description: isKo ? '시장 상황·진입·청산 근거' : 'Regime, entry and exit evidence' },
+  ];
 
   return (
     <div className="space-y-4">
@@ -293,17 +327,24 @@ export default function TradeAnalysisPage() {
       </header>
       {periodError && <div className="text-xs text-bear">{periodError}</div>}
 
-      <CurrentMarketSimilarityPanel
-        coin={selectedCoin}
-        allEntries={entries}
-        trades={allTrades}
-        qualityItems={qualityQuery.data?.items || []}
-        isHistoryLoading={isJournalLoading || qualityQuery.isLoading}
-        isKo={isKo}
-      />
+      <nav className="grid grid-cols-2 border border-dark-700 bg-dark-900/35 p-1" aria-label={isKo ? '매매 분석 섹션' : 'Trade analysis sections'}>
+        {sections.map((section) => (
+          <button
+            key={section.id}
+            type="button"
+            onClick={() => { setActiveSection(section.id); setSelectedRegimeId(null); }}
+            className={`min-h-10 px-3 text-xs font-medium transition-colors ${activeSection === section.id ? 'bg-primary-500/20 text-primary-200' : 'text-dark-400 hover:text-white'}`}
+          >
+            <span className="block">{section.label}</span>
+            <span className="mt-0.5 block text-[10px] font-normal opacity-70">{section.description}</span>
+          </button>
+        ))}
+      </nav>
+
+      <OngoingPositionFills entries={entries} openPositions={openPositionsQuery.data || []} isKo={isKo} />
 
       <section className="flex flex-wrap items-center justify-between gap-3 border-y border-dark-700 py-2">
-        <div><div className="text-xs font-medium text-dark-200">{isKo ? '분석 방향' : 'Analysis Direction'}</div><div className="mt-0.5 text-[10px] text-dark-500">{isKo ? '아래 품질·손절 통계에 적용' : 'Applied to quality and stop statistics'}</div></div>
+        <div><div className="text-xs font-medium text-dark-200">{isKo ? '분석 방향' : 'Analysis Direction'}</div><div className="mt-0.5 text-[10px] text-dark-500">{isKo ? '아래 진입·청산 품질 통계에 적용' : 'Applied to entry and exit quality statistics'}</div></div>
         <div className="grid min-w-64 grid-cols-2 border border-dark-700 bg-dark-900/35 p-1" aria-label={isKo ? '거래 방향' : 'Trade direction'}>
           {directions.map((item) => (
             <button
@@ -318,68 +359,70 @@ export default function TradeAnalysisPage() {
         </div>
       </section>
 
-      <StopLossExpectationTool
-        trades={directionTrades}
-        direction={direction}
-        isLoading={isJournalLoading || qualityQuery.isLoading}
-        isKo={isKo}
-      />
-
-      <SlTpExpectationAnalysis
-        startTime={startTime}
-        endTime={endTime}
-        direction={direction}
-        isKo={isKo}
-      />
-
-      <MajorFailureAnalysis
-        trades={allTrades}
-        qualityItems={qualityQuery.data?.items || []}
-        allEntries={entries}
-        isLoading={isJournalLoading || qualityQuery.isLoading}
-        isKo={isKo}
-      />
-
-      <TradeQualityAnalysis
+      {activeSection === 'overview' && <TradeQualityAnalysis
         data={qualityQuery.data}
         isLoading={qualityQuery.isLoading || qualityQuery.isFetching}
         isError={qualityQuery.isError}
         isKo={isKo}
         direction={direction}
         onRetry={() => void qualityQuery.refetch()}
-      />
+        showRegimes={false}
+        showExitAnalysis={false}
+        showComparisons={false}
+      />}
 
-      <details
-        className="group"
-        open={stopDetailsOpen}
-        onToggle={(event) => setStopDetailsOpen(event.currentTarget.open)}
-      >
-        <summary className="flex cursor-pointer list-none items-center justify-between border border-dark-700 bg-dark-900/30 px-4 py-3 hover:bg-dark-900/50">
-          <span className="flex items-center gap-2 text-sm font-medium text-dark-200"><ShieldAlert className="h-4 w-4 text-amber-300" />{isKo ? '손절 분석 상세' : 'Stop Analysis Details'}</span>
-          <span className="flex items-center gap-2 text-[11px] text-dark-500">{direction.toUpperCase()} · {stopLossQuery.data?.direction_breakdown[direction].summary.confirmed_stop_count || 0}{isKo ? '개 확정 손절' : ' confirmed stops'}<ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180" /></span>
-        </summary>
-        <div className="mt-3 space-y-3">
-          <StopLossAnalysis
-            data={stopLossQuery.data}
-            direction={direction}
-            isLoading={stopLossQuery.isLoading || stopLossQuery.isFetching}
-            isError={stopLossQuery.isError}
-            isKo={isKo}
-            onRetry={() => void stopLossQuery.refetch()}
-          />
+      {activeSection === 'overview' && <MajorSuccessAnalysis
+        trades={allTrades}
+        qualityItems={qualityQuery.data?.items || []}
+        allEntries={entries}
+        isLoading={isJournalLoading || qualityQuery.isLoading}
+        isKo={isKo}
+      />}
 
-          <StopOptimizationAnalysis
-            data={stopOptimizationQuery.data}
-            direction={direction}
-            isLoading={stopOptimizationQuery.isLoading || stopOptimizationQuery.isFetching}
-            isError={stopOptimizationQuery.isError}
-            isKo={isKo}
-            onRetry={() => void stopOptimizationQuery.refetch()}
-          />
-        </div>
-      </details>
+      {activeSection === 'overview' && <MajorFailureAnalysis
+        trades={allTrades}
+        qualityItems={qualityQuery.data?.items || []}
+        allEntries={entries}
+        isLoading={isJournalLoading || qualityQuery.isLoading}
+        isKo={isKo}
+      />}
 
-      <details className="group">
+      {activeSection === 'entry' && <>
+        <CurrentMarketSimilarityPanel
+          coin={selectedCoin}
+          allEntries={entries}
+          trades={allTrades}
+          qualityItems={qualityQuery.data?.items || []}
+          isHistoryLoading={isJournalLoading || qualityQuery.isLoading}
+          isKo={isKo}
+        />
+        <TradeQualityAnalysis
+          data={qualityQuery.data}
+          isLoading={qualityQuery.isLoading || qualityQuery.isFetching}
+          isError={qualityQuery.isError}
+          isKo={isKo}
+          direction={direction}
+          onRetry={() => void qualityQuery.refetch()}
+          showOverview={false}
+          onSelectRegime={setSelectedRegimeId}
+        />
+        <TradeExitReviewList
+          entries={entries}
+          qualityItems={qualityQuery.data?.items || []}
+          direction={direction}
+          isKo={isKo}
+        />
+        {selectedRegimeId && <TradeEvidenceList
+          regimeId={selectedRegimeId}
+          direction={direction}
+          qualityItems={qualityQuery.data?.items || []}
+          entries={entries}
+          isKo={isKo}
+          onClose={() => setSelectedRegimeId(null)}
+        />}
+      </>}
+
+      {activeSection === 'entry' && <details className="group" open>
         <summary className="flex cursor-pointer list-none items-center justify-between border border-dark-700 bg-dark-900/30 px-4 py-3 hover:bg-dark-900/50">
           <span className="flex items-center gap-2 text-sm font-medium text-dark-200"><SlidersHorizontal className="h-4 w-4 text-primary-300" />{isKo ? '승패·보조지표 상세' : 'Win/Loss and Indicator Details'}</span>
           <span className="flex items-center gap-2 text-[11px] text-dark-500">{direction.toUpperCase()} · {rangeTrades.length}{isKo ? '건' : ' trades'} · {timeframe.toUpperCase()}<ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180" /></span>
@@ -455,7 +498,7 @@ export default function TradeAnalysisPage() {
         </>
           )}
         </div>
-      </details>
+      </details>}
     </div>
   );
 }

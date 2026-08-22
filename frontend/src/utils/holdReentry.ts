@@ -10,6 +10,7 @@ export interface HoldReentryInputs {
   targetPrice: number;
   marginUsd: number;
   leverage: number;
+  feePercent?: number;
 }
 
 export interface HoldReentryResult {
@@ -33,9 +34,11 @@ export interface HoldReentryResult {
 
 export function calculateHoldReentry(inputs: HoldReentryInputs): HoldReentryResult {
   const { direction, entryPrice, currentPrice, reentryPrice, targetPrice, marginUsd, leverage } = inputs;
+  const feePercent = inputs.feePercent ?? leverage * BASE_FEE_PERCENT;
   const isValid = [entryPrice, currentPrice, reentryPrice, targetPrice, marginUsd].every(
     (value) => Number.isFinite(value) && value > 0
-  ) && Number.isFinite(leverage) && leverage >= 1 && leverage <= MAX_LEVERAGE;
+  ) && Number.isFinite(leverage) && leverage >= 1 && leverage <= MAX_LEVERAGE
+    && Number.isFinite(feePercent) && feePercent >= 0 && feePercent <= 10;
 
   if (!isValid) {
     return {
@@ -67,7 +70,7 @@ export function calculateHoldReentry(inputs: HoldReentryInputs): HoldReentryResu
   const reentryPnl = (targetPrice - reentryPrice) * reentryQuantity * side;
   const reentryFinalPnl = currentPnl + reentryPnl;
   const grossReentryAdvantage = reentryFinalPnl - holdingPnl;
-  const feeRate = BASE_FEE_PERCENT / 100;
+  const feeRate = feePercent / 100;
   const holdingExitFee = targetPrice * positionQuantity * feeRate;
   const reentryScenarioFees = (
     currentPrice * positionQuantity +
@@ -82,7 +85,7 @@ export function calculateHoldReentry(inputs: HoldReentryInputs): HoldReentryResu
     positionQuantity,
     reentryQuantity,
     positionNotional,
-    effectiveFeePercent: leverage * BASE_FEE_PERCENT,
+    effectiveFeePercent: feePercent,
     currentPnl,
     currentPnlPercent: ((currentPrice - entryPrice) / entryPrice) * 100 * side * leverage,
     holdingPnl,

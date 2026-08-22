@@ -2,6 +2,22 @@ import { describe, expect, it } from 'vitest';
 import { calculateHoldReentry } from './holdReentry';
 
 describe('calculateHoldReentry', () => {
+  it('uses a manually supplied one-way fee instead of the leverage default', () => {
+    const result = calculateHoldReentry({
+      direction: 'long',
+      entryPrice: 100,
+      currentPrice: 99,
+      reentryPrice: 98,
+      targetPrice: 102,
+      marginUsd: 100,
+      leverage: 10,
+      feePercent: 0.06,
+    });
+
+    expect(result.effectiveFeePercent).toBe(0.06);
+    expect(result.incrementalFees).toBeCloseTo(1.2064898, 6);
+  });
+
   it('calculates the supplied long hold-versus-reentry example', () => {
     const result = calculateHoldReentry({
       direction: 'long',
