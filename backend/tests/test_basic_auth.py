@@ -4,6 +4,7 @@ import sys
 import pytest
 from fastapi import HTTPException
 from fastapi.security import HTTPBasicCredentials
+from starlette.requests import Request
 
 MAIN_MODULE = "backend.main"
 
@@ -15,11 +16,24 @@ def load_main_module(monkeypatch, app_env: str):
     return importlib.import_module(MAIN_MODULE)
 
 
+def request(client_host: str = "127.0.0.1"):
+    return Request({"type": "http", "client": (client_host, 8080)})
+
+
 def test_dev_mode_skips_basic_auth(monkeypatch):
     main = load_main_module(monkeypatch, "development")
 
     assert main.security.auto_error is False
-    assert main.verify_credentials(None) == "local_dev"
+    assert main.verify_credentials(request(), None) == "local_dev"
+
+
+def test_dev_mode_rejects_non_loopback_requests(monkeypatch):
+    main = load_main_module(monkeypatch, "development")
+
+    with pytest.raises(HTTPException) as exc_info:
+        main.verify_credentials(request("192.168.0.10"), None)
+
+    assert exc_info.value.status_code == 403
 
 
 def test_production_requires_basic_auth(monkeypatch):
@@ -28,7 +42,7 @@ def test_production_requires_basic_auth(monkeypatch):
     main = load_main_module(monkeypatch, "production")
 
     with pytest.raises(HTTPException) as exc_info:
-        main.verify_credentials(None)
+        main.verify_credentials(request(), None)
 
     assert exc_info.value.status_code == 401
     assert exc_info.value.headers == {"WWW-Authenticate": "Basic"}
@@ -48,6 +62,7 @@ def test_production_accepts_valid_basic_auth(monkeypatch):
     main = load_main_module(monkeypatch, "production")
 
     username = main.verify_credentials(
+        request(),
         HTTPBasicCredentials(
             username="demo",
             password="secret",

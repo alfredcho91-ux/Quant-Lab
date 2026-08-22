@@ -173,6 +173,14 @@ export interface JournalQualityAnalysisData extends TradeQualityAnalysisSlice {
   direction_stats: TradeQualityGroup[];
   direction_breakdown: Record<'Long' | 'Short', TradeQualityAnalysisSlice>;
   items: TradeQualityItem[];
+  return_filter: {
+    basis: 'net_return_on_invested_margin';
+    minimum_abs_net_return_pct: number;
+    candidate_count: number;
+    included_count: number;
+    excluded_below_threshold_count: number;
+    excluded_return_unavailable_count: number;
+  };
   warnings: string[];
 }
 
@@ -459,7 +467,8 @@ export interface TradeQualityItem {
 export interface DeepcoinStatus {
   configured: boolean;
   mode: 'read_only';
-  credential_storage: 'local_env' | 'environment' | 'not_configured';
+  credential_storage: 'environment' | 'keyring' | 'encrypted_db' | 'not_configured';
+  deleted?: boolean | null;
 }
 
 export interface DeepcoinSyncResult {

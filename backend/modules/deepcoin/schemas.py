@@ -8,7 +8,8 @@ from pydantic import BaseModel, Field
 class DeepcoinStatusData(BaseModel):
     configured: bool
     mode: Literal["read_only"] = "read_only"
-    credential_storage: Literal["local_env", "environment", "not_configured"] = "not_configured"
+    credential_storage: Literal["environment", "keyring", "encrypted_db", "not_configured"] = "not_configured"
+    deleted: Optional[bool] = None
 
 
 class DeepcoinStatusEnvelope(BaseModel):

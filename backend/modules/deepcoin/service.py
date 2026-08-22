@@ -33,7 +33,12 @@ from backend.modules.deepcoin.snapshot import (
     indicator_snapshot_for_event as _indicator_snapshot_for_fill,
     snapshot_candle_count as _snapshot_candle_count,
 )
-from backend.modules.deepcoin.credentials import has_local_deepcoin_credentials, save_local_deepcoin_credentials
+from backend.modules.deepcoin.credentials import (
+    credential_storage_source,
+    delete_local_deepcoin_credentials,
+    save_local_deepcoin_credentials,
+)
+from backend.utils.log_redaction import register_sensitive_values
 from backend.utils.error_handler import BusinessLogicError, DataLoadError
 
 DEEPCOIN_FILLS_PATH = "/deepcoin/trade/fills"
@@ -604,27 +609,25 @@ def _closed_position_journal_row(
 
 def get_deepcoin_status_service() -> Dict[str, Any]:
     configured = get_deepcoin_credentials() is not None
+    storage = credential_storage_source() if configured else "not_configured"
     return {
         "success": True,
         "data": {
             "configured": configured,
             "mode": "read_only",
-            "credential_storage": (
-                "local_env" if configured and has_local_deepcoin_credentials()
-                else "environment" if configured
-                else "not_configured"
-            ),
+            "credential_storage": storage,
         },
     }
 
 
 def configure_deepcoin_credentials_service(api_key: str, secret_key: str, passphrase: str) -> Dict[str, Any]:
-    """Verify read access before persisting credentials in the local env file."""
+    """Verify read access before persisting credentials in protected local storage."""
     credentials = DeepcoinCredentials(
         api_key=api_key.strip(),
         secret_key=secret_key.strip(),
         passphrase=passphrase.strip(),
     )
+    register_sensitive_values(credentials.api_key, credentials.secret_key, credentials.passphrase)
     try:
         DeepcoinClient(credentials).get_fills(inst_type="SWAP", lookback_days=1)
     except (DataLoadError, ValueError) as exc:
@@ -641,6 +644,20 @@ def configure_deepcoin_credentials_service(api_key: str, secret_key: str, passph
             error_code="DEEPCOIN_CREDENTIAL_SAVE_FAILED",
         ) from exc
     return get_deepcoin_status_service()
+
+
+def delete_deepcoin_credentials_service() -> Dict[str, Any]:
+    """Remove the local read-only Deepcoin credential set."""
+    try:
+        deleted = delete_local_deepcoin_credentials()
+    except (OSError, ValueError) as exc:
+        raise BusinessLogicError(
+            "Deepcoin credentials could not be deleted locally.",
+            error_code="DEEPCOIN_CREDENTIAL_DELETE_FAILED",
+        ) from exc
+    status = get_deepcoin_status_service()
+    status["data"]["deleted"] = deleted
+    return status
 
 
 def get_deepcoin_trade_markers_service(
@@ -931,6 +948,7 @@ __all__ = [
     "get_deepcoin_status_service",
     "get_deepcoin_open_positions_service",
     "configure_deepcoin_credentials_service",
+    "delete_deepcoin_credentials_service",
     "get_deepcoin_trade_markers_service",
     "sync_deepcoin_fills_service",
 ]

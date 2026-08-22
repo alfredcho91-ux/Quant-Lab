@@ -3,6 +3,8 @@ uvicorn[standard]>=0.27.0
 pandas>=2.0.0
 numpy>=1.24.0
 ccxt>=4.0.0
+keyring>=25.0.0
+cryptography>=42.0.0
 requests>=2.31.0
 urllib3<2  # temporary pin for LibreSSL-based local Python environments
 python-multipart>=0.0.6

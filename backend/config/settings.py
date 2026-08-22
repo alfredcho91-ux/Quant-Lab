@@ -99,16 +99,19 @@ class DeepcoinCredentials:
 
 
 def get_deepcoin_credentials() -> Optional[DeepcoinCredentials]:
-    """Return complete Deepcoin credentials, or ``None`` when not configured."""
-    api_key = os.getenv("DEEPCOIN_API_KEY", "").strip()
-    secret_key = os.getenv("DEEPCOIN_SECRET_KEY", "")
-    passphrase = os.getenv("DEEPCOIN_PASSPHRASE", "")
-    if not all((api_key, secret_key, passphrase)):
+    """Return environment or protected local credentials without exposing storage details."""
+    try:
+        from backend.modules.deepcoin.secure_credentials import CredentialStorageError, load_stored_credentials
+
+        stored, _source = load_stored_credentials()
+    except CredentialStorageError:
+        return None
+    if stored is None:
         return None
     return DeepcoinCredentials(
-        api_key=api_key,
-        secret_key=secret_key,
-        passphrase=passphrase,
+        api_key=stored.api_key,
+        secret_key=stored.secret_key,
+        passphrase=stored.passphrase,
     )
 
 

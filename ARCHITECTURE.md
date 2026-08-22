@@ -108,7 +108,7 @@ VPVR의 거래량은 실제 체결가 분포가 아닌 캔들 고가-저가 구�
 
 ### Deepcoin 체결 저널
 
-1. `JournalPage`는 `GET /api/deepcoin/status`로 연결 상태만 확인합니다. `POST /api/deepcoin/credentials`는 사용자가 직접 입력한 API Key·Secret·Passphrase로 읽기 전용 조회를 먼저 검증하고, 성공한 값만 프로젝트 루트의 git 제외 `.env`에 원자적으로 저장하며 파일 권한을 `600`으로 제한합니다. 응답은 연결 상태만 반환하고 비밀값은 반환하지 않습니다.
+1. `JournalPage`는 `GET /api/deepcoin/status`로 연결 상태만 확인합니다. `POST /api/deepcoin/credentials`는 사용자가 직접 입력한 API Key·Secret·Passphrase로 읽기 전용 조회를 먼저 검증하고, 성공한 값만 OS credential vault 또는 AES-256-GCM 암호화 SQLite에 저장합니다. `DELETE /api/deepcoin/credentials`는 로컬 저장값을 제거합니다. 응답은 저장 방식과 연결 상태만 반환하고 비밀값은 반환하지 않습니다.
 2. `POST /api/deepcoin/sync`는 Deepcoin의 읽기 전용 fills·positions-history API를 시간 구간 분할 방식으로 조회합니다. 종료 포지션의 레버리지와 총손익·가격 변동으로 투입 증거금을 복원해 투자금 대비 순수익률의 분모로 사용합니다. `GET /api/deepcoin/trade-markers`는 복기 시 해당 상품의 읽기 전용 trigger-orders-history를 조회하지만 주문 생성·수정·취소 endpoint는 호출하지 않습니다.
 3. `modules/deepcoin/snapshot.py`와 저널 분석 서비스는 `modules/journal/market_data.py`를 통해 Deepcoin SWAP OHLCV를 해당 시각까지 먼저 로드하고, **이벤트 전에 완료된 마지막 봉**만 사용합니다. 2시간봉처럼 거래소가 제공하지 않는 시간대나 요청 실패 시에만 Binance Spot fallback으로 내려가며, 프레임 속성과 응답에 출처를 기록합니다. `service.py`는 동기화와 저장 오케스트레이션을 담당하며, 저장소는 외부 ID를 한 번에 조회한 뒤 신규 삽입·기존 종료 포지션 갱신을 각각 단일 트랜잭션으로 처리합니다.
 4. `core/indicator_pipelines.py`의 추세판단 계산을 재사용해 1h/2h/4h/1d RSI, MACD, Slow Stochastic, Stoch RSI를 계산합니다. 각 시간대의 240봉(일봉 180봉) VPVR도 계산합니다.
@@ -137,7 +137,7 @@ Deepcoin 체결가는 거래소 체결 데이터이며 저널 지표와 OHLCV �
 
 - 개발 모드에서는 Basic Auth를 생략합니다.
 - `APP_ENV=production`이면 `DEMO_USERNAME`, `DEMO_PASSWORD`를 요구합니다.
-- Deepcoin API key, secret, passphrase는 서버 환경 변수로만 읽습니다. 조회 권한만 사용하고 거래·출금 권한은 부여하지 않으며 IP 허용 목록을 설정합니다.
+- Deepcoin API key, secret, passphrase는 명시적인 배포 환경변수 또는 보호된 로컬 credential store에서만 읽습니다. 조회 권한만 사용하고 거래·출금 권한은 부여하지 않으며 IP 허용 목록을 설정합니다. 개발 모드도 loopback 요청만 허용하고 기본 실행 주소는 `127.0.0.1`입니다.
 - AI Lab의 Python 실행 도구는 AST 필터와 별도 프로세스를 사용하지만 운영체제 권한을 완전히 격리하지 않습니다. 외부 공개 시 이 엔드포인트를 끄거나 컨테이너 격리해야 합니다.
 
 ## 품질 장치

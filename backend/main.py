@@ -11,6 +11,7 @@ import secrets
 from typing import Optional
 
 from fastapi import FastAPI, Request, Depends, HTTPException, status
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import ORJSONResponse
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
@@ -34,6 +35,9 @@ from backend.modules.journal.router import router as journal_router
 from backend.modules.ai_lab.router import router as ai_lab_router
 from backend.modules.deepcoin.router import router as deepcoin_router
 from backend.modules.indicators.router import router as indicators_router
+from backend.utils.log_redaction import install_log_redaction
+
+install_log_redaction()
 
 security = HTTPBasic(auto_error=False)
 
@@ -42,11 +46,19 @@ if get_app_environment() == "production":
     get_basic_auth_credentials()
 
 
-def verify_credentials(credentials: Optional[HTTPBasicCredentials] = Depends(security)):
+def verify_credentials(
+    request: Request,
+    credentials: Optional[HTTPBasicCredentials] = Depends(security),
+):
     """Verify HTTP Basic Auth credentials against environment variables."""
-    # 로컬 개발 환경(APP_ENV가 production이 아닐 때)에서는 비밀번호 검사를 건너뜁니다.
     if get_app_environment() != "production":
-        return "local_dev"
+        client = request.client.host if request.client else ""
+        if client in {"127.0.0.1", "::1", "testclient"}:
+            return "local_dev"
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Development mode only accepts loopback requests",
+        )
 
     if credentials is None:
         raise HTTPException(
@@ -91,6 +103,28 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_error_handler(_request: Request, exc: RequestValidationError):
+    """Do not echo submitted API credentials in validation responses."""
+    fields = [
+        {
+            "location": [str(part) for part in error.get("loc", ())],
+            "message": str(error.get("msg", "Invalid value")),
+            "type": str(error.get("type", "validation_error")),
+        }
+        for error in exc.errors()
+    ]
+    return ORJSONResponse(
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        content={
+            "success": False,
+            "error": "Request validation failed",
+            "error_code": "VALIDATION_ERROR",
+            "details": {"fields": fields},
+        },
+    )
 
 
 @app.middleware("http")
@@ -154,4 +188,4 @@ app.mount("/", StaticFiles(directory=str(frontend_dist), html=True), name="front
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("backend.main:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("backend.main:app", host="127.0.0.1", port=8000, reload=True)

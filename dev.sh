@@ -39,7 +39,7 @@ if [ ! -d "backend/venv" ]; then
 fi
 
 "$SCRIPT_DIR/backend/venv/bin/python" -m uvicorn backend.main:app \
-    --host 0.0.0.0 \
+    --host "${QUANT_MASTER_HOST:-127.0.0.1}" \
     --port 8000 \
     --reload \
     --reload-dir backend \

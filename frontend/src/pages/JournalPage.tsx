@@ -5,6 +5,7 @@ import { BarChart3, CandlestickChart, KeyRound, Link2, Loader2, RefreshCw, Trash
 
 import {
   configureDeepcoinCredentials,
+  deleteDeepcoinCredentials,
   deleteJournalEntry,
   getDeepcoinStatus,
   getJournal,
@@ -72,7 +73,7 @@ function DeepcoinConnectionModal({
         <div className="flex items-start justify-between gap-4 border-b border-dark-700 px-5 py-4">
           <div>
             <h2 className="flex items-center gap-2 text-base font-semibold text-white"><KeyRound className="h-4 w-4 text-primary-300" />Deepcoin {isKo ? '연결' : 'Connection'}</h2>
-            <p className="mt-1 text-xs leading-5 text-dark-400">{isKo ? '읽기 전용 API만 사용합니다. 입력값은 브라우저에 저장하지 않으며, 연결 확인 후 이 컴퓨터의 git 제외 .env 파일에만 저장됩니다.' : 'Only read-only API access is used. Values are not saved in the browser and are stored only in this computer\'s git-ignored .env after verification.'}</p>
+            <p className="mt-1 text-xs leading-5 text-dark-400">{isKo ? '읽기 전용 API만 사용합니다. 입력값은 브라우저에 저장하지 않으며, 연결 확인 후 이 컴퓨터의 보안 저장소에 암호화해 보관됩니다.' : 'Only read-only API access is used. Values are not saved in the browser and are kept in this computer\'s protected credential store after verification.'}</p>
           </div>
           <button type="button" onClick={onClose} disabled={isSaving} className="text-dark-400 hover:text-white" aria-label={isKo ? '닫기' : 'Close'}><X className="h-4 w-4" /></button>
         </div>
@@ -671,7 +672,7 @@ export default function JournalPage() {
   const [historyPeriod, setHistoryPeriod] = useState<JournalPeriod>(() => buildJournalPeriod());
   const [connectionOpen, setConnectionOpen] = useState(false);
 
-  const { data: entries, isLoading } = useQuery({
+  const { data: entries, isLoading, isError: entriesError, refetch: refetchEntries } = useQuery({
     queryKey: journalQueryKeys.entries,
     queryFn: getJournal,
   });
@@ -712,6 +713,14 @@ export default function JournalPage() {
       await queryClient.invalidateQueries({ queryKey: ['deepcoin-status'] });
       setConnectionOpen(false);
       setSyncMessage(isKo ? 'Deepcoin 읽기 전용 연결을 확인하고 이 컴퓨터에 저장했습니다.' : 'Deepcoin read-only connection verified and saved on this computer.');
+    },
+  });
+
+  const deepcoinDisconnectMutation = useMutation({
+    mutationFn: deleteDeepcoinCredentials,
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['deepcoin-status'] });
+      setSyncMessage(isKo ? '이 컴퓨터에 저장된 Deepcoin 연결 정보를 삭제했습니다.' : 'The Deepcoin connection stored on this computer was deleted.');
     },
   });
 
@@ -777,8 +786,8 @@ export default function JournalPage() {
                   ? '읽기 전용 연결 준비됨'
                   : 'Read-only connection ready'
                 : isKo
-                ? '서버 환경변수 설정 필요'
-                : 'Server environment setup required'}
+                ? '읽기 전용 API 연결 필요'
+                : 'Read-only API connection required'}
             </div>
           </div>
         </div>
@@ -787,6 +796,21 @@ export default function JournalPage() {
             <KeyRound className="h-3.5 w-3.5 text-primary-300" />
             {deepcoinStatus?.configured ? (isKo ? '연결 설정' : 'Connection settings') : (isKo ? 'API 연결' : 'Connect API')}
           </button>
+          {deepcoinStatus?.configured && deepcoinStatus.credential_storage !== 'environment' && (
+            <button
+              type="button"
+              onClick={() => {
+                if (window.confirm(isKo ? '이 컴퓨터에 저장된 Deepcoin API 연결 정보를 삭제할까요?' : 'Delete the Deepcoin API connection stored on this computer?')) {
+                  deepcoinDisconnectMutation.mutate();
+                }
+              }}
+              disabled={deepcoinDisconnectMutation.isPending}
+              className="inline-flex items-center gap-1.5 border border-bear/40 px-3 py-2 text-xs text-bear hover:bg-bear/10 disabled:opacity-50"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              {isKo ? '연결 삭제' : 'Delete connection'}
+            </button>
+          )}
           <select
             value={deepcoinInstType}
             onChange={(event) => setDeepcoinInstType(event.target.value as 'SWAP' | 'SPOT')}
@@ -835,7 +859,7 @@ export default function JournalPage() {
           <div className={`text-2xl font-bold ${(stats.netReturnPct || 0) >= 0 ? 'text-bull' : 'text-bear'}`}>
             {stats.netReturnPct == null ? '-' : `${formatSignedNumber(stats.netReturnPct, 2)}%`}
           </div>
-          <div className="text-sm text-dark-400">{isKo ? '순수익률' : 'Net Return'}</div>
+          <div className="text-sm text-dark-400">{isKo ? '투입 증거금 대비 수익률' : 'Return on deployed margin'}</div>
           <div className="mt-1 text-[11px] text-dark-500">
             {isKo ? '수수료·펀딩 반영' : 'After fees and funding'}
           </div>
@@ -864,7 +888,12 @@ export default function JournalPage() {
           </div>
         </div>
 
-        {isLoading ? (
+        {entriesError ? (
+          <div className="flex items-center justify-center gap-3 py-8 text-sm text-amber-300">
+            <span>{isKo ? '거래 기록을 불러오지 못했습니다.' : 'Trade history could not be loaded.'}</span>
+            <button type="button" onClick={() => void refetchEntries()} className="inline-flex items-center gap-1 border border-amber-300/40 px-2 py-1 text-xs"><RefreshCw className="h-3 w-3" />{isKo ? '재시도' : 'Retry'}</button>
+          </div>
+        ) : isLoading ? (
           <div className="text-center py-8 text-dark-400">{isKo ? '로딩 중...' : 'Loading...'}</div>
         ) : visibleEntries.length === 0 ? (
           <div className="text-center py-8 text-dark-400">
@@ -881,7 +910,7 @@ export default function JournalPage() {
                   <th className="text-center py-2 px-3">{isKo ? '방향' : 'Dir'}</th>
                   <th className="text-right py-2 px-3">{isKo ? '진입' : 'Entry'}</th>
                   <th className="text-right py-2 px-3">{isKo ? '청산' : 'Exit'}</th>
-                  <th className="text-right py-2 px-3">{isKo ? '순수익률' : 'Net Return'}</th>
+                  <th className="text-right py-2 px-3">{isKo ? '투입금 대비 수익률' : 'Margin Return'}</th>
                   <th className="text-right py-2 px-3">{isKo ? '순수익금' : 'Net Profit'}</th>
                   <th className="text-center py-2 px-3">{isKo ? '손익 결과' : 'PnL Result'}</th>
                   <th className="text-center py-2 px-1">

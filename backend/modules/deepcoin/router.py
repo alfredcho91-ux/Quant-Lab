@@ -3,7 +3,7 @@
 from datetime import datetime
 from typing import Literal
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, Request
 from fastapi.concurrency import run_in_threadpool
 
 from backend.modules.deepcoin.schemas import (
@@ -16,12 +16,14 @@ from backend.modules.deepcoin.schemas import (
 )
 from backend.modules.deepcoin.service import (
     configure_deepcoin_credentials_service,
+    delete_deepcoin_credentials_service,
     get_deepcoin_open_positions_service,
     get_deepcoin_status_service,
     get_deepcoin_trade_markers_service,
     sync_deepcoin_fills_service,
 )
 from backend.utils.decorators import handle_api_errors
+from backend.utils.transport_security import require_secure_credential_transport
 
 router = APIRouter(prefix="/api/deepcoin", tags=["deepcoin"])
 
@@ -42,14 +44,23 @@ async def api_deepcoin_open_positions():
 
 @router.post("/credentials", response_model=DeepcoinStatusEnvelope)
 @handle_api_errors()
-async def api_configure_deepcoin_credentials(request: DeepcoinCredentialsRequest):
+async def api_configure_deepcoin_credentials(payload: DeepcoinCredentialsRequest, request: Request):
     """Verify and save local read-only credentials without returning any secret."""
+    require_secure_credential_transport(request)
     return await run_in_threadpool(
         configure_deepcoin_credentials_service,
-        request.api_key,
-        request.secret_key,
-        request.passphrase,
+        payload.api_key,
+        payload.secret_key,
+        payload.passphrase,
     )
+
+
+@router.delete("/credentials", response_model=DeepcoinStatusEnvelope)
+@handle_api_errors()
+async def api_delete_deepcoin_credentials(request: Request):
+    """Remove locally persisted Deepcoin credentials."""
+    require_secure_credential_transport(request)
+    return await run_in_threadpool(delete_deepcoin_credentials_service)
 
 
 @router.get("/trade-markers", response_model=DeepcoinTradeMarkersEnvelope)

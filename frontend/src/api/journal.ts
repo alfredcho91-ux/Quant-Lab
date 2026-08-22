@@ -51,6 +51,7 @@ export async function getJournalExcursions(params: {
 export async function getJournalQualityAnalysis(params: {
   start_time: number;
   end_time: number;
+  min_abs_net_return_pct?: number;
 }): Promise<JournalQualityAnalysisData> {
   try {
     const res = await api.get<ApiResponse<JournalQualityAnalysisData>>('/journal/quality-analysis', {
@@ -154,6 +155,15 @@ export async function configureDeepcoinCredentials(params: {
     return unwrapApiResponse(res, 'Failed to verify and save Deepcoin credentials.');
   } catch (error: unknown) {
     throw toApiClientError(error, 'Failed to verify and save Deepcoin credentials.');
+  }
+}
+
+export async function deleteDeepcoinCredentials(): Promise<DeepcoinStatus> {
+  try {
+    const res = await api.delete<ApiResponse<DeepcoinStatus>>('/deepcoin/credentials');
+    return unwrapApiResponse(res, 'Failed to delete Deepcoin credentials.');
+  } catch (error: unknown) {
+    throw toApiClientError(error, 'Failed to delete Deepcoin credentials.');
   }
 }
 
