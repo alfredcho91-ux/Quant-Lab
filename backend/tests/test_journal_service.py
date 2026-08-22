@@ -10,6 +10,7 @@ from backend.modules.journal import repository as journal_repository
 from backend.modules.journal.service import (
     delete_journal_service,
     get_journal_service,
+    update_journal_behavior_service,
 )
 
 
@@ -356,3 +357,38 @@ def test_journal_service_maps_legacy_indicator_list_into_reason_indicators(
     assert fetched["data"][0]["entry_reason_1_indicator"] == "RSI"
     assert fetched["data"][0]["entry_reason_2_indicator"] == "MA"
     assert fetched["data"][0]["entry_reason_3_indicator"] == "Volume"
+
+
+def test_behavior_notes_are_preserved_when_exchange_fields_refresh(isolated_journal_store):
+    created = add_test_entry({
+        "symbol": "BTC/USDT",
+        "direction": "Long",
+        "realized_pnl": 10.0,
+    })
+    entry_id = created["data"]["id"]
+    updated = update_journal_behavior_service(entry_id, {
+        "planned_stop_pct": 1.5,
+        "planned_target_pct": 3.0,
+        "setup_tags": ["추세추종", "VPVR 지지"],
+        "mistake_tags": ["조기청산"],
+        "plan_recorded_at": "2026-08-22T00:00:00+00:00",
+    })
+
+    assert updated["success"] is True
+    assert updated["data"]["setup_tags"] == ["추세추종", "VPVR 지지"]
+    assert journal_repository.update_imported_entries_by_external_id([{
+        "external_id": updated["data"]["external_id"],
+        "symbol": "BTC/USDT",
+        "realized_pnl": 12.0,
+    }]) == 1
+
+    refreshed = get_journal_service()["data"][0]
+    assert refreshed["realized_pnl"] == 12.0
+    assert refreshed["planned_stop_pct"] == 1.5
+    assert refreshed["mistake_tags"] == ["조기청산"]
+
+    later = update_journal_behavior_service(entry_id, {
+        "mistake_tags": ["조기청산", "늦은 손절"],
+        "plan_recorded_at": "2026-08-23T00:00:00+00:00",
+    })
+    assert later["data"]["plan_recorded_at"] == "2026-08-22T00:00:00+00:00"

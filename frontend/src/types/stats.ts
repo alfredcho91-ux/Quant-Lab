@@ -78,4 +78,15 @@ export interface IndicatorProjection {
   }>;
   rsi_30_price: number;
   rsi_70_price: number;
+  vwap_deviation?: {
+    anchor: 'month';
+    length: number;
+    source: string;
+    vwap: number;
+    standard_deviation: number;
+    current_price: number;
+    sigma: number | null;
+    zone: string;
+    bands: Record<string, number>;
+  } | null;
 }

@@ -29,7 +29,7 @@ export function IndicatorProjectionCard({ data, interval, isKo, isLoading, isErr
     );
   }
 
-  const { current_price, current_rsi, vwaps, rolling_vwaps, rsi_30_price, rsi_70_price } = data;
+  const { current_price, current_rsi, vwaps, rolling_vwaps, vwap_deviation, rsi_30_price, rsi_70_price } = data;
   const vwapLabels = {
     day: isKo ? '일간 VWAP' : 'Daily VWAP',
     week: isKo ? '주간 VWAP' : 'Weekly VWAP',
@@ -50,6 +50,7 @@ export function IndicatorProjectionCard({ data, interval, isKo, isLoading, isErr
   };
   
   const formatDiff = (diff: number) => `${diff > 0 ? '+' : ''}${diff.toFixed(2)}%`;
+  const formatSigma = (sigma: number | null) => sigma == null ? '—' : `${sigma >= 0 ? '+' : ''}${sigma.toFixed(2)}σ`;
 
   const renderTargetRow = (key: string, label: string, targetPrice: number) => {
     const diff = calculateDiff(targetPrice, current_price);
@@ -79,6 +80,18 @@ export function IndicatorProjectionCard({ data, interval, isKo, isLoading, isErr
       </div>
       
       <div className="space-y-1.5">
+        {vwap_deviation && (
+          <div className="rounded border border-primary-500/20 bg-primary-500/5 px-2.5 py-2">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs text-dark-300">{isKo ? '월간 VWAP 편차' : 'Monthly VWAP deviation'}</span>
+              <span className="font-mono text-sm font-bold text-primary-300">{formatSigma(vwap_deviation.sigma)}</span>
+            </div>
+            <div className="mt-1 flex items-center justify-between gap-2 text-[10px] text-dark-500">
+              <span>{isKo ? vwap_deviation.zone : vwap_deviation.zone}</span>
+              <span>1σ {formatPrice(vwap_deviation.bands['1'])} · 2σ {formatPrice(vwap_deviation.bands['2'])} · 3σ {formatPrice(vwap_deviation.bands['3'])}</span>
+            </div>
+          </div>
+        )}
         <div className="grid grid-cols-[1fr_auto] items-center gap-2 rounded border border-dark-700 bg-dark-800/50 px-2.5 py-2">
           <span className="text-xs text-dark-400">{isKo ? '현재 RSI(14)' : 'Current RSI(14)'}</span>
           <span className={`font-mono text-sm font-bold ${current_rsi != null && current_rsi >= 50 ? 'text-primary-400' : 'text-red-400'}`}>

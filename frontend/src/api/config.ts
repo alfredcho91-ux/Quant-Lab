@@ -3,8 +3,11 @@
 import axios from 'axios';
 import type { AxiosResponse } from 'axios';
 
+// Keep local development on the same-origin proxy; Pages can point to a public API.
+const configuredApiBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim();
+
 export const api = axios.create({
-  baseURL: '/api',
+  baseURL: (configuredApiBaseUrl || '/api').replace(/\/+$/, ''),
   timeout: 60000,
 });
 

@@ -121,6 +121,7 @@ VPVR의 거래량은 실제 체결가 분포가 아닌 캔들 고가-저가 구�
 11. `StopLossExpectationTool`은 별도 API를 호출하지 않고 이미 조회한 종료 거래와 15분봉 MFE/MAE 결과를 재사용합니다. 순수 계산은 `features/tradeAnalysis/stopLossExpectation.ts`에 격리합니다. 진입가 대비 방향 반영 MAE가 N%에 도달하면 `-N%`, 미도달 거래는 실제 진입가 대비 청산가의 방향 반영 가격 수익률로 계산합니다. 레버리지·투자금·수수료·펀딩은 계산에 넣지 않으며, 필수 가격 경로가 없는 거래는 임의 보정하지 않습니다.
 12. `GET /api/journal/sl-tp-analysis`는 `sl_tp_analysis.py`에서 거래소 우선 5분봉을 최초 진입부터 실제 종료까지 재생합니다. SL/TP별 최초 도달 봉을 거래당 한 번 계산해 최대 800개 조합에서 재사용하고, 같은 5분봉 동시 도달은 ambiguous SL로 보수 처리합니다. 전체 결과와 과거 70% 선택·최근 30% 검증을 함께 반환하며 프런트의 `SlTpExpectationAnalysis`가 추천 범위, 단일 후보, 실제 청산 비교, Heatmap과 전체 표를 표시합니다. 경로 캐시와 조합 결과 캐시는 분리해 입력 범위 변경 시 시장 데이터를 다시 받지 않습니다.
 13. `GET /api/journal/current-market`는 Deepcoin 진입 스냅샷과 동일한 계산 경로로 선택 코인의 현재 완료봉 지표를 만들고, 기존 Weekly/Daily/4H Regime 계산을 재사용합니다. `CurrentMarketSimilarityPanel`은 결과를 점수에 섞지 않고 추세 45%, 정규화한 RSI·Stoch·MACD·VWAP·VPVR 55%로 같은 종목의 과거 진입을 정렬한 뒤 승패, 투자금 대비 순수익률, MFE와 청산 후 추가 움직임을 표시합니다.
+14. `PATCH /api/journal/{id}/behavior`는 계획 SL/TP, 계획 근거, Setup/Mistake 태그만 갱신하며 거래소 소유 필드를 수정하지 않습니다. `GET /api/journal/behavior-analysis`는 캐시된 품질 분석의 진입 시점 Regime·MFE/MAE·청산 품질을 `journal_id`로 결합합니다. 태그 성과, 계획 준수, Biggest Leak, 조건 선택지를 한 응답으로 만들고 `POST /api/journal/behavior-analysis/compare`는 두 조건의 동일 지표 성과를 계산합니다. 규칙은 `journal_behavior_rules` SQLite 테이블에 저장하며, 추세 역방향 금지·최대 계획 손절률·최소 계획 손익비·물타기 금지를 지원합니다. 계획이나 체결 근거가 없으면 값이나 위반을 임의로 만들지 않고 `unknown`으로 반환합니다.
 
 Deepcoin 체결가는 거래소 체결 데이터이며 저널 지표와 OHLCV 분석은 Deepcoin SWAP 공개 캔들을 우선 사용합니다. Binance Spot fallback이 사용된 응답은 명시적으로 표시되며, 그 경우 거래소 간 가격·거래량 차이가 생길 수 있습니다. 기존에 저장된 Binance Spot 스냅샷은 재동기화 전까지 그대로 남습니다.
 
@@ -132,6 +133,12 @@ Deepcoin 체결가는 거래소 체결 데이터이며 저널 지표와 OHLCV �
 - 프런트엔드의 저널 파생 React Query 키는 `features/journal/journalQueryKeys.ts`에서 관리합니다. 동기화·삭제 시 저널, MFE/MAE, 품질, 손절, SL/TP, 현재 시장 비교 키를 함께 무효화합니다.
 - 추세판단과 전용 차트의 React Query 캐시는 1시간 stale time을 사용합니다. 두 화면은 공용 훅으로 매 정각에 갱신하고, 1시간 이상 지난 뒤 탭이 다시 보일 때에도 갱신합니다.
 - 캐시별 정확한 TTL과 운영 원칙은 [docs/CACHE_STRATEGY.md](./docs/CACHE_STRATEGY.md)를 봅니다.
+
+## Cloudflare Pages 배포 경계
+
+Cloudflare Pages에는 `frontend/`만 연결합니다. Root directory는 `frontend`, build command는 `npm run build`, output directory는 `dist`이며 `main` 브랜치 push를 배포 기준으로 사용합니다. `frontend/src/api/config.ts`는 로컬에서 `/api` 프록시를 유지하고 Pages에서는 공개 환경변수 `VITE_API_BASE_URL`로 별도 HTTPS 백엔드를 지정합니다. `frontend/public/_redirects`는 브라우저 새로고침 시 SPA 경로가 404가 되지 않도록 Pages fallback을 제공합니다.
+
+Pages 환경변수에는 API Key, API Secret, Passphrase, `CREDENTIAL_MASTER_KEY`, Basic Auth 비밀번호를 넣지 않습니다. 이 값들은 백엔드 호스팅 환경의 Secret으로만 설정해야 하며, 백엔드 CORS에는 Pages 도메인을 명시적으로 추가해야 합니다. Windows 다운로드 버튼의 `VITE_WINDOWS_RELEASE_URL`은 공개 GitHub Releases 링크이므로 비밀값이 아닙니다. 상세한 Dashboard 입력값과 배포 전 점검은 [docs/CLOUDFLARE_PAGES.md](./docs/CLOUDFLARE_PAGES.md)를 따릅니다.
 
 ## 보안 경계
 
@@ -147,3 +154,7 @@ Deepcoin 체결가는 거래소 체결 데이터이며 저널 지표와 OHLCV �
 - `scripts/check_route_imports.py`: 라우터가 전략을 직접 참조하지 않는지 검사합니다.
 - `backend/tests/`는 Deepcoin HMAC 서명, 페이지네이션, 중복 동기화, 확정봉 스냅샷도 검증합니다. 프런트엔드 유틸 단위 테스트는 OHLCV와 홀딩/재진입 계산을 검증합니다.
 - CI는 가드, 백엔드 pytest, 프런트엔드 Vitest, ESLint, production build를 실행합니다.
+
+## VWAP 분석 경계
+
+`core/indicator_primitives.py`의 `compute_vwap_standard_deviation`이 월간 Anchored VWAP, HLC3, Length 14 표준편차, 현재 σ 위치와 1σ·2σ·3σ 밴드를 공통 계산합니다. 요청된 1W·1D·4H 데이터는 각 타임프레임별로 별도 계산하며, 진행 중인 봉은 서비스 계층에서 제외합니다. 프런트엔드는 가격 자체뿐 아니라 `sigma`와 구간 설명을 표시하고, 기존 롤링 VWAP·VPVR 계산은 별도 계약으로 유지합니다.

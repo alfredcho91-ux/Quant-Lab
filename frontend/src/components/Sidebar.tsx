@@ -18,6 +18,7 @@ import {
   CandlestickChart,
   GitCompareArrows,
   ShieldAlert,
+  Download,
 } from 'lucide-react';
 import {
   useBackgroundTheme,
@@ -51,6 +52,9 @@ const menuItems = [
   { path: '/hold-reentry', icon: GitCompareArrows, labelKey: 'menu_hold_reentry' as const },
   { path: '/ai-backtest-lab', icon: Bot, labelKey: 'menu_ai_backtest_lab' as const },
 ];
+
+const windowsReleaseUrl = import.meta.env.VITE_WINDOWS_RELEASE_URL?.trim()
+  || 'https://github.com/alfredcho91-ux/Quant-Lab/releases/latest';
 
 export default function Sidebar() {
   const navigate = useNavigate();
@@ -328,6 +332,15 @@ export default function Sidebar() {
       {/* Footer */}
       {!isSidebarCollapsed && (
         <div className="p-4 border-t border-dark-700">
+          <a
+            href={windowsReleaseUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="mb-3 flex items-center justify-center gap-2 rounded-lg border border-primary-500/30 bg-primary-500/10 px-3 py-2 text-xs font-medium text-primary-300 transition-colors hover:bg-primary-500/20"
+          >
+            <Download className="h-4 w-4" aria-hidden="true" />
+            <span>{language === 'ko' ? 'Windows용 다운로드' : 'Download for Windows'}</span>
+          </a>
           <p className="text-xs text-dark-500 text-center">
             {labels.sidebar_caption}
           </p>

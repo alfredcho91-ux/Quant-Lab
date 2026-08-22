@@ -5,7 +5,7 @@ import { type TrendPriceLevel } from '../components/TrendPriceChart';
 import type { Coin } from '../types';
 import { getCompletedCandles } from '../utils/ohlcv';
 
-export const PRICE_PROJECTION_INTERVALS = ['1h', '2h', '4h', '1d'] as const;
+export const PRICE_PROJECTION_INTERVALS = ['1h', '2h', '4h', '1d', '1w'] as const;
 type PriceProjectionInterval = (typeof PRICE_PROJECTION_INTERVALS)[number];
 
 export const TREND_PRICE_QUERY_OPTIONS = {
