@@ -8,11 +8,12 @@ import { RefreshCw, TrendingUp } from 'lucide-react';
 import { MiniChart } from '../components/MiniChart';
 import { StochMiniChart } from '../components/StochMiniChart';
 import { IndicatorProjectionCard } from '../components/IndicatorProjectionCard';
+import { VWAPDeviationCard } from '../components/VWAPDeviationCard';
 import { MomentumIndicatorPanels } from '../components/MomentumIndicatorPanels';
 import { VPVRTable } from '../components/VPVRTable';
 import ErrorNotice from '../components/ErrorNotice';
 import type { Coin } from '../types';
-import { PRICE_PROJECTION_INTERVALS, TREND_PRICE_QUERY_OPTIONS, useTrendPriceChart } from '../hooks/useTrendPriceChart';
+import { PRICE_PROJECTION_INTERVALS, TREND_PRICE_QUERY_OPTIONS, useTrendPriceChart, VWAP_DEVIATION_INTERVALS } from '../hooks/useTrendPriceChart';
 import { useHourlyRefresh } from '../hooks/useHourlyRefresh';
 import {
   getStochState,
@@ -40,7 +41,8 @@ export default function TrendJudgmentPage() {
     vpvrData,
     isVPVRLoading,
     isRefreshing: isTrendPriceRefreshing,
-    projectionQueries,
+    priceProjectionQueries,
+    vwapDeviationQueries,
     refresh: refreshTrendPriceData,
   } = trendPriceData;
 
@@ -146,12 +148,21 @@ export default function TrendJudgmentPage() {
             key={interval}
             interval={interval}
             isKo={isKo}
-            data={projectionQueries[index]?.data}
-            isLoading={projectionQueries[index]?.isLoading ?? false}
-            isError={projectionQueries[index]?.isError ?? false}
+            data={priceProjectionQueries[index]?.data}
+            isLoading={priceProjectionQueries[index]?.isLoading ?? false}
+            isError={priceProjectionQueries[index]?.isError ?? false}
           />
         ))}
       </div>
+
+      <section className="space-y-2">
+        <h2 className="text-sm font-semibold text-white">{isKo ? '월간 Anchored VWAP 위치' : 'Monthly Anchored VWAP position'}</h2>
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+          {VWAP_DEVIATION_INTERVALS.map((interval, index) => (
+            <VWAPDeviationCard key={interval} interval={interval} isKo={isKo} data={vwapDeviationQueries[index]?.data} isLoading={vwapDeviationQueries[index]?.isLoading ?? false} isError={vwapDeviationQueries[index]?.isError ?? false} />
+          ))}
+        </div>
+      </section>
 
       <VPVRTable data={vpvrData} isLoading={isVPVRLoading} isKo={isKo} />
 

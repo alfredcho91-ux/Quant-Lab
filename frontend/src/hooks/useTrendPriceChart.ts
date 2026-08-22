@@ -5,7 +5,8 @@ import { type TrendPriceLevel } from '../components/TrendPriceChart';
 import type { Coin } from '../types';
 import { getCompletedCandles } from '../utils/ohlcv';
 
-export const PRICE_PROJECTION_INTERVALS = ['1h', '2h', '4h', '1d', '1w'] as const;
+export const PRICE_PROJECTION_INTERVALS = ['1h', '2h', '4h', '1d'] as const;
+export const VWAP_DEVIATION_INTERVALS = ['1w', '1d', '4h'] as const;
 type PriceProjectionInterval = (typeof PRICE_PROJECTION_INTERVALS)[number];
 
 export const TREND_PRICE_QUERY_OPTIONS = {
@@ -28,11 +29,8 @@ export function useTrendPriceChart(
   const queryClient = useQueryClient();
   const selectedProjectionIndex = PRICE_PROJECTION_INTERVALS.indexOf(selectedInterval as PriceProjectionInterval);
   const projectionIntervals = useMemo(
-    () =>
-      selectedProjectionIndex >= 0
-        ? PRICE_PROJECTION_INTERVALS
-        : [...PRICE_PROJECTION_INTERVALS, selectedInterval],
-    [selectedInterval, selectedProjectionIndex]
+    () => Array.from(new Set([...PRICE_PROJECTION_INTERVALS, ...VWAP_DEVIATION_INTERVALS, selectedInterval])),
+    [selectedInterval]
   );
 
   const vpvrQuery = useQuery({
@@ -59,13 +57,14 @@ export function useTrendPriceChart(
     ...TREND_PRICE_QUERY_OPTIONS,
   });
 
-  const selectedProjection = projectionQueries[
-    selectedProjectionIndex >= 0 ? selectedProjectionIndex : PRICE_PROJECTION_INTERVALS.length
-  ]?.data;
+  const projectionFor = useCallback((interval: string) => projectionQueries[projectionIntervals.indexOf(interval)], [projectionIntervals, projectionQueries]);
+  const selectedProjection = projectionFor(selectedInterval)?.data;
+  const priceProjectionQueries = PRICE_PROJECTION_INTERVALS.map(projectionFor);
+  const vwapDeviationQueries = VWAP_DEVIATION_INTERVALS.map(projectionFor);
   const chartPriceLevels = useMemo<TrendPriceLevel[]>(
     () => {
       const levels = PRICE_PROJECTION_INTERVALS.flatMap((interval, index) => {
-        const projection = projectionQueries[index]?.data;
+        const projection = priceProjectionQueries[index]?.data;
         if (!projection) return [];
 
         return [
@@ -102,7 +101,7 @@ export function useTrendPriceChart(
         },
       ].filter((level) => Number.isFinite(level.price));
     },
-    [projectionQueries, selectedInterval, selectedProjection, selectedProjectionIndex]
+    [priceProjectionQueries, selectedInterval, selectedProjection, selectedProjectionIndex]
   );
 
   const refresh = useCallback(() => {
@@ -130,6 +129,8 @@ export function useTrendPriceChart(
     isVPVRFetching: vpvrQuery.isFetching,
     isVPVRError: vpvrQuery.isError,
     projectionQueries,
+    priceProjectionQueries,
+    vwapDeviationQueries,
     selectedProjection,
     chartPriceLevels,
     trendChartData: trendChartQuery.data ?? [],

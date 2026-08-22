@@ -239,8 +239,18 @@ def compute_vwap_standard_deviation(
     if vwap is None:
         return None
 
-    typical = (df["high"] + df["low"] + df["close"]) / 3.0
-    sample = pd.DataFrame({"typical": typical, "volume": df["volume"]}).tail(length)
+    timestamps = pd.to_datetime(
+        df[timestamp_column] if timestamp_column in df.columns else df.index,
+        errors="coerce",
+        utc=True,
+    )
+    reference = timestamps.iloc[-1] if isinstance(timestamps, pd.Series) else timestamps[-1]
+    month_start = reference.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    # Deviation must never include a prior anchor period. Early in a month the
+    # available anchored bars can be fewer than the configured 14-bar window.
+    period = df.loc[timestamps >= month_start]
+    typical = (period["high"] + period["low"] + period["close"]) / 3.0
+    sample = pd.DataFrame({"typical": typical, "volume": period["volume"]}).tail(length)
     sample = sample.replace([np.inf, -np.inf], np.nan).dropna()
     if sample.empty:
         return None
@@ -254,21 +264,21 @@ def compute_vwap_standard_deviation(
     current_price = float(df["close"].iloc[-1])
     sigma = None if standard_deviation <= 0 else (current_price - vwap) / standard_deviation
     if sigma is None:
-        zone = "중심권"
+        zone = "center"
     elif sigma >= 3:
-        zone = "극단적 상단 이격"
+        zone = "extreme_upper"
     elif sigma >= 2:
-        zone = "강한 상단 이격"
+        zone = "strong_upper"
     elif sigma >= 1:
-        zone = "상단 확장"
+        zone = "upper_expansion"
     elif sigma <= -3:
-        zone = "극단적 하단 이격"
+        zone = "extreme_lower"
     elif sigma <= -2:
-        zone = "강한 하단 이격"
+        zone = "strong_lower"
     elif sigma <= -1:
-        zone = "하단 확장"
+        zone = "lower_expansion"
     else:
-        zone = "중심권"
+        zone = "center"
     bands = {str(multiplier): vwap + standard_deviation * multiplier for multiplier in (-3, -2, -1, 1, 2, 3)}
     return {
         "anchor": "month",
