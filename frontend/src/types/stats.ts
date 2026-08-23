@@ -1,4 +1,5 @@
 // 통계 분석 관련 타입
+import type { AnchoredVwapDeviation } from './indicators';
 
 export interface BBMidParams {
   coin: string;
@@ -78,15 +79,5 @@ export interface IndicatorProjection {
   }>;
   rsi_30_price: number;
   rsi_70_price: number;
-  vwap_deviation?: {
-    anchor: 'month';
-    length: number;
-    source: string;
-    vwap: number;
-    standard_deviation: number;
-    current_price: number;
-    sigma: number | null;
-    zone: string;
-    bands: Record<string, number>;
-  } | null;
+  vwap_deviation?: AnchoredVwapDeviation | null;
 }

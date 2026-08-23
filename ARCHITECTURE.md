@@ -110,7 +110,7 @@ VPVR의 거래량은 실제 체결가 분포가 아닌 캔들 고가-저가 구�
 
 1. `JournalPage`는 `GET /api/deepcoin/status`로 연결 상태만 확인합니다. `POST /api/deepcoin/credentials`는 사용자가 직접 입력한 API Key·Secret·Passphrase로 읽기 전용 조회를 먼저 검증하고, 성공한 값만 OS credential vault 또는 AES-256-GCM 암호화 SQLite에 저장합니다. `DELETE /api/deepcoin/credentials`는 로컬 저장값을 제거합니다. 응답은 저장 방식과 연결 상태만 반환하고 비밀값은 반환하지 않습니다.
 2. `POST /api/deepcoin/sync`는 Deepcoin의 읽기 전용 fills·positions-history API를 시간 구간 분할 방식으로 조회합니다. 종료 포지션의 레버리지와 총손익·가격 변동으로 투입 증거금을 복원해 투자금 대비 순수익률의 분모로 사용합니다. `GET /api/deepcoin/trade-markers`는 복기 시 해당 상품의 읽기 전용 trigger-orders-history를 조회하지만 주문 생성·수정·취소 endpoint는 호출하지 않습니다.
-3. `modules/deepcoin/snapshot.py`와 저널 분석 서비스는 `modules/journal/market_data.py`를 통해 Deepcoin SWAP OHLCV를 해당 시각까지 먼저 로드하고, **이벤트 전에 완료된 마지막 봉**만 사용합니다. 2시간봉처럼 거래소가 제공하지 않는 시간대나 요청 실패 시에만 Binance Spot fallback으로 내려가며, 프레임 속성과 응답에 출처를 기록합니다. `service.py`는 동기화와 저장 오케스트레이션을 담당하며, 저장소는 외부 ID를 한 번에 조회한 뒤 신규 삽입·기존 종료 포지션 갱신을 각각 단일 트랜잭션으로 처리합니다.
+3. `modules/deepcoin/snapshot.py`와 저널 분석 서비스는 `modules/journal/market_data.py`를 통해 Deepcoin SWAP OHLCV를 해당 시각까지 먼저 로드하고, **이벤트 전에 완료된 마지막 봉**만 사용합니다. 종료 포지션의 진입 분석 스냅샷은 종료 시각이 아니라 거래소가 제공한 최초 진입 시각(`cTime`)으로 다시 계산하며, `position_entry` 기준 시각을 메타데이터에 기록합니다. 2시간봉처럼 거래소가 제공하지 않는 시간대나 요청 실패 시에만 Binance Spot fallback으로 내려가며, 프레임 속성과 응답에 출처를 기록합니다. `service.py`는 동기화와 저장 오케스트레이션을 담당하며, 저장소는 외부 ID를 한 번에 조회한 뒤 신규 삽입·기존 종료 포지션 갱신을 각각 단일 트랜잭션으로 처리합니다.
 4. `core/indicator_pipelines.py`의 추세판단 계산을 재사용해 1h/2h/4h/1d RSI, MACD, Slow Stochastic, Stoch RSI를 계산합니다. 각 시간대의 240봉(일봉 180봉) VPVR도 계산합니다.
 5. `journal_entries.external_id`의 unique index가 Deepcoin `billId` 기반 기록 중복을 막고, `indicator_snapshot` JSON에 계산값·출처·기준 시각을 고정합니다.
 6. 종료 거래의 통합 리포트는 `/api/indicators/trade-report/{coin}/{interval}`에서 표시용 Binance Spot 캔들·모멘텀 시계열을 받습니다. 이 차트 endpoint는 기존 계약을 유지하며, 저널 분석용 거래소 우선 OHLCV와는 별도입니다. VPVR와 VWAP는 사용자가 선택한 진입 또는 종료 시각보다 먼저 끝난 확정봉 300개를 기준으로 계산하고, 종료 이후 흐름 확인용 캔들은 기준값 계산에서 제외합니다.
@@ -157,4 +157,4 @@ Pages 환경변수에는 API Key, API Secret, Passphrase, `CREDENTIAL_MASTER_KEY
 
 ## VWAP 분석 경계
 
-`core/indicator_primitives.py`의 `compute_vwap_standard_deviation`이 월간 Anchored VWAP, HLC3, Length 14 표준편차, 현재 σ 위치와 1σ·2σ·3σ 밴드를 공통 계산합니다. 요청된 1W·1D·4H 데이터는 각 타임프레임별로 별도 계산하며, 진행 중인 봉은 서비스 계층에서 제외합니다. 프런트엔드는 가격 자체뿐 아니라 `sigma`와 구간 설명을 표시하고, 기존 롤링 VWAP·VPVR 계산은 별도 계약으로 유지합니다.
+`core/indicator_primitives.py`의 `compute_vwap_standard_deviation`이 월간 Anchored VWAP, HLC3, Length 14 표준편차, 실제 사용 완료봉 수(`sample_count`), 현재 σ 위치와 1σ·2σ·3σ 밴드를 공통 계산합니다. 요청된 1W·1D·4H 데이터는 각 타임프레임별로 별도 계산하며, 진행 중인 봉은 서비스 계층에서 제외합니다. 프런트엔드는 가격 자체뿐 아니라 `sigma`와 구간 설명·표본 수를 표시하고, 기존 롤링 VWAP·VPVR 계산은 별도 계약으로 유지합니다.

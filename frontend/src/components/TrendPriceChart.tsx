@@ -133,6 +133,7 @@ export function TrendPriceChart({
       ...priceLevels.map((level) => level.price),
       ...(vwaps?.vwaps.flatMap(({ value }) => value == null ? [] : [value]) ?? []),
       ...(vwaps?.rolling_vwaps.flatMap(({ value }) => value == null ? [] : [value]) ?? []),
+      ...(vwaps?.vwap_deviation ? Object.values(vwaps.vwap_deviation.bands) : []),
       ...(vpvr ? [vpvr.poc_price_low, vpvr.poc_price_high, vpvr.value_area_low, vpvr.value_area_high] : []),
     ].filter(Number.isFinite);
 
@@ -214,6 +215,22 @@ export function TrendPriceChart({
         labelPosition: 84 - index * 8,
       });
     });
+    const deviation = vwaps?.vwap_deviation;
+    if (deviation) {
+      [-3, -2, -1, 1, 2, 3].forEach((band, index) => {
+        const price = deviation.bands[String(band)];
+        if (!Number.isFinite(price)) return;
+        lines.push({
+          key: `monthly-vwap-${band}sigma`,
+          label: `${isKo ? '월간' : 'Monthly'} ${band >= 0 ? '+' : ''}${band}σ`,
+          price,
+          color: band > 0 ? '#fb7185' : '#38bdf8',
+          width: Math.abs(band) === 1 ? 2 : 1,
+          style: Math.abs(band) === 1 ? LineStyle.Dashed : LineStyle.Dotted,
+          labelPosition: 12 + index * 15,
+        });
+      });
+    }
     priceLevels.forEach((level) => {
       lines.push({
         key: `${level.interval}-${level.type}`,

@@ -15,6 +15,7 @@ import type {
   TrendIndicatorsResult,
   IndicatorProjection,
 } from '../types';
+import type { AnchoredVwapDeviation } from '../types/indicators';
 
 interface IndicatorProjectionPayload {
   current_price: number;
@@ -27,17 +28,7 @@ interface IndicatorProjectionPayload {
     window: number;
     value: number | null;
   }>;
-  vwap_deviation?: {
-    anchor: 'month';
-    length: number;
-    source: string;
-    vwap: number;
-    standard_deviation: number;
-    current_price: number;
-    sigma: number | null;
-    zone: string;
-    bands: Record<string, number>;
-  } | null;
+  vwap_deviation?: AnchoredVwapDeviation | null;
   projections: {
     rsi_30: number;
     rsi_70: number;
