@@ -5,6 +5,8 @@ import type { DeepcoinOpenPosition, JournalEntry } from '../../types';
 import TradeReportModal from '../journal/TradeReportModal';
 import { isOngoingFill } from '../journal/journalEntries';
 
+const MAX_VISIBLE_FILLS = 20;
+
 function dateLabel(value: string | null | undefined): string {
   if (!value) return '-';
   const date = new Date(value);
@@ -35,7 +37,7 @@ export default function OngoingPositionFills({
       liveByKey.set(key, position);
     }
   });
-  const rows = entries
+  const allRows = entries
     .filter(isOngoingFill)
     .filter((entry) => {
       const position = liveByKey.get(normalizedKey(entry.symbol, entry.direction));
@@ -45,6 +47,7 @@ export default function OngoingPositionFills({
       return !Number.isFinite(openedAt) || openedAt <= 0 || fillTime >= openedAt - 5_000;
     })
     .sort((left, right) => new Date(right.datetime || 0).getTime() - new Date(left.datetime || 0).getTime());
+  const rows = allRows.slice(0, MAX_VISIBLE_FILLS);
   const positions = [...openPositions].sort((left, right) => {
     const leftTime = new Date(left.opened_at || 0).getTime();
     const rightTime = new Date(right.opened_at || 0).getTime();
@@ -76,7 +79,7 @@ export default function OngoingPositionFills({
       </table>
     </div>
     {rows.length > 0 && <div className="mt-4 overflow-x-auto">
-      <div className="mb-2 text-[11px] text-dark-500">{isKo ? '저장된 진입·부분 청산 체결' : 'Saved entry and partial-close fills'}</div>
+      <div className="mb-2 text-[11px] text-dark-500">{isKo ? `저장된 진입·부분 청산 체결${allRows.length > rows.length ? ` (최근 ${MAX_VISIBLE_FILLS}건 / 전체 ${allRows.length}건)` : ''}` : `Saved entry and partial-close fills${allRows.length > rows.length ? ` (latest ${MAX_VISIBLE_FILLS} of ${allRows.length})` : ''}`}</div>
       <table className="w-full min-w-[680px] text-xs">
         <thead className="text-dark-500"><tr className="border-b border-dark-700"><th className="py-2 text-left">{isKo ? '체결시각' : 'Fill time'}</th><th className="py-2 text-left">{isKo ? '종목' : 'Symbol'}</th><th className="py-2 text-center">{isKo ? '방향' : 'Side'}</th><th className="py-2 text-right">{isKo ? '체결가' : 'Price'}</th><th className="py-2 text-right">{isKo ? '수량' : 'Size'}</th><th className="py-2 text-center"><span className="sr-only">{isKo ? '리포트' : 'Report'}</span></th></tr></thead>
         <tbody>{rows.map((row) => <tr key={row.id || row.external_id || `${row.symbol}-${row.datetime}`} className="border-b border-dark-800 last:border-0">

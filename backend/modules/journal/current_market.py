@@ -20,7 +20,7 @@ from backend.modules.journal.quality_market import (
     prepare_quality_frame,
 )
 from backend.utils.cache import DataCache
-from backend.modules.journal.market_data import is_market_fallback, load_journal_ohlcv, market_source
+from backend.modules.journal.market_data import load_journal_ohlcv, market_source
 from backend.utils.error_handler import DataLoadError
 from backend.utils.validators import validate_coin_symbol
 
@@ -78,7 +78,6 @@ def build_current_market_snapshot(coin: str, as_of_ms: int) -> Dict[str, Any]:
             interval,
             total_candles=candle_count,
             end_time=as_of_ms,
-            exchange="Deepcoin",
         )
         if frame is None or frame.empty:
             warnings.append(f"{normalized_coin} {interval}: market data unavailable")
@@ -137,7 +136,7 @@ def build_current_market_snapshot(coin: str, as_of_ms: int) -> Dict[str, Any]:
             "indicator_snapshot": {
                 "version": 2,
                 "market_source": market_source(next((frame for frame in frames.values() if frame is not None), None)),
-                "market_source_fallback": any(is_market_fallback(frame) for frame in frames.values() if frame is not None),
+                "market_source_fallback": False,
                 "reference": "last_completed_candle_before_current_hour_refresh",
                 "event_type": "current_market",
                 "event_time": _timestamp_to_iso(as_of_ms),

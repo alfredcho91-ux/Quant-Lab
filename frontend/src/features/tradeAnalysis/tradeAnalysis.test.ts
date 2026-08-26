@@ -4,6 +4,8 @@ import type { JournalEntry, TradeIndicatorSnapshot } from '../../types';
 import {
   buildAnalyzedTrades,
   conditionComparisons,
+  filterTradesByCondition,
+  filterTradesByIndicatorMetric,
   filterTradesByReturnRange,
   indicatorComparisons,
   performanceSummary,
@@ -111,6 +113,11 @@ describe('trade analysis', () => {
     expect(rsi?.lossAverage).toBe(70);
     expect(lowRsi?.winFrequency).toBe(100);
     expect(lowRsi?.lossFrequency).toBe(0);
+    expect(lowRsi?.winMatched).toBe(1);
+    expect(lowRsi?.lossMatched).toBe(0);
+    expect(lowRsi?.lift).toBeNull();
+    expect(filterTradesByCondition(trades, '4h', 'rsi_low').map((trade) => trade.entry.id)).toEqual([2]);
+    expect(filterTradesByIndicatorMetric(trades, '4h', 'macd_hist').map((trade) => trade.entry.id)).toEqual([2, 4]);
   });
 
   it('classifies profit and loss return magnitudes at exact boundaries', () => {

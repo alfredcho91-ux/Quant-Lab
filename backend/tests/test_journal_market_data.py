@@ -18,35 +18,40 @@ def _candles() -> pd.DataFrame:
     })
 
 
-def test_journal_market_data_prefers_deepcoin_for_deepcoin_positions(monkeypatch):
-    native = _candles()
-    monkeypatch.setattr(market_data, "fetch_deepcoin_swap_klines", lambda *args, **kwargs: native)
-    monkeypatch.setattr(market_data, "fetch_binance_klines", lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("fallback should not run")))
+def test_journal_market_data_always_uses_binance_usdt_m_futures(monkeypatch):
+    captured = {}
 
-    frame = market_data.load_journal_ohlcv("BTC/USDT", "4h", total_candles=100, exchange="Deepcoin")
+    def fetch(symbol, interval, total_candles, end_time):
+        captured.update({
+            "symbol": symbol,
+            "interval": interval,
+            "total_candles": total_candles,
+            "end_time": end_time,
+        })
+        return _candles()
 
-    assert frame is not None
-    assert market_data.market_source(frame) == market_data.DEEPCOIN_SOURCE
-    assert market_data.is_market_fallback(frame) is False
+    monkeypatch.setattr(market_data, "fetch_binance_klines", fetch)
 
-
-def test_journal_market_data_marks_binance_as_fallback_when_native_is_unavailable(monkeypatch):
-    monkeypatch.setattr(market_data, "fetch_deepcoin_swap_klines", lambda *args, **kwargs: None)
-    monkeypatch.setattr(market_data, "fetch_binance_klines", lambda *args, **kwargs: _candles())
-
-    frame = market_data.load_journal_ohlcv("BTC/USDT", "2h", total_candles=100, exchange="Deepcoin")
-
-    assert frame is not None
-    assert market_data.market_source(frame) == market_data.BINANCE_FALLBACK_SOURCE
-    assert market_data.is_market_fallback(frame) is True
-
-
-def test_weekly_native_candles_use_the_next_open_as_the_completed_close_time():
-    week_ms = 7 * 24 * 60 * 60 * 1000
-    frame = market_data._normalize_deepcoin_rows([
-        [1_000, "100", "101", "99", "100.5", "10", "1000"],
-        [1_000 + week_ms, "101", "102", "100", "101.5", "11", "1100"],
-    ], "1w")
+    frame = market_data.load_journal_ohlcv(
+        "BTC/USDT",
+        "4h",
+        total_candles=100,
+        end_time=1_700_000_000_000,
+        exchange="Deepcoin",
+    )
 
     assert frame is not None
-    assert int(frame.iloc[0]["close_time"]) == 1_000 + week_ms - 1
+    assert captured == {
+        "symbol": "BTCUSDT",
+        "interval": "4h",
+        "total_candles": 100,
+        "end_time": 1_700_000_000_000,
+    }
+    assert market_data.market_source(frame) == market_data.BINANCE_USDT_M_FUTURES_SOURCE
+    assert frame.attrs["market_source_fallback"] is False
+
+
+def test_journal_market_data_returns_none_when_binance_usdt_m_is_unavailable(monkeypatch):
+    monkeypatch.setattr(market_data, "fetch_binance_klines", lambda *args, **kwargs: None)
+
+    assert market_data.load_journal_ohlcv("BTC/USDT", "2h", total_candles=100) is None

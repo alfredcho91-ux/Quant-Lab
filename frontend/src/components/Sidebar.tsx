@@ -18,6 +18,7 @@ import {
   CandlestickChart,
   GitCompareArrows,
   ShieldAlert,
+  ClipboardCheck,
   Download,
 } from 'lucide-react';
 import {
@@ -43,6 +44,7 @@ const menuItems = [
   { path: '/journal', icon: BookOpen, labelKey: 'menu_journal' as const },
   { path: '/trade-analysis', icon: BarChart3, labelKey: 'menu_trade_analysis' as const },
   { path: '/risk-lab', icon: ShieldAlert, labelKey: 'menu_risk_lab' as const },
+  { path: '/plan-lab', icon: ClipboardCheck, labelKey: 'menu_plan_lab' as const },
   // 주요 분석 페이지
   { path: '/trend-judgment', icon: Activity, labelKey: 'menu_trend_judgment' as const },
   { path: '/trend-chart', icon: CandlestickChart, labelKey: 'menu_trend_chart' as const },

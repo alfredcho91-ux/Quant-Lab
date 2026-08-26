@@ -35,6 +35,7 @@ from backend.modules.journal.router import router as journal_router
 from backend.modules.ai_lab.router import router as ai_lab_router
 from backend.modules.deepcoin.router import router as deepcoin_router
 from backend.modules.indicators.router import router as indicators_router
+from backend.modules.plan_lab.router import router as plan_lab_router
 from backend.utils.log_redaction import install_log_redaction
 
 install_log_redaction()
@@ -179,6 +180,7 @@ app.include_router(journal_router)  # /api/journal
 app.include_router(deepcoin_router)  # /api/deepcoin/*
 app.include_router(ai_lab_router)  # /api/ai/research
 app.include_router(indicators_router)  # /api/indicators
+app.include_router(plan_lab_router)  # /api/plans and /api/plan-lab
 
 # Serve frontend static files
 frontend_dist = PROJECT_ROOT / "frontend" / "dist"

@@ -14,6 +14,7 @@ export interface Labels {
   menu_journal: string;
   menu_trade_analysis: string;
   menu_risk_lab: string;
+  menu_plan_lab: string;
   menu_streak_analysis: string;
   menu_trend_judgment: string;
   menu_trend_chart: string;
@@ -80,6 +81,7 @@ const labels_ko: Labels = {
   menu_journal: '📝 매매 일지',
   menu_trade_analysis: '매매 분석',
   menu_risk_lab: 'Risk Lab',
+  menu_plan_lab: '계획 분석',
   menu_streak_analysis: '🏹 연속 봉 분석',
   menu_trend_judgment: '📊 추세판단',
   menu_trend_chart: '추세분석 차트',
@@ -153,6 +155,7 @@ const labels_en: Labels = {
   menu_journal: '📝 Trading Journal',
   menu_trade_analysis: 'Trade Analysis',
   menu_risk_lab: 'Risk Lab',
+  menu_plan_lab: 'Plan Lab',
   menu_streak_analysis: '🏹 Candle Streak',
   menu_trend_judgment: '📊 Trend Judgment',
   menu_trend_chart: 'Trend Analysis Chart',

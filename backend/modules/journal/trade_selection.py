@@ -40,6 +40,27 @@ def market_group_key(entry: Dict[str, Any]) -> tuple[str, str]:
     return exchange, symbol
 
 
+def path_covers_position(
+    candles: pd.DataFrame,
+    entry_time: int,
+    exit_time: int,
+    interval_ms: int,
+) -> bool:
+    """Return whether candle history reaches both boundaries of a position."""
+    if candles is None or candles.empty or entry_time > exit_time:
+        return False
+    if "open_time" not in candles.columns or "close_time" not in candles.columns:
+        return False
+    open_times = pd.to_numeric(candles.get("open_time"), errors="coerce").dropna()
+    close_times = pd.to_numeric(candles.get("close_time"), errors="coerce").dropna()
+    if open_times.empty or close_times.empty:
+        return False
+    return bool(
+        float(open_times.min()) < entry_time + interval_ms
+        and float(close_times.max()) > exit_time - interval_ms
+    )
+
+
 def closed_positions(
     entries: Iterable[Dict[str, Any]],
     start_time: int,

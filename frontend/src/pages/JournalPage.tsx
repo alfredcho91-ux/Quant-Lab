@@ -9,11 +9,12 @@ import {
   deleteJournalEntry,
   getDeepcoinStatus,
   getJournal,
-  getJournalExcursions,
+  getJournalQualityAnalysis,
   syncDeepcoinFills,
 } from '../api/client';
 import { useLanguage } from '../store/useStore';
-import type { JournalEntry } from '../types';
+import { useNavigate } from '../router-context';
+import type { JournalEntry, TradeQualityItem } from '../types';
 import { isClosedPosition } from '../features/journal/journalEntries';
 import {
   buildJournalPeriod,
@@ -24,7 +25,6 @@ import {
   type JournalPeriod,
 } from '../features/journal/journalPeriod';
 import {
-  aggregateNetPnl,
   aggregateNetReturnPct,
   feeImpact,
   fundingImpact,
@@ -34,12 +34,25 @@ import {
 import { journalDerivedQueryPrefixes, journalQueryKeys } from '../features/journal/journalQueryKeys';
 import TradeReportModal from '../features/journal/TradeReportModal';
 import { tradeOutcomeAssessment } from '../features/journal/tradeOutcomeAssessment';
+import { buildAnalyzedTrades } from '../features/tradeAnalysis/tradeAnalysis';
+import { summarizeTradeStyle } from '../features/journal/tradeStyleSummary';
+import DailyPnlCalendar from '../features/journal/DailyPnlCalendar';
+import TradingStyleSelect from '../features/preferences/TradingStyleSelect';
 
 function formatSignedNumber(value: number | null | undefined, maximumFractionDigits = 4): string {
   if (value == null || !Number.isFinite(value)) {
     return '-';
   }
   return `${value >= 0 ? '+' : ''}${value.toLocaleString(undefined, { maximumFractionDigits })}`;
+}
+
+function formatHoldingMinutes(minutes: number | null, isKo: boolean): string {
+  if (minutes == null || !Number.isFinite(minutes)) return '-';
+  const totalMinutes = Math.max(0, Math.round(minutes));
+  const hours = Math.floor(totalMinutes / 60);
+  const remainingMinutes = totalMinutes % 60;
+  if (hours === 0) return isKo ? `${remainingMinutes}분` : `${remainingMinutes}m`;
+  return isKo ? `${hours}시간 ${remainingMinutes}분` : `${hours}h ${remainingMinutes}m`;
 }
 
 function DeepcoinConnectionModal({
@@ -119,6 +132,26 @@ function AnalysisMetric({
       {detail != null && <div className="mt-1 text-[11px] text-dark-500">{detail}</div>}
     </div>
   );
+}
+
+function PlanLabSummary({ data, isKo, onOpen }: {
+  data?: import('../types').PlanLabData;
+  isKo: boolean;
+  onOpen: () => void;
+}) {
+  const summary = data?.summary;
+  return <section className="flex items-center justify-between gap-4 border border-dark-700 bg-dark-900/30 px-4 py-3">
+    <div className="min-w-0">
+      <div className="text-xs font-semibold text-dark-100">{isKo ? '계획 분석' : 'Plan Lab'}</div>
+      {summary?.plan_recorded_count ? <div className="mt-1 flex flex-wrap gap-x-5 gap-y-1 text-[11px] text-dark-400">
+        <span>{isKo ? '계획 입력' : 'Plan coverage'} <strong className="font-mono text-dark-100">{summary.plan_recorded_count}/{data?.coverage.closed_trades || 0}</strong></span>
+        <span>Plan Exp <strong className="font-mono text-dark-100">{formatSignedNumber(summary.plan_expectancy_r, 2)}R</strong></span>
+        <span>Actual <strong className="font-mono text-dark-100">{formatSignedNumber(summary.actual_expectancy_r, 2)}R</strong></span>
+        <span>Δ <strong className={`font-mono ${(summary.execution_delta_r || 0) >= 0 ? 'text-bull' : 'text-bear'}`}>{formatSignedNumber(summary.execution_delta_r, 2)}R</strong></span>
+      </div> : <div className="mt-1 text-[11px] text-dark-500">{data ? (isKo ? '사전 계획을 기록하면 계획 품질과 실행 이행도를 분석할 수 있습니다.' : 'Record pre-trade plans to analyze plan quality and execution adherence.') : (isKo ? 'Plan Lab 결과는 Plan Lab에서 불러온 뒤 이곳에 표시됩니다.' : 'Load Plan Lab for this period to show its official summary here.')}</div>}
+    </div>
+    <button type="button" onClick={onOpen} className="shrink-0 text-xs text-primary-200 hover:text-white">{isKo ? 'Plan Lab에서 자세히 보기 →' : 'Open Plan Lab →'}</button>
+  </section>;
 }
 
 function CumulativePnlChart({ trades, isKo }: { trades: JournalEntry[]; isKo: boolean }) {
@@ -206,7 +239,9 @@ function CumulativePnlChart({ trades, isKo }: { trades: JournalEntry[]; isKo: bo
 }
 
 function PeriodAnalysis({
+  allEntries,
   closedEntries,
+  qualityItems,
   isKo,
   instType,
   canSync,
@@ -217,7 +252,9 @@ function PeriodAnalysis({
   onSyncDays,
   onPeriodApply,
 }: {
+  allEntries: JournalEntry[];
   closedEntries: JournalEntry[];
+  qualityItems: TradeQualityItem[];
   isKo: boolean;
   instType: 'SWAP' | 'SPOT';
   canSync: boolean;
@@ -233,6 +270,7 @@ function PeriodAnalysis({
   const [analysisEnd, setAnalysisEnd] = useState(initialPeriod.end);
   const [activePreset, setActivePreset] = useState<'7' | '30' | '90' | 'custom'>('30');
   const [customError, setCustomError] = useState<string | null>(null);
+  const [showSupportingMetrics, setShowSupportingMetrics] = useState(false);
 
   const applyPreset = (days: 7 | 30 | 90) => {
     const end = new Date();
@@ -316,35 +354,20 @@ function PeriodAnalysis({
   const periodFeeImpact = feeImpact(analysisTrades);
   const periodFundingImpact = fundingImpact(analysisTrades);
   const periodNetCostImpact = netCostImpact(analysisTrades);
-
-  let maxWinStreak = 0;
-  let maxLossStreak = 0;
-  let currentWinStreak = 0;
-  let currentLossStreak = 0;
-  for (const trade of analysisTrades) {
-    const pnl = trade.realized_pnl as number;
-    if (pnl > 0) {
-      currentWinStreak += 1;
-      currentLossStreak = 0;
-      maxWinStreak = Math.max(maxWinStreak, currentWinStreak);
-    } else if (pnl < 0) {
-      currentLossStreak += 1;
-      currentWinStreak = 0;
-      maxLossStreak = Math.max(maxLossStreak, currentLossStreak);
-    } else {
-      currentWinStreak = 0;
-      currentLossStreak = 0;
-    }
-  }
-
-  const bestTrade = analysisTrades.reduce<JournalEntry | null>((best, entry) => {
-    if (!best || (entry.realized_pnl || 0) > (best.realized_pnl || 0)) return entry;
-    return best;
-  }, null);
-  const worstTrade = analysisTrades.reduce<JournalEntry | null>((worst, entry) => {
-    if (!worst || (entry.realized_pnl || 0) < (worst.realized_pnl || 0)) return entry;
-    return worst;
-  }, null);
+  const periodAnalyzedTrades = useMemo(() => {
+    const periodIds = new Set(periodClosedEntries.flatMap((entry) => entry.id == null ? [] : [entry.id]));
+    return buildAnalyzedTrades(allEntries).filter((trade) => trade.entry.id != null && periodIds.has(trade.entry.id));
+  }, [allEntries, periodClosedEntries]);
+  const averageHoldingMinutes = useMemo(() => {
+    const values = periodAnalyzedTrades.flatMap((trade) => (
+      trade.holdingMinutes != null && Number.isFinite(trade.holdingMinutes) ? [trade.holdingMinutes] : []
+    ));
+    return values.length ? values.reduce((total, value) => total + value, 0) / values.length : null;
+  }, [periodAnalyzedTrades]);
+  const tradeStyle = useMemo(
+    () => summarizeTradeStyle(periodAnalyzedTrades, qualityItems, isKo),
+    [isKo, periodAnalyzedTrades, qualityItems],
+  );
 
   const directionStats = (direction: 'Long' | 'Short') => {
     const subset = analysisTrades.filter((entry) => entry.direction === direction);
@@ -397,6 +420,7 @@ function PeriodAnalysis({
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          <TradingStyleSelect isKo={isKo} />
           {[7, 30, 90].map((days) => {
             const isActive = activePreset === String(days);
             return (
@@ -507,7 +531,7 @@ function PeriodAnalysis({
         </div>
       ) : (
         <>
-          <div className="mt-5 grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-8">
+          <div className="mt-5 grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-5">
             <AnalysisMetric
               label={isKo ? '기간 순수익률' : 'Net Return'}
               value={periodNetReturn == null ? '-' : `${formatSignedNumber(periodNetReturn, 2)}%`}
@@ -532,29 +556,26 @@ function PeriodAnalysis({
               detail={isKo ? '총이익 ÷ 총손실' : 'Gross profit / gross loss'}
             />
             <AnalysisMetric
-              label={isKo ? '평균 수익' : 'Avg Win'}
-              value={`${formatSignedNumber(averageWin, 2)} USDT`}
-              tone="positive"
-            />
-            <AnalysisMetric
-              label={isKo ? '평균 손실' : 'Avg Loss'}
-              value={`${formatSignedNumber(averageLoss, 2)} USDT`}
-              tone="negative"
-            />
-            <AnalysisMetric
-              label={isKo ? '거래당 기대값' : 'Expectancy / Trade'}
-              value={`${formatSignedNumber(expectancy, 2)} USDT`}
-              tone={expectancy >= 0 ? 'positive' : 'negative'}
-            />
-            <AnalysisMetric
-              label={isKo ? '비용 순효과' : 'Net Cost Impact'}
-              value={`${formatSignedNumber(periodNetCostImpact, 2)} USDT`}
-              tone={periodNetCostImpact >= 0 ? 'positive' : 'negative'}
-              detail={`${isKo ? '수수료' : 'Fee'} ${formatSignedNumber(periodFeeImpact, 2)} · ${isKo ? '펀딩' : 'Funding'} ${formatSignedNumber(periodFundingImpact, 2)}`}
+              label={isKo ? '평균 보유 시간' : 'Average Holding Time'}
+              value={formatHoldingMinutes(averageHoldingMinutes, isKo)}
+              detail={isKo ? '선택 기간의 종료 거래 기준' : 'Based on closed trades in selected period'}
             />
           </div>
 
-          <div className="mt-4 grid gap-3 lg:grid-cols-4">
+          <div className="mt-3 flex flex-wrap items-baseline gap-x-2 gap-y-1 border-l-2 border-primary-400/60 bg-dark-900/25 px-3 py-2.5 text-sm leading-6 text-dark-200">
+            <span className="font-bold text-primary-200">{isKo ? '매매 스타일' : 'Trading style'}</span>
+            <span className="font-medium text-dark-100">
+              {tradeStyle.insufficientData
+                ? (isKo ? '분석할 거래가 더 필요합니다' : 'More completed trades are needed to analyze.')
+                : tradeStyle.traits.join(' · ')}
+            </span>
+          </div>
+
+          <div className="mt-5">
+            <div className="mb-2 text-xs text-dark-500">
+              {isKo ? `${period.start} ~ ${period.end} 선택 기간 기준` : `For ${period.start} to ${period.end}`}
+            </div>
+            <div className="grid gap-3 md:grid-cols-2">
             <div className="border border-dark-700 bg-dark-900/35 p-4">
               <div className="text-xs font-semibold text-dark-300">LONG</div>
               <div className={`mt-2 font-mono text-xl font-bold ${longStats.pnl >= 0 ? 'text-bull' : 'text-bear'}`}>
@@ -573,37 +594,16 @@ function PeriodAnalysis({
                 {shortStats.count}{isKo ? '회' : ' trades'} · {isKo ? '승률' : 'win'} {shortStats.winRate.toFixed(1)}%
               </div>
             </div>
-            <div className="border border-dark-700 bg-dark-900/35 p-4">
-              <div className="text-xs font-semibold text-dark-300">{isKo ? '최고 / 최악 거래' : 'Best / Worst Trade'}</div>
-              <div className="mt-2 text-xs text-dark-400">
-                <div className="flex justify-between gap-2">
-                  <span>{bestTrade?.symbol || '-'}</span>
-                  <span className="font-mono text-bull">{bestTrade ? `${formatSignedNumber(bestTrade.realized_pnl, 2)}` : '-'}</span>
-                </div>
-                <div className="mt-1 flex justify-between gap-2">
-                  <span>{worstTrade?.symbol || '-'}</span>
-                  <span className="font-mono text-bear">{worstTrade ? `${formatSignedNumber(worstTrade.realized_pnl, 2)}` : '-'}</span>
-                </div>
-              </div>
-            </div>
-            <div className="border border-dark-700 bg-dark-900/35 p-4">
-              <div className="text-xs font-semibold text-dark-300">{isKo ? '연속 기록' : 'Streaks'}</div>
-              <div className="mt-2 grid grid-cols-2 gap-3">
-                <div>
-                  <div className="text-[10px] text-dark-500">{isKo ? '최대 연승' : 'Max wins'}</div>
-                  <div className="font-mono text-xl font-bold text-bull">{maxWinStreak}</div>
-                </div>
-                <div>
-                  <div className="text-[10px] text-dark-500">{isKo ? '최대 연패' : 'Max losses'}</div>
-                  <div className="font-mono text-xl font-bold text-bear">{maxLossStreak}</div>
-                </div>
-              </div>
             </div>
           </div>
 
-          <div className="mt-4 grid gap-4 xl:grid-cols-[1.7fr,1fr]">
+          <div className="mt-4">
             <CumulativePnlChart trades={analysisTrades} isKo={isKo} />
-            <div className="border border-dark-700 bg-dark-900/35 p-4">
+          </div>
+
+          <DailyPnlCalendar trades={analysisTrades} period={period} isKo={isKo} />
+
+          <div className="mt-4 border border-dark-700 bg-dark-900/35 p-4">
               <div className="mb-3 flex items-center justify-between gap-2">
                 <div>
                   <div className="text-sm font-semibold text-white">{isKo ? '코인별 성과' : 'Performance by Symbol'}</div>
@@ -639,7 +639,43 @@ function PeriodAnalysis({
                   </table>
                 </div>
               )}
-            </div>
+          </div>
+
+          <div className="mt-3 border border-dark-700 bg-dark-900/25">
+            <button
+              type="button"
+              onClick={() => setShowSupportingMetrics((value) => !value)}
+              className="flex w-full items-center justify-between px-4 py-3 text-left text-sm font-medium text-dark-200 hover:bg-dark-800/50 hover:text-white"
+              aria-expanded={showSupportingMetrics}
+            >
+              <span>{isKo ? '보조 성과 지표 보기' : 'View supporting performance metrics'}</span>
+              <span className="text-dark-500">{showSupportingMetrics ? '▴' : '▾'}</span>
+            </button>
+            {showSupportingMetrics && (
+              <div className="grid grid-cols-2 gap-3 border-t border-dark-700 p-4 md:grid-cols-4">
+                <AnalysisMetric
+                  label={isKo ? '평균 수익' : 'Avg Win'}
+                  value={`${formatSignedNumber(averageWin, 2)} USDT`}
+                  tone="positive"
+                />
+                <AnalysisMetric
+                  label={isKo ? '평균 손실' : 'Avg Loss'}
+                  value={`${formatSignedNumber(averageLoss, 2)} USDT`}
+                  tone="negative"
+                />
+                <AnalysisMetric
+                  label={isKo ? '거래당 기대값' : 'Expectancy / Trade'}
+                  value={`${formatSignedNumber(expectancy, 2)} USDT`}
+                  tone={expectancy >= 0 ? 'positive' : 'negative'}
+                />
+                <AnalysisMetric
+                  label={isKo ? '비용 순효과' : 'Net Cost Impact'}
+                  value={`${formatSignedNumber(periodNetCostImpact, 2)} USDT`}
+                  tone={periodNetCostImpact >= 0 ? 'positive' : 'negative'}
+                  detail={`${isKo ? '수수료' : 'Fee'} ${formatSignedNumber(periodFeeImpact, 2)} · ${isKo ? '펀딩' : 'Funding'} ${formatSignedNumber(periodFundingImpact, 2)}`}
+                />
+              </div>
+            )}
           </div>
 
           <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-[11px] text-dark-500">
@@ -665,12 +701,14 @@ export default function JournalPage() {
   const language = useLanguage();
   const isKo = language === 'ko';
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
 
   const [deepcoinInstType, setDeepcoinInstType] = useState<'SWAP' | 'SPOT'>('SWAP');
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
   const [snapshotEntry, setSnapshotEntry] = useState<JournalEntry | null>(null);
   const [historyPeriod, setHistoryPeriod] = useState<JournalPeriod>(() => buildJournalPeriod());
   const [connectionOpen, setConnectionOpen] = useState(false);
+  const [visibleTradeCount, setVisibleTradeCount] = useState(10);
 
   const { data: entries, isLoading, isError: entriesError, refetch: refetchEntries } = useQuery({
     queryKey: journalQueryKeys.entries,
@@ -678,9 +716,12 @@ export default function JournalPage() {
   });
   const historyStartTime = dateBoundaryTimestamp(historyPeriod.start);
   const historyEndTime = dateBoundaryTimestamp(historyPeriod.end, true);
-  const excursionQuery = useQuery({
-    queryKey: journalQueryKeys.excursions(historyStartTime, historyEndTime),
-    queryFn: () => getJournalExcursions({
+  const cachedPlanLab = queryClient.getQueryData<import('../types').PlanLabData>(
+    journalQueryKeys.planLab(historyStartTime, historyEndTime, 'ALL', undefined, undefined, 'ALL'),
+  );
+  const qualityQuery = useQuery({
+    queryKey: journalQueryKeys.qualityAnalysis(historyStartTime, historyEndTime),
+    queryFn: () => getJournalQualityAnalysis({
       start_time: historyStartTime as number,
       end_time: historyEndTime as number,
     }),
@@ -688,9 +729,15 @@ export default function JournalPage() {
     staleTime: 30 * 60_000,
     retry: false,
   });
+  const qualityByJournalId = useMemo(
+    () => new Map((qualityQuery.data?.items || []).map((item) => [item.journal_id, item])),
+    [qualityQuery.data?.items],
+  );
   const excursionByJournalId = useMemo(
-    () => new Map((excursionQuery.data?.items || []).map((item) => [item.journal_id, item])),
-    [excursionQuery.data?.items],
+    () => new Map((qualityQuery.data?.items || []).flatMap((item) => (
+      item.excursion ? [[item.journal_id, item.excursion] as const] : []
+    ))),
+    [qualityQuery.data?.items],
   );
 
   const { data: deepcoinStatus } = useQuery({
@@ -740,18 +787,6 @@ export default function JournalPage() {
   const allEntries = entries || [];
   const closedEntries = allEntries.filter(isClosedPosition);
   const periodClosedEntries = closedEntries.filter((entry) => isJournalEntryWithinPeriod(entry, historyPeriod));
-  const evaluatedEntries = periodClosedEntries.filter((entry) =>
-    ['Win', 'Loss', 'Breakeven'].includes(entry.outcome || ''),
-  );
-  const stats = {
-    total: periodClosedEntries.length,
-    wins: evaluatedEntries.filter((entry) => entry.outcome === 'Win').length,
-    losses: evaluatedEntries.filter((entry) => entry.outcome === 'Loss').length,
-    netReturnPct: aggregateNetReturnPct(periodClosedEntries),
-    netPnl: aggregateNetPnl(periodClosedEntries),
-  };
-  const winRate = evaluatedEntries.length > 0 ? (stats.wins / evaluatedEntries.length) * 100 : 0;
-
   const visibleEntries = periodClosedEntries
     .sort((a, b) => {
       const aTime = a.datetime ? new Date(a.datetime).getTime() : 0;
@@ -759,6 +794,7 @@ export default function JournalPage() {
       if (aTime !== bTime) return bTime - aTime;
       return (b.id || 0) - (a.id || 0);
     });
+  const displayedEntries = visibleEntries.slice(0, visibleTradeCount);
 
   return (
     <div className="space-y-6">
@@ -827,7 +863,9 @@ export default function JournalPage() {
       </section>
 
       <PeriodAnalysis
+        allEntries={allEntries}
         closedEntries={closedEntries}
+        qualityItems={qualityQuery.data?.items || []}
         isKo={isKo}
         instType={deepcoinInstType}
         canSync={Boolean(deepcoinStatus?.configured)}
@@ -842,39 +880,13 @@ export default function JournalPage() {
             lookback_days: days,
           });
         }}
-        onPeriodApply={setHistoryPeriod}
+        onPeriodApply={(period) => {
+          setHistoryPeriod(period);
+          setVisibleTradeCount(10);
+        }}
       />
 
-      <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-        <div className="card p-4 text-center">
-          <div className="text-2xl font-bold text-white">{stats.total}</div>
-          <div className="text-sm text-dark-400">{isKo ? '종료 거래' : 'Closed Trades'}</div>
-          <div className="mt-1 text-[11px] text-dark-500">{isKo ? 'Deepcoin 포지션 기준' : 'Deepcoin positions'}</div>
-        </div>
-        <div className="card p-4 text-center">
-          <div className="text-2xl font-bold text-primary-400">{winRate.toFixed(2)}%</div>
-          <div className="text-sm text-dark-400">{isKo ? '승률' : 'Win Rate'}</div>
-        </div>
-        <div className="card p-4 text-center">
-          <div className={`text-2xl font-bold ${(stats.netReturnPct || 0) >= 0 ? 'text-bull' : 'text-bear'}`}>
-            {stats.netReturnPct == null ? '-' : `${formatSignedNumber(stats.netReturnPct, 2)}%`}
-          </div>
-          <div className="text-sm text-dark-400">{isKo ? '투입 증거금 대비 수익률' : 'Return on deployed margin'}</div>
-          <div className="mt-1 text-[11px] text-dark-500">
-            {isKo ? '수수료·펀딩 반영' : 'After fees and funding'}
-          </div>
-        </div>
-        <div className="card p-4 text-center">
-          <div className={`text-2xl font-bold ${stats.netPnl >= 0 ? 'text-bull' : 'text-bear'}`}>
-            {formatSignedNumber(stats.netPnl, 2)} USDT
-          </div>
-          <div className="text-sm text-dark-400">{isKo ? '순수익금' : 'Net Profit'}</div>
-          <div className="mt-1 text-[11px] text-dark-500">
-            {isKo ? '수수료·펀딩 반영' : 'After fees and funding'}
-          </div>
-        </div>
-      </div>
-
+      <PlanLabSummary data={cachedPlanLab} isKo={isKo} onOpen={() => navigate('/plan-lab')} />
 
       <div className="card p-6">
         <div className="mb-4">
@@ -900,13 +912,13 @@ export default function JournalPage() {
             {isKo ? '현재 필터에 표시할 거래가 없습니다.' : 'No trades match the current filter.'}
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <>
+          <div className="hidden overflow-x-auto md:block">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-dark-700">
                   <th className="text-left py-2 px-3">{isKo ? '날짜' : 'Date'}</th>
                   <th className="text-left py-2 px-3">{isKo ? '심볼' : 'Symbol'}</th>
-                  <th className="text-left py-2 px-3">{isKo ? '결과 판정' : 'Outcome Assessment'}</th>
                   <th className="text-center py-2 px-3">{isKo ? '방향' : 'Dir'}</th>
                   <th className="text-right py-2 px-3">{isKo ? '진입' : 'Entry'}</th>
                   <th className="text-right py-2 px-3">{isKo ? '청산' : 'Exit'}</th>
@@ -920,10 +932,13 @@ export default function JournalPage() {
                 </tr>
               </thead>
               <tbody>
-                {visibleEntries.map((entry) => {
+                {displayedEntries.map((entry) => {
                   const closed = isClosedPosition(entry);
                   const excursion = entry.id == null ? null : excursionByJournalId.get(entry.id) || null;
-                  const assessment = excursion ? tradeOutcomeAssessment(excursion, isKo) : null;
+                  const quality = entry.id == null ? null : qualityByJournalId.get(entry.id) || null;
+                  const assessment = excursion
+                    ? tradeOutcomeAssessment(excursion, quality?.quality_class, isKo)
+                    : null;
                   const displayNetReturnPct = netReturnPct(entry);
                   const closeDate = entry.datetime ? new Date(entry.datetime) : null;
                   const hasValidCloseDate = closeDate != null && Number.isFinite(closeDate.getTime());
@@ -959,20 +974,6 @@ export default function JournalPage() {
                           )}
                         </div>
                       </td>
-                      <td className="min-w-[320px] py-2 px-3">
-                        {assessment ? (
-                          <div>
-                            <div className={`text-xs font-semibold ${assessment.tone === 'negative' ? 'text-bear' : assessment.tone === 'warning' ? 'text-amber-300' : 'text-primary-300'}`}>
-                              {assessment.label}
-                            </div>
-                            <div className="mt-1 text-[11px] leading-4 text-dark-400">{assessment.explanation}</div>
-                          </div>
-                        ) : excursionQuery.isLoading ? (
-                          <span className="text-xs text-dark-500">{isKo ? '판정 계산 중' : 'Calculating assessment'}</span>
-                        ) : (
-                          <span className="text-xs text-dark-500">{isKo ? '판정 데이터 없음' : 'Assessment unavailable'}</span>
-                        )}
-                      </td>
                       <td
                         className={`py-2 px-3 text-center ${
                           entry.direction === 'Long' ? 'text-bull' : 'text-bear'
@@ -994,18 +995,6 @@ export default function JournalPage() {
                         <div className={closed ? 'text-base font-bold' : ''}>
                           {displayNetReturnPct == null ? '-' : `${formatSignedNumber(displayNetReturnPct, 3)}%`}
                         </div>
-                        {closed && (entry.fee != null || entry.funding_fee != null) && (
-                          <div className="mt-1 space-y-0.5 text-[10px] font-sans text-dark-500">
-                            {entry.fee != null && (
-                              <div>
-                                {isKo ? '수수료' : 'Fee'}: {formatSignedNumber(-Math.abs(entry.fee))} {entry.fee_currency || 'USDT'}
-                              </div>
-                            )}
-                            {entry.funding_fee != null && (
-                              <div>{isKo ? '펀딩' : 'Funding'}: {formatSignedNumber(entry.funding_fee)} USDT</div>
-                            )}
-                          </div>
-                        )}
                       </td>
                       <td
                         className={`py-2 px-3 text-right font-mono font-bold ${
@@ -1054,13 +1043,33 @@ export default function JournalPage() {
                         </div>
                       </td>
                       <td className="py-2 px-3">
-                        <button
-                          onClick={() => entry.id && deleteMutation.mutate(entry.id)}
-                          className="text-dark-500 hover:text-red-400 transition-colors"
-                          disabled={deleteMutation.isPending}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                        <details className="group relative">
+                          <summary className="cursor-pointer list-none text-xs text-dark-500 hover:text-white">{isKo ? '상세' : 'Details'}</summary>
+                          <div className="absolute right-0 z-10 mt-2 w-64 border border-dark-700 bg-dark-950 p-3 text-left shadow-xl">
+                            {assessment ? (
+                              <div>
+                                <div className={`text-xs font-semibold ${assessment.tone === 'negative' ? 'text-bear' : assessment.tone === 'warning' ? 'text-amber-300' : 'text-primary-300'}`}>{assessment.label}</div>
+                                <div className="mt-1 text-[11px] leading-4 text-dark-400">{assessment.explanation}</div>
+                              </div>
+                            ) : qualityQuery.isLoading ? (
+                              <div className="text-xs text-dark-500">{isKo ? '판정 계산 중' : 'Calculating assessment'}</div>
+                            ) : null}
+                            {(entry.fee != null || entry.funding_fee != null) && (
+                              <div className="mt-2 border-t border-dark-800 pt-2 text-[11px] text-dark-400">
+                                {entry.fee != null && <div>{isKo ? '수수료' : 'Fee'}: {formatSignedNumber(-Math.abs(entry.fee))} {entry.fee_currency || 'USDT'}</div>}
+                                {entry.funding_fee != null && <div>{isKo ? '펀딩' : 'Funding'}: {formatSignedNumber(entry.funding_fee)} USDT</div>}
+                              </div>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => entry.id && deleteMutation.mutate(entry.id)}
+                              disabled={deleteMutation.isPending}
+                              className="mt-3 inline-flex items-center gap-1 text-xs text-dark-500 hover:text-red-400 disabled:opacity-50"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />{isKo ? '삭제' : 'Delete'}
+                            </button>
+                          </div>
+                        </details>
                       </td>
                     </tr>
                   );
@@ -1068,6 +1077,65 @@ export default function JournalPage() {
               </tbody>
             </table>
           </div>
+          <div className="space-y-2 md:hidden">
+            {displayedEntries.map((entry) => {
+              const excursion = entry.id == null ? null : excursionByJournalId.get(entry.id) || null;
+              const quality = entry.id == null ? null : qualityByJournalId.get(entry.id) || null;
+              const assessment = excursion ? tradeOutcomeAssessment(excursion, quality?.quality_class, isKo) : null;
+              const displayNetReturnPct = netReturnPct(entry);
+              const closeDate = entry.datetime ? new Date(entry.datetime) : null;
+              const hasValidCloseDate = closeDate != null && Number.isFinite(closeDate.getTime());
+              const pnl = entry.realized_pnl || 0;
+              return (
+                <article key={entry.id} className="border border-dark-700 bg-dark-900/35 p-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="font-medium text-white">{entry.symbol || '-'}</div>
+                      <div className="mt-0.5 text-[11px] text-dark-500">
+                        {hasValidCloseDate ? `${toDateInputValue(closeDate)} ${closeDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : '-'}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className={`text-xs font-semibold ${entry.direction === 'Long' ? 'text-bull' : 'text-bear'}`}>{entry.direction || '-'}</span>
+                      <span className={`rounded px-2 py-0.5 text-xs ${entry.outcome === 'Win' ? 'bg-bull/20 text-bull' : entry.outcome === 'Loss' ? 'bg-bear/20 text-bear' : 'bg-dark-600 text-dark-300'}`}>{entry.outcome || '-'}</span>
+                    </div>
+                  </div>
+                  <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
+                    <div><span className="text-dark-500">{isKo ? '진입' : 'Entry'}</span><div className="mt-0.5 font-mono text-dark-200">{entry.entry_price?.toLocaleString() || '-'}</div></div>
+                    <div><span className="text-dark-500">{isKo ? '청산' : 'Exit'}</span><div className="mt-0.5 font-mono text-dark-200">{entry.exit_price?.toLocaleString() || '-'}</div></div>
+                    <div><span className="text-dark-500">{isKo ? '투입금 대비 수익률' : 'Margin return'}</span><div className={`mt-0.5 font-mono font-semibold ${(displayNetReturnPct || 0) >= 0 ? 'text-bull' : 'text-bear'}`}>{displayNetReturnPct == null ? '-' : `${formatSignedNumber(displayNetReturnPct, 3)}%`}</div></div>
+                    <div><span className="text-dark-500">{isKo ? '순수익금' : 'Net profit'}</span><div className={`mt-0.5 font-mono font-semibold ${pnl >= 0 ? 'text-bull' : 'text-bear'}`}>{entry.realized_pnl == null ? '-' : `${formatSignedNumber(entry.realized_pnl, 4)} USDT`}</div></div>
+                  </div>
+                  <div className="mt-3 flex items-center justify-between gap-3 border-t border-dark-800 pt-2">
+                    <details>
+                      <summary className="cursor-pointer list-none text-xs text-dark-500 hover:text-white">{isKo ? '세부 정보' : 'Details'}</summary>
+                      <div className="mt-2 space-y-1 text-[11px] leading-4 text-dark-400">
+                        {assessment && <><div className={assessment.tone === 'negative' ? 'font-semibold text-bear' : assessment.tone === 'warning' ? 'font-semibold text-amber-300' : 'font-semibold text-primary-300'}>{assessment.label}</div><div>{assessment.explanation}</div></>}
+                        {entry.fee != null && <div>{isKo ? '수수료' : 'Fee'}: {formatSignedNumber(-Math.abs(entry.fee))} {entry.fee_currency || 'USDT'}</div>}
+                        {entry.funding_fee != null && <div>{isKo ? '펀딩' : 'Funding'}: {formatSignedNumber(entry.funding_fee)} USDT</div>}
+                      </div>
+                    </details>
+                    <div className="flex items-center gap-3">
+                      {entry.datetime && entry.exit_price != null && <button type="button" onClick={() => setSnapshotEntry(entry)} className="text-amber-300 hover:text-amber-100" title={isKo ? '거래 리포트 및 차트' : 'Trade report and chart'}><CandlestickChart className="h-4 w-4" /></button>}
+                      <button type="button" onClick={() => entry.id && deleteMutation.mutate(entry.id)} disabled={deleteMutation.isPending} className="text-dark-500 hover:text-red-400 disabled:opacity-50" aria-label={isKo ? '거래 삭제' : 'Delete trade'}><Trash2 className="h-4 w-4" /></button>
+                    </div>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+          {visibleEntries.length > displayedEntries.length && (
+            <div className="mt-4 flex justify-center">
+              <button
+                type="button"
+                onClick={() => setVisibleTradeCount((count) => count + 10)}
+                className="border border-dark-600 bg-dark-900 px-4 py-2 text-xs text-dark-200 hover:border-primary-400/60 hover:text-white"
+              >
+                {isKo ? `거래 ${Math.min(10, visibleEntries.length - displayedEntries.length)}건 더 보기` : `Show ${Math.min(10, visibleEntries.length - displayedEntries.length)} more`}
+              </button>
+            </div>
+          )}
+          </>
         )}
       </div>
 
@@ -1076,7 +1144,8 @@ export default function JournalPage() {
           entry={snapshotEntry}
           allEntries={entries || []}
           excursion={snapshotEntry.id == null ? null : excursionByJournalId.get(snapshotEntry.id) || null}
-          excursionLoading={excursionQuery.isLoading}
+          excursionLoading={qualityQuery.isLoading}
+          qualityItem={snapshotEntry.id == null ? null : qualityByJournalId.get(snapshotEntry.id) || null}
           isKo={isKo}
           onClose={() => setSnapshotEntry(null)}
           onBehaviorUpdated={async () => {

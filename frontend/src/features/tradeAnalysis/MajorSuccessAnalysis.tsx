@@ -67,7 +67,12 @@ export default function MajorSuccessAnalysis({ trades, qualityItems, allEntries,
           <div className="border-b border-bull/15 px-4 py-3 sm:border-b-0 sm:border-r"><div className="text-[11px] text-dark-500">{isKo ? '전체 수익 중 비중' : 'Share of gross profit'}</div><div className="mt-1 font-mono text-lg text-white">{grossProfit > 0 ? number(totalProfit / grossProfit * 100) : '-'}%</div></div>
           <div className="px-4 py-3"><div className="text-[11px] text-dark-500">{isKo ? '최근 거래 우선' : 'Newest first'}</div><div className="mt-1 text-sm text-dark-200">{cases[0]?.entry.symbol} · {cases[0]?.entry.direction}</div></div>
         </div>
-        <div>
+        <details className="group">
+          <summary className="flex cursor-pointer list-none items-center justify-between border-b border-dark-800 px-4 py-3 text-xs text-dark-300 hover:text-white">
+            <span>{isKo ? '대표 거래 보기' : 'View representative trades'}</span>
+            <span className="text-dark-500 group-open:rotate-180">⌄</span>
+          </summary>
+          <div>
           {cases.map((trade) => {
             const marginReturn = netReturnPct(trade.entry);
             const marketReturn = priceReturn(trade);
@@ -78,9 +83,10 @@ export default function MajorSuccessAnalysis({ trades, qualityItems, allEntries,
               <div className="text-right"><div className="text-[10px] text-dark-500">{isKo ? '투자금 / 가격 수익률' : 'Margin / price return'}</div><div className="font-mono text-xs text-dark-200">{marginReturn != null ? `+${number(marginReturn)}%` : '-'} / {marketReturn != null ? `+${number(marketReturn)}%` : '-'}</div></div>
             </article>;
           })}
-        </div>
+          </div>
+        </details>
       </>}
-      {selectedTrade && <TradeReportModal entry={selectedTrade.entry} allEntries={allEntries} excursion={selectedTrade.excursion} isKo={isKo} onClose={() => setSelectedTrade(null)} />}
+      {selectedTrade && <TradeReportModal entry={selectedTrade.entry} allEntries={allEntries} excursion={selectedTrade.excursion} qualityItem={selectedTrade.entry.id == null ? null : qualityById.get(selectedTrade.entry.id)} isKo={isKo} onClose={() => setSelectedTrade(null)} />}
     </section>
   );
 }

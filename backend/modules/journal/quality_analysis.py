@@ -27,7 +27,7 @@ from backend.config.settings import PROJECT_ROOT
 from backend.utils.cache import DataCache
 
 MIN_REGIME_CONCLUSION_SAMPLE = 5
-QUALITY_ANALYSIS_CACHE_VERSION = 6
+QUALITY_ANALYSIS_CACHE_VERSION = 7
 QUALITY_ANALYSIS_CACHE = DataCache(
     ttl_minutes=10,
     cache_dir=str(PROJECT_ROOT / ".cache" / "journal_quality"),
@@ -65,12 +65,12 @@ def _performance_stats(items: List[Dict[str, Any]]) -> Dict[str, Any]:
         "r_sample_count": len(r_values),
         "average_pnl": float(np.mean(pnls)) if pnls else None,
         "profit_factor": sum(wins) / gross_loss if gross_loss > 0 else None,
-        "average_mfe_pct": _mean(item.get("excursion", {}).get("mfe_pct") for item in items),
-        "average_mae_pct": _mean(item.get("excursion", {}).get("mae_pct") for item in items),
+        "average_mfe_pct": _mean((item.get("excursion") or {}).get("mfe_pct") for item in items),
+        "average_mae_pct": _mean((item.get("excursion") or {}).get("mae_pct") for item in items),
         "average_holding_minutes": _mean(item.get("holding_minutes") for item in items),
         "early_exit_ratio_pct": early_count / len(items) * 100 if items else None,
         "late_exit_ratio_pct": late_count / len(items) * 100 if items else None,
-        "average_capture_ratio_pct": _mean(item.get("exit_quality", {}).get("capture_ratio_pct") for item in items),
+        "average_capture_ratio_pct": _mean((item.get("exit_quality") or {}).get("capture_ratio_pct") for item in items),
         "sample_quality": _sample_quality(len(items)),
     }
 
@@ -81,7 +81,7 @@ def _hold_aggregates(items: List[Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:
         results = [
             result
             for item in items
-            if (result := item.get("exit_quality", {}).get("hold_results", {}).get(key, {})).get("available")
+            if (result := (item.get("exit_quality") or {}).get("hold_results", {}).get(key, {})).get("available")
         ]
         output[key] = {
             "available_count": len(results),
@@ -103,7 +103,7 @@ def _strategy_aggregates(items: List[Dict[str, Any]]) -> Dict[str, Dict[str, Any
         results = [
             result
             for item in items
-            if (result := item.get("exit_quality", {}).get("virtual_exits", {}).get(strategy_id, {})).get("available")
+            if (result := (item.get("exit_quality") or {}).get("virtual_exits", {}).get(strategy_id, {})).get("available")
         ]
         output[strategy_id] = {
             "triggered_count": len(results),
@@ -130,11 +130,11 @@ def _best_exit_method(items: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
 def _quality_thresholds(items: List[Dict[str, Any]]) -> Dict[str, Any]:
     return {
         "method": "selected_period_distribution",
-        "mfe_low_pct": _percentile((item.get("excursion", {}).get("mfe_pct") for item in items), 25),
-        "mae_typical_pct": _percentile((item.get("excursion", {}).get("mae_pct") for item in items), 50),
-        "post_exit_high_pct": _percentile((item.get("exit_quality", {}).get("additional_profit_potential_pct") for item in items), 75),
-        "give_up_high_pct": _percentile((item.get("exit_quality", {}).get("profit_give_up_pct") for item in items), 75),
-        "capture_typical_pct": _percentile((item.get("exit_quality", {}).get("capture_ratio_pct") for item in items), 50),
+        "mfe_low_pct": _percentile(((item.get("excursion") or {}).get("mfe_pct") for item in items), 25),
+        "mae_typical_pct": _percentile(((item.get("excursion") or {}).get("mae_pct") for item in items), 50),
+        "post_exit_high_pct": _percentile(((item.get("exit_quality") or {}).get("additional_profit_potential_pct") for item in items), 75),
+        "give_up_high_pct": _percentile(((item.get("exit_quality") or {}).get("profit_give_up_pct") for item in items), 75),
+        "capture_typical_pct": _percentile(((item.get("exit_quality") or {}).get("capture_ratio_pct") for item in items), 50),
     }
 
 

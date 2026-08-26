@@ -8,6 +8,7 @@ import {
   isMarketCoin,
   type MarketInterval,
 } from '../constants/market';
+import { isTradingStyle, type TradingStyle } from '../features/preferences/tradingStyle';
 
 export type Interval = MarketInterval;
 export type BackgroundTheme = 'default' | 'white' | 'black';
@@ -20,6 +21,7 @@ interface AppState {
   backgroundTheme: BackgroundTheme;
   selectedCoin: Coin;
   selectedInterval: Interval;
+  tradingStyle: TradingStyle;
   currentPage: MenuPage;
   sidebarCollapsed: boolean;
   
@@ -31,6 +33,7 @@ interface AppState {
   setBackgroundTheme: (theme: BackgroundTheme) => void;
   setSelectedCoin: (coin: Coin) => void;
   setSelectedInterval: (interval: Interval) => void;
+  setTradingStyle: (style: TradingStyle) => void;
   setCurrentPage: (page: MenuPage) => void;
   toggleSidebar: () => void;
   updateBacktestParams: (params: Partial<BacktestParams>) => void;
@@ -74,6 +77,7 @@ export const useStore = create<AppState>()(
       backgroundTheme: 'default',
       selectedCoin: DEFAULT_COIN,
       selectedInterval: DEFAULT_INTERVAL,
+      tradingStyle: 'auto',
       currentPage: 'backtest',
       sidebarCollapsed: false,
       backtestParams: defaultBacktestParams,
@@ -93,6 +97,7 @@ export const useStore = create<AppState>()(
           selectedInterval: interval,
           backtestParams: { ...state.backtestParams, interval },
         })),
+      setTradingStyle: (tradingStyle) => set({ tradingStyle }),
       
       setCurrentPage: (page) => set({ currentPage: page }),
       
@@ -120,6 +125,7 @@ export const useStore = create<AppState>()(
         backgroundTheme: state.backgroundTheme,
         selectedCoin: state.selectedCoin,
         selectedInterval: state.selectedInterval,
+        tradingStyle: state.tradingStyle,
         backtestParams: state.backtestParams,
       }),
       merge: (persistedState, currentState) => {
@@ -130,6 +136,9 @@ export const useStore = create<AppState>()(
           ? incoming.selectedCoin
           : currentState.selectedCoin;
         const selectedInterval = incoming.selectedInterval ?? currentState.selectedInterval;
+        const tradingStyle = isTradingStyle(incoming.tradingStyle)
+          ? incoming.tradingStyle
+          : currentState.tradingStyle;
         const normalizedParams: BacktestParams = {
           ...defaultBacktestParams,
           ...persistedParams,
@@ -144,6 +153,7 @@ export const useStore = create<AppState>()(
         return {
           ...currentState,
           ...incoming,
+          tradingStyle,
           backtestParams: normalizedParams,
         };
       },
@@ -157,12 +167,14 @@ export const useBackgroundTheme = () => useStore((state) => state.backgroundThem
 export const useSelectedCoin = () => useStore((state) => state.selectedCoin);
 export const useCurrentPage = () => useStore((state) => state.currentPage);
 export const useSelectedInterval = () => useStore((state) => state.selectedInterval);
+export const useTradingStyle = () => useStore((state) => state.tradingStyle);
 export const useSidebarCollapsed = () => useStore((state) => state.sidebarCollapsed);
 export const useBacktestParams = () => useStore((state) => state.backtestParams);
 export const useSetLanguage = () => useStore((state) => state.setLanguage);
 export const useSetBackgroundTheme = () => useStore((state) => state.setBackgroundTheme);
 export const useSetSelectedCoin = () => useStore((state) => state.setSelectedCoin);
 export const useSetSelectedInterval = () => useStore((state) => state.setSelectedInterval);
+export const useSetTradingStyle = () => useStore((state) => state.setTradingStyle);
 export const useSetCurrentPage = () => useStore((state) => state.setCurrentPage);
 export const useToggleSidebar = () => useStore((state) => state.toggleSidebar);
 export const useUpdateBacktestParams = () => useStore((state) => state.updateBacktestParams);

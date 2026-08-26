@@ -15,14 +15,14 @@ from backend.modules.journal import repository
 from backend.modules.journal.cache_keys import position_analysis_cache_key
 from backend.modules.journal.trade_selection import closed_positions, finite_float, market_group_key, position_batches, timestamp_ms
 from backend.utils.cache import DataCache
-from backend.modules.journal.market_data import is_market_fallback, load_journal_ohlcv, market_source
+from backend.modules.journal.market_data import load_journal_ohlcv
 
 PATH_INTERVAL = "5m"
 PATH_INTERVAL_MS = 5 * 60 * 1000
 MAX_PATH_CANDLES = 30_000
 TRAIN_RATIO = 0.7
 MAX_GRID_COMBINATIONS = 800
-SL_TP_CACHE_VERSION = 2
+SL_TP_CACHE_VERSION = 3
 SCORE_WEIGHTS = {
     "expectancy": 0.35,
     "profit_factor": 0.25,
@@ -165,7 +165,7 @@ def _simulate_items(items: Iterable[Dict[str, Any]], sl_pct: float, tp_pct: floa
     return [_simulate_prepared_item(item, sl_pct, tp_pct) for item in items]
 
 
-def _first_barrier_index(item: Dict[str, Any], barrier: str, distance_pct: float) -> Optional[int]:
+def _first_barrier_event(item: Dict[str, Any], barrier: str, distance_pct: float) -> Optional[tuple[int, bool]]:
     cache = item.setdefault("_barrier_indices", {})
     key = (barrier, distance_pct)
     if key in cache:
@@ -186,14 +186,30 @@ def _first_barrier_index(item: Dict[str, Any], barrier: str, distance_pct: float
             else path["high"] >= entry_price * (1.0 + distance_pct / 100.0)
         )
     locations = hits.to_numpy().nonzero()[0]
-    result = int(locations[0]) if len(locations) else None
+    if len(locations):
+        index = int(locations[0])
+        result: Optional[tuple[int, bool]] = (index, bool(path.iloc[index].get("boundary_uncertain", False)))
+    else:
+        result = None
     cache[key] = result
     return result
 
 
 def _simulate_prepared_item(item: Dict[str, Any], sl_pct: float, tp_pct: float) -> Dict[str, Any]:
-    stop_index = _first_barrier_index(item, "stop", sl_pct)
-    target_index = _first_barrier_index(item, "target", tp_pct)
+    stop_event = _first_barrier_event(item, "stop", sl_pct)
+    target_event = _first_barrier_event(item, "target", tp_pct)
+    stop_index = stop_event[0] if stop_event else None
+    target_index = target_event[0] if target_event else None
+    first_index = min(index for index in (stop_index, target_index) if index is not None) if stop_index is not None or target_index is not None else None
+    if any(event is not None and event[0] == first_index and event[1] for event in (stop_event, target_event)):
+        return {
+            "outcome": "not_evaluable",
+            "stop_hit": False,
+            "tp_hit": False,
+            "ambiguous": False,
+            "return_pct": None,
+            "r_multiple": None,
+        }
     if stop_index is not None and target_index is not None and stop_index == target_index:
         outcome = "ambiguous_stop"
         gross_return_pct = -sl_pct
@@ -425,8 +441,6 @@ def _build_path_items(positions: List[Dict[str, Any]]) -> tuple[List[Dict[str, A
             if candles is None or candles.empty:
                 warnings.append(f"{symbol} batch {batch_index}: SL/TP market data unavailable")
                 continue
-            if is_market_fallback(candles):
-                warnings.append(f"{symbol} {PATH_INTERVAL}: {market_source(candles)}")
 
             for position in batch:
                 entry_time = timestamp_ms(position.get("entry_datetime"))
@@ -435,16 +449,23 @@ def _build_path_items(positions: List[Dict[str, Any]]) -> tuple[List[Dict[str, A
                 exit_price = finite_float(position.get("exit_price"))
                 if None in (entry_time, exit_time, entry_price, exit_price) or entry_price <= 0:
                     continue
+                open_times = pd.to_numeric(candles["open_time"], errors="coerce")
+                close_times = pd.to_numeric(candles["close_time"], errors="coerce")
                 path = candles.loc[
-                    (pd.to_numeric(candles["open_time"], errors="coerce") >= entry_time)
-                    & (pd.to_numeric(candles["close_time"], errors="coerce") <= exit_time)
+                    (close_times >= entry_time)
+                    & (open_times < exit_time)
                 ].copy().reset_index(drop=True)
                 if path.empty:
                     continue
-                first_open = finite_float(path.iloc[0].get("open_time"))
-                if first_open is None or first_open > entry_time + PATH_INTERVAL_MS:
-                    warnings.append(f"journal {position['id']}: complete 5m path does not reach the entry")
+                path_open = pd.to_numeric(path["open_time"], errors="coerce")
+                path_close_exclusive = pd.to_numeric(path["close_time"], errors="coerce") + 1
+                if path_open.empty or float(path_open.min()) >= entry_time + PATH_INTERVAL_MS or float(pd.to_numeric(path["close_time"], errors="coerce").max()) <= exit_time - PATH_INTERVAL_MS:
+                    warnings.append(f"journal {position['id']}: complete 5m path does not reach both boundaries")
                     continue
+                path["boundary_uncertain"] = (
+                    ((path_open < entry_time) & (entry_time < path_close_exclusive))
+                    | ((path_open < exit_time) & (exit_time < path_close_exclusive))
+                )
                 fee_pct = _fee_pct(position)
                 items.append({
                     "journal_id": int(position["id"]),
@@ -555,4 +576,13 @@ def run_journal_sl_tp_analysis_service(
         return result
 
 
-__all__ = ["run_journal_sl_tp_analysis_service"]
+def load_trade_path_items(
+    start_time: int,
+    end_time: int,
+    positions: List[Dict[str, Any]],
+) -> tuple[List[Dict[str, Any]], List[str]]:
+    """Public reuse point for analyses that need the canonical completed 5m path."""
+    return _load_path_items(start_time, end_time, positions)
+
+
+__all__ = ["load_trade_path_items", "run_journal_sl_tp_analysis_service", "simulate_trade_path"]
