@@ -42,8 +42,14 @@ def market_source(frame: Optional[pd.DataFrame]) -> str:
     return str(frame.attrs.get("market_source") or BINANCE_USDT_M_FUTURES_SOURCE) if frame is not None else "Unknown market data"
 
 
+def is_market_fallback(frame: Optional[pd.DataFrame]) -> bool:
+    """Return the source fallback flag kept for legacy snapshot consumers."""
+    return bool(frame is not None and frame.attrs.get("market_source_fallback"))
+
+
 __all__ = [
     "BINANCE_USDT_M_FUTURES_SOURCE",
+    "is_market_fallback",
     "load_journal_ohlcv",
     "market_source",
 ]
