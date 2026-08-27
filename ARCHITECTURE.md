@@ -20,6 +20,8 @@ flowchart LR
 
 의존성의 기본 방향은 `frontend -> backend/modules -> backend/strategy 또는 core -> backend/utils`입니다. `core/`는 HTTP, 파일 I/O, 네트워크 접근을 하지 않습니다. 라우터도 전략 로직을 직접 호출하지 않고 도메인 서비스를 거칩니다.
 
+현재 배포 버전: `v1.0.0`
+
 ## 디렉터리 책임
 
 ### `frontend/`

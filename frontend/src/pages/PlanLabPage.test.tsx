@@ -144,7 +144,11 @@ describe('Past Trade Plan Input reliability', () => {
   it('uses retrospective actual entry only as a preview reference, never as a plan entry', () => {
     const result = calculateTargetRiskRewardFromDraft(draft, 100);
     expect(result).toMatchObject({ valid: true, tp1R: 2, mode: 'TP1_ONLY' });
-    expect(revisionPayload(draft, true)?.entry_price).toBeNull();
+    const payload = revisionPayload(draft, true);
+    expect(payload?.entry_price).toBeNull();
+    expect(payload).not.toHaveProperty('targetRR');
+    expect(payload).not.toHaveProperty('targetRiskReward');
+    expect(payload).not.toHaveProperty('splitTargetR');
     const html = renderPlanForm();
     expect(html).toContain('목표 손익비');
     expect(html).toContain('실제 진입가를 기준으로 현재 입력한 SL/TP 가격 구조');
