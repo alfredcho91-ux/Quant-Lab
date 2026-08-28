@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { X } from 'lucide-react';
 
 import TradeReportModal from '../journal/TradeReportModal';
+import { entryRvol20, formatRvol20 } from '../journal/tradeReportSnapshot';
 import type { JournalEntry, PlanEvaluation, TradingPlan } from '../../types';
 
 function signed(value: number | null | undefined, digits = 2, suffix = ''): string {
@@ -126,6 +127,11 @@ export function TradeAnalysisSummary({ entry, evaluation, entries, isKo, onClose
       <div className="mt-4 grid grid-cols-2 gap-3">
         <Metric label={isKo ? '진입 후 최대 유리 움직임' : 'Maximum favorable move'} value={signed(evaluation?.mfe_r, 2, 'R')} tone="text-bull" />
         <Metric label={isKo ? '진입 후 최대 불리 움직임' : 'Maximum adverse move'} value="-" />
+      </div>
+      <div className="mt-3 border border-dark-800 bg-dark-950/45 px-3 py-2">
+        <div className="text-[10px] text-dark-500">{isKo ? '진입 당시 RVOL20 · 4H' : 'Entry RVOL20 · 4H'}</div>
+        <div className="mt-1 font-mono text-sm font-semibold text-dark-100">{formatRvol20(entryRvol20(entry, entries))}</div>
+        <p className="mt-1 text-[10px] leading-4 text-dark-500">{isKo ? '진입 직전 완료봉 거래량 ÷ 그 이전 20개 완료봉 평균' : 'Last completed candle volume ÷ average of the prior 20 completed candles'}</p>
       </div>
       <p className="mt-4 text-[11px] leading-5 text-dark-500">{isKo ? '현재 연결된 거래와 기존 분석 결과만 표시합니다. 새 분석이나 추가 시장 데이터 요청은 실행하지 않습니다.' : 'Uses the linked trade and existing analysis only. No new analysis or market-data request is started.'}</p>
       <div className="mt-4 flex flex-wrap gap-2">

@@ -16,6 +16,7 @@ from core.indicator_pipelines import compute_trend_judgment_indicators
 from core.vpvr import calculate_vpvr
 
 SNAPSHOT_INTERVALS = ("1h", "2h", "4h", "1d", "1w", "1M")
+SNAPSHOT_VERSION = 4
 SNAPSHOT_VPVR_CANDLES = {
     "1h": 240,
     "2h": 240,
@@ -25,6 +26,12 @@ SNAPSHOT_VPVR_CANDLES = {
     "1M": 120,
 }
 SNAPSHOT_BIN_COUNT = 24
+RVOL20_WINDOW = 20
+VWAP_ANCHOR_INTERVALS = {
+    "day": "1h",
+    "week": "4h",
+    "month": "1d",
+}
 
 
 class SnapshotEvent(Protocol):
@@ -48,6 +55,24 @@ def _json_number(value: Any) -> Optional[float]:
     except (TypeError, ValueError):
         return None
     return result if math.isfinite(result) else None
+
+
+def _entry_rvol20(completed: pd.DataFrame) -> Optional[float]:
+    """Return RVOL20 from the last completed candle and its 20 predecessors."""
+    if "volume" not in completed.columns or len(completed) < RVOL20_WINDOW + 1:
+        return None
+    volumes = pd.to_numeric(completed["volume"], errors="coerce")
+    reference = _json_number(volumes.iloc[-1])
+    baseline = volumes.iloc[-(RVOL20_WINDOW + 1):-1]
+    if reference is None or len(baseline) != RVOL20_WINDOW:
+        return None
+    baseline_values = [_json_number(value) for value in baseline]
+    if any(value is None for value in baseline_values):
+        return None
+    average = sum(value for value in baseline_values if value is not None) / RVOL20_WINDOW
+    if average <= 0:
+        return None
+    return _json_number(reference / average)
 
 
 def snapshot_candle_count(events: List[SnapshotEvent], interval: str) -> int:
@@ -111,7 +136,7 @@ def indicator_snapshot_for_event(
     poc_low = _json_number(vpvr.get("poc_price_low"))
     poc_high = _json_number(vpvr.get("poc_price_high"))
 
-    return {
+    snapshot = {
         "status": "complete",
         "candle_close_time": _timestamp_to_iso(int(row["close_time"])),
         "close": _json_number(row.get("close")),
@@ -145,6 +170,26 @@ def indicator_snapshot_for_event(
         },
         "anchored_vwap": anchored_vwap,
     }
+    if event.event_type in {"fill", "position_entry", "current_market"}:
+        snapshot["rvol20"] = _entry_rvol20(completed)
+    return snapshot
+
+
+def anchored_vwap_snapshots_for_event(
+    frames: Dict[str, Optional[pd.DataFrame]],
+    event: SnapshotEvent,
+) -> Dict[str, Dict[str, object]]:
+    """Build the three report VWAP anchors from their dedicated source frames."""
+    snapshots: Dict[str, Dict[str, object]] = {}
+    for anchor, interval in VWAP_ANCHOR_INTERVALS.items():
+        frame = frames.get(interval)
+        if frame is None or frame.empty:
+            continue
+        completed = frame.loc[frame["close_time"] < event.timestamp_ms].copy()
+        value = compute_vwap_standard_deviation(completed, anchor=anchor, length=14)
+        if value is not None:
+            snapshots[anchor] = value
+    return snapshots
 
 
 def build_indicator_snapshots(events: List[SnapshotEvent]) -> Dict[str, Dict[str, Any]]:
@@ -163,7 +208,6 @@ def build_indicator_snapshots(events: List[SnapshotEvent]) -> Dict[str, Dict[str
                     interval,
                     total_candles=snapshot_candle_count(coin_events, interval),
                     end_time=latest_event_time,
-                    exchange="Deepcoin",
                 )
             except (ValueError, requests.RequestException):
                 frames[interval] = None
@@ -181,13 +225,14 @@ def build_indicator_snapshots(events: List[SnapshotEvent]) -> Dict[str, Dict[str
                     timeframes[interval] = {"status": "unavailable", "reason": "calculation_failed"}
 
             snapshots[event.external_id] = {
-                "version": 2,
+                "version": SNAPSHOT_VERSION,
                 "market_source": market_source(next((frame for frame in frames.values() if frame is not None), None)),
-                "market_source_fallback": any(is_market_fallback(frame) for frame in frames.values() if frame is not None),
+                "market_source_fallback": False,
                 "reference": f"last_completed_candle_before_deepcoin_{event.event_type}",
                 "event_type": event.event_type,
                 "event_time": _timestamp_to_iso(event.timestamp_ms),
                 "timeframes": timeframes,
+                "anchored_vwaps": anchored_vwap_snapshots_for_event(frames, event),
             }
             if event.event_type == "fill":
                 time_key = "fill_time"
@@ -200,8 +245,10 @@ def build_indicator_snapshots(events: List[SnapshotEvent]) -> Dict[str, Dict[str
 
 
 __all__ = [
+    "RVOL20_WINDOW",
     "SNAPSHOT_BIN_COUNT",
     "SNAPSHOT_INTERVALS",
+    "SNAPSHOT_VERSION",
     "SNAPSHOT_VPVR_CANDLES",
     "build_indicator_snapshots",
     "indicator_snapshot_for_event",

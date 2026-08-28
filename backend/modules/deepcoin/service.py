@@ -28,6 +28,7 @@ from backend.modules.journal.repository import (
 from backend.modules.deepcoin.snapshot import (
     SNAPSHOT_BIN_COUNT,
     SNAPSHOT_INTERVALS,
+    SNAPSHOT_VERSION,
     SNAPSHOT_VPVR_CANDLES,
     build_indicator_snapshots as _build_indicator_snapshots,
     indicator_snapshot_for_event as _indicator_snapshot_for_fill,
@@ -852,7 +853,7 @@ def sync_deepcoin_fills_service(inst_type: str, lookback_days: int) -> Dict[str,
         snapshot = snapshots.get(
             event.external_id,
             {
-                "version": 2,
+                "version": SNAPSHOT_VERSION,
                 "market_source": "Binance USDT-M Futures",
                 "reference": fallback_reference,
                 "event_type": snapshot_event.event_type,
