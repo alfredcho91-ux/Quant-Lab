@@ -53,6 +53,8 @@ class DeepcoinSyncEnvelope(BaseModel):
 
 class DeepcoinOpenPosition(BaseModel):
     position_id: str
+    lifecycle_id: Optional[str] = None
+    lifecycle_available: bool = True
     symbol: str
     direction: Literal["Long", "Short"]
     size: float

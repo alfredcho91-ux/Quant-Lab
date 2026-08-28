@@ -495,6 +495,8 @@ export interface DeepcoinSyncResult {
 
 export interface DeepcoinOpenPosition {
   position_id: string;
+  lifecycle_id?: string | null;
+  lifecycle_available?: boolean;
   symbol: string;
   direction: 'Long' | 'Short';
   size: number;

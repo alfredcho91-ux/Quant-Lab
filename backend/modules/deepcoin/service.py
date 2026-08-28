@@ -853,7 +853,7 @@ def sync_deepcoin_fills_service(inst_type: str, lookback_days: int) -> Dict[str,
             event.external_id,
             {
                 "version": 2,
-                "market_source": "binance_spot_klines",
+                "market_source": "Binance USDT-M Futures",
                 "reference": fallback_reference,
                 "event_type": snapshot_event.event_type,
                 "event_time": _timestamp_to_iso(snapshot_event.timestamp_ms),
@@ -955,8 +955,12 @@ def get_deepcoin_open_positions_service() -> Dict[str, Any]:
         # across API versions. Chronological order is stable even when labels are not.
         opened_ms = min(raw_times) if raw_times else None
         updated_ms = max(raw_times) if raw_times else None
+        stable_position_id = str(raw.get("posId") or "").strip()
+        display_position_id = stable_position_id or f"deepcoin:{coin}/USDT:{side}"
         positions.append({
-            "position_id": str(raw.get("posId") or ""),
+            "position_id": display_position_id,
+            "lifecycle_id": stable_position_id or None,
+            "lifecycle_available": bool(stable_position_id),
             "symbol": f"{coin}/USDT",
             "direction": "Long" if side == "long" else "Short",
             "size": size,

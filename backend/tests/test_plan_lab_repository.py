@@ -86,6 +86,26 @@ def test_retrospective_schema_allows_missing_plan_entry_only():
         PlanRevisionInput.model_validate(_revision(None))
 
 
+def test_generic_revision_enforces_plan_source_entry_rules(tmp_path):
+    db_path = tmp_path / "journal.db"
+    in_trade = repository.create_plan(_plan_payload(), db_path=db_path)
+    with sqlite3.connect(db_path) as conn:
+        conn.execute("UPDATE trading_plans SET source='IN_TRADE' WHERE id=?", (in_trade["id"],))
+    with pytest.raises(ValueError, match="IN_TRADE revisions cannot use"):
+        repository.add_revision(in_trade["id"], _revision(101.0), db_path=db_path)
+
+    entry = _closed_entry(db_path, external_id="binance:position:revision-source")
+    retrospective = repository.create_retrospective_plan(
+        _retrospective_payload(), entry["id"], db_path=db_path,
+    )
+
+    with pytest.raises(ValueError, match="must keep planned entry empty"):
+        repository.add_revision(retrospective["id"], _revision(101.0), db_path=db_path)
+
+    revised = repository.add_revision(retrospective["id"], _revision(None), db_path=db_path)
+    assert revised["latest_revision"]["entry_price"] is None
+
+
 def test_secondary_target_is_optional_and_uses_primary_target_validation():
     assert PlanRevisionInput.model_validate(_revision()).take_profit_2 is None
     assert PlanRevisionInput.model_validate({**_revision(), "take_profit_2": 108.0}).take_profit_2 == 108.0

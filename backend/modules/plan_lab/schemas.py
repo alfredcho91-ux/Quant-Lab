@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field, model_validator
 
 PlanSide = Literal["Long", "Short"]
 PlanStatus = Literal["active", "linked", "cancelled"]
-PlanSource = Literal["RETROSPECTIVE", "VERIFIED_PRETRADE"]
+PlanSource = Literal["RETROSPECTIVE", "VERIFIED_PRETRADE", "IN_TRADE"]
 
 
 class PlanRevisionFields(BaseModel):
@@ -76,7 +76,19 @@ class RetrospectivePlanCreate(BaseModel):
     revision: RetrospectivePlanRevisionInput
 
 
-class PlanRevisionCreate(PlanRevisionInput):
+class InTradePlanCreate(BaseModel):
+    """Plan recorded after a confirmed live entry, before final exit."""
+
+    exchange: str = Field(min_length=1, max_length=40)
+    position_id: str = Field(min_length=1, max_length=160)
+    revision: RetrospectivePlanRevisionInput
+
+
+class InTradePlanRevisionCreate(RetrospectivePlanRevisionInput):
+    pass
+
+
+class PlanRevisionCreate(PlanRevisionFields):
     pass
 
 

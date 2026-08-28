@@ -7,15 +7,36 @@ from fastapi.concurrency import run_in_threadpool
 
 from backend.modules.plan_lab.analysis import run_plan_lab_service
 from backend.modules.plan_lab.repository import (
-    add_revision, create_plan, create_retrospective_plan, get_plan, link_plan, list_plans, update_status,
+    add_in_trade_revision, add_revision, create_in_trade_plan, create_plan, create_retrospective_plan,
+    get_plan, link_plan, list_plans, update_status,
 )
 from backend.modules.plan_lab.schemas import (
-    PlanCreate, PlanEnvelope, PlanLabEnvelope, PlanLabQuery, PlanLinkRequest,
-    PlanListEnvelope, PlanRevisionCreate, PlanStatusUpdate, RetrospectivePlanCreate,
+    InTradePlanCreate, InTradePlanRevisionCreate, PlanCreate, PlanEnvelope, PlanLabEnvelope,
+    PlanLabQuery, PlanLinkRequest, PlanListEnvelope, PlanRevisionCreate, PlanStatusUpdate,
+    RetrospectivePlanCreate,
 )
+from backend.modules.deepcoin.service import get_deepcoin_open_positions_service
 from backend.utils.decorators import handle_api_errors
 
 router = APIRouter(prefix="/api", tags=["plan-lab"])
+
+
+def _confirmed_open_position(exchange: str, position_id: str):
+    if exchange.lower() != "deepcoin":
+        raise HTTPException(status_code=409, detail="Only Deepcoin live positions are supported in Quant Lab")
+    result = get_deepcoin_open_positions_service().get("data") or []
+    for position in result:
+        if str(position.get("position_id") or "") == position_id:
+            if position.get("lifecycle_available") is False:
+                raise HTTPException(
+                    status_code=409,
+                    detail="Deepcoin lifecycle identity is unavailable. Synchronize fills before saving an in-trade plan.",
+                )
+            return position
+    raise HTTPException(
+        status_code=409,
+        detail="The position is no longer open. Synchronize closed trades, then record it as retrospective.",
+    )
 
 
 @router.get("/plans", response_model=PlanListEnvelope)
@@ -60,6 +81,21 @@ async def api_create_retrospective_plan(payload: RetrospectivePlanCreate):
     }
 
 
+@router.post("/plans/in-trade", response_model=PlanEnvelope)
+@handle_api_errors()
+async def api_create_in_trade_plan(payload: InTradePlanCreate):
+    position = await run_in_threadpool(_confirmed_open_position, payload.exchange, payload.position_id)
+    plan_payload = {
+        "exchange": payload.exchange,
+        "position_id": str(position.get("position_id") or payload.position_id),
+        "symbol": str(position.get("symbol") or ""),
+        "side": position.get("direction"),
+        "revision": payload.revision.model_dump(),
+    }
+    return {
+        "success": True,
+        "data": await run_in_threadpool(create_in_trade_plan, plan_payload, position),
+    }
 @router.get("/plans/{plan_id}", response_model=PlanEnvelope)
 @handle_api_errors()
 async def api_get_plan(plan_id: int):
@@ -77,6 +113,24 @@ async def api_add_plan_revision(plan_id: int, payload: PlanRevisionCreate):
     if plan is None:
         raise HTTPException(status_code=404, detail="Plan not found")
     return {"success": True, "data": plan}
+
+
+@router.post("/plans/{plan_id}/in-trade-revisions", response_model=PlanEnvelope)
+@handle_api_errors()
+async def api_add_in_trade_revision(plan_id: int, payload: InTradePlanRevisionCreate):
+    try:
+        plan = await run_in_threadpool(get_plan, plan_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="Plan not found") from exc
+    if plan.get("source") != "IN_TRADE" or not plan.get("live_position_id"):
+        raise HTTPException(status_code=409, detail="This plan is not linked to an open position")
+    position = await run_in_threadpool(
+        _confirmed_open_position, str(plan.get("exchange") or ""), str(plan.get("live_position_id") or ""),
+    )
+    updated = await run_in_threadpool(add_in_trade_revision, plan_id, payload.model_dump(), position)
+    if updated is None:
+        raise HTTPException(status_code=404, detail="Plan not found")
+    return {"success": True, "data": updated}
 
 
 @router.post("/plans/{plan_id}/link", response_model=PlanEnvelope)

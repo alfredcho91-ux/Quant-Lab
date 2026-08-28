@@ -112,6 +112,8 @@ def test_open_positions_service_returns_only_normalized_live_positions(monkeypat
     assert result["data"] == [
         {
             "position_id": "position-1",
+            "lifecycle_id": "position-1",
+            "lifecycle_available": True,
             "symbol": "BTC/USDT",
             "direction": "Short",
             "size": 12.0,
@@ -123,6 +125,25 @@ def test_open_positions_service_returns_only_normalized_live_positions(monkeypat
             "updated_at": "2024-08-04T10:00:00Z",
         }
     ]
+
+
+def test_open_positions_without_posid_keep_display_identity_but_mark_lifecycle_unavailable(monkeypatch):
+    credentials = DeepcoinCredentials("key", "secret", "passphrase")
+    monkeypatch.setattr(deepcoin_service, "get_deepcoin_credentials", lambda: credentials)
+    monkeypatch.setattr(
+        deepcoin_service.DeepcoinClient,
+        "get_open_positions",
+        lambda _client: [{
+            "instId": "BTC-USDT-SWAP", "posSide": "long", "pos": "1",
+            "avgPx": "100", "lastPx": "101", "cTime": "1722761000000",
+        }],
+    )
+
+    result = deepcoin_service.get_deepcoin_open_positions_service()
+
+    assert result["data"][0]["position_id"] == "deepcoin:BTC/USDT:long"
+    assert result["data"][0]["lifecycle_id"] is None
+    assert result["data"][0]["lifecycle_available"] is False
 
 
 def test_deepcoin_fills_split_saturated_time_windows(monkeypatch):
@@ -188,7 +209,7 @@ def test_deepcoin_sync_is_idempotent_and_persists_snapshot(isolated_journal_stor
     }
     snapshot = {
         "version": 1,
-        "market_source": "binance_spot_klines",
+        "market_source": "Binance USDT-M Futures",
         "reference": "last_completed_candle_before_deepcoin_fill",
         "fill_time": "2024-08-04T10:20:00Z",
         "timeframes": {interval: {"status": "complete"} for interval in ("1h", "2h", "4h", "1d")},
@@ -244,7 +265,7 @@ def test_deepcoin_sync_imports_closed_positions_with_net_realized_pnl(
     }
     snapshot = {
         "version": 1,
-        "market_source": "binance_spot_klines",
+        "market_source": "Binance USDT-M Futures",
         "reference": "last_completed_candle_before_deepcoin_position_close",
         "event_type": "position_close",
         "event_time": "2024-08-04T10:20:00Z",
