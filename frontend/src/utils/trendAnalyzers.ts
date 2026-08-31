@@ -99,7 +99,6 @@ export function calculateTrendBias(
   pushVote(latest.macd_hist != null ? latest.macd_hist >= 0 : null);
   pushVote(latest.supertrend_dir != null ? latest.supertrend_dir > 0 : null);
   pushVote(latest.close != null && latest.sma20 != null ? latest.close >= latest.sma20 : null);
-  pushVote(latest.close != null && latest.vwap_20 != null ? latest.close >= latest.vwap_20 : null);
   pushVote(stochState != null ? stochState === 'golden' : null);
 
   if (votes === 0) return 'neutral';

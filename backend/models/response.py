@@ -79,7 +79,6 @@ class TrendIndicatorsLatest(BaseModel):
     slow_stoch_20d: Optional[float] = None
     stoch_rsi_k: Optional[float] = None
     stoch_rsi_d: Optional[float] = None
-    vwap_20: Optional[float] = None
     supertrend: Optional[float] = None
     supertrend_dir: Optional[float] = None
 

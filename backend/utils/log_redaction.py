@@ -27,6 +27,17 @@ def redact_text(value: Any) -> str:
     return text
 
 
+def _redact_log_args(value: Any) -> Any:
+    """Redact string arguments without changing formatter-specific tuple shapes."""
+    if isinstance(value, tuple):
+        return tuple(_redact_log_args(item) for item in value)
+    if isinstance(value, list):
+        return [_redact_log_args(item) for item in value]
+    if isinstance(value, dict):
+        return {key: _redact_log_args(item) for key, item in value.items()}
+    return redact_text(value) if isinstance(value, str) else value
+
+
 def install_log_redaction() -> None:
     global _INSTALLED
     if _INSTALLED:
@@ -34,11 +45,8 @@ def install_log_redaction() -> None:
     previous = logging.getLogRecordFactory()
     def factory(*args: Any, **kwargs: Any) -> logging.LogRecord:
         record = previous(*args, **kwargs)
-        try:
-            record.msg = redact_text(record.getMessage())
-        except (TypeError, ValueError):
-            record.msg = redact_text(record.msg)
-        record.args = ()
+        record.msg = redact_text(record.msg)
+        record.args = _redact_log_args(record.args)
         return record
     logging.setLogRecordFactory(factory)
     _INSTALLED = True

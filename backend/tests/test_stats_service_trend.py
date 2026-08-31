@@ -53,7 +53,6 @@ def test_run_trend_indicators_analysis_uses_trend_judgment_pipeline(monkeypatch)
         out["slow_stoch_20d"] = 31.0
         out["stoch_rsi_k"] = 61.0
         out["stoch_rsi_d"] = 57.0
-        out["vwap_20"] = 109.0
         out["supertrend"] = 107.0
         out["supertrend_dir"] = 1.0
         return out
@@ -107,7 +106,6 @@ def test_run_trend_indicators_analysis_uses_previous_completed_candle_for_all_la
     out.loc[idx[1], "slow_stoch_20d"] = 42.0
     out.loc[idx[1], "stoch_rsi_k"] = 30.0
     out.loc[idx[1], "stoch_rsi_d"] = 35.0
-    out.loc[idx[1], "vwap_20"] = 101.0
     out.loc[idx[1], "supertrend"] = 100.0
     out.loc[idx[1], "supertrend_dir"] = -1.0
     out.loc[idx[1], "sma20"] = 99.0
@@ -128,7 +126,6 @@ def test_run_trend_indicators_analysis_uses_previous_completed_candle_for_all_la
     out.loc[idx[2], "slow_stoch_20d"] = 46.0
     out.loc[idx[2], "stoch_rsi_k"] = 65.0
     out.loc[idx[2], "stoch_rsi_d"] = 55.0
-    out.loc[idx[2], "vwap_20"] = 102.0
     out.loc[idx[2], "supertrend"] = 101.0
     out.loc[idx[2], "supertrend_dir"] = 1.0
     out.loc[idx[2], "sma20"] = 100.0
@@ -156,7 +153,6 @@ def test_run_trend_indicators_analysis_uses_previous_completed_candle_for_all_la
     assert latest["slow_stoch_20k"] == 41.0
     assert latest["stoch_rsi_k"] == 30.0
     assert latest["stoch_rsi_d"] == 35.0
-    assert latest["vwap_20"] == 101.0
     assert latest["supertrend"] == 100.0
     assert latest["supertrend_dir"] == -1.0
     assert latest["sma20"] == 99.0

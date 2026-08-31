@@ -108,7 +108,6 @@ def test_compute_trend_indicators_contains_expected_columns():
         "stoch_rsi_5k",
         "stoch_rsi_10k",
         "stoch_rsi_20k",
-        "vwap_20",
         "supertrend",
         "supertrend_dir",
     ]
@@ -329,6 +328,24 @@ def test_vwap_standard_deviation_excludes_prior_month_from_its_window():
     assert result["vwap"] == pytest.approx(101.0)
     assert result["standard_deviation"] == pytest.approx(1.0)
     assert result["bands"]["1"] == pytest.approx(102.0)
+
+
+@pytest.mark.parametrize("anchor", ["day", "week"])
+def test_vwap_standard_deviation_supports_daily_and_weekly_anchors(anchor):
+    index = pd.date_range("2024-02-05 00:00:00", periods=32, freq="4h")
+    frame = pd.DataFrame({
+        "high": np.linspace(101, 132, len(index)),
+        "low": np.linspace(99, 130, len(index)),
+        "close": np.linspace(100, 131, len(index)),
+        "volume": np.ones(len(index)),
+    }, index=index)
+
+    result = compute_vwap_standard_deviation(frame, anchor=anchor, length=14)
+
+    assert result is not None
+    assert result["anchor"] == anchor
+    assert result["sample_count"] > 0
+    assert result["bands"]["1"] > result["vwap"]
 
 
 @pytest.mark.skipif(talib is None, reason="TA-Lib not installed in environment")

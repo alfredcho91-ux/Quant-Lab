@@ -46,25 +46,18 @@ const VWAP_COLORS: Record<string, string> = {
   day: '#38bdf8',
   week: '#a78bfa',
   month: '#f59e0b',
-  quarter: '#fb7185',
-  year: '#e2e8f0',
-  rolling: '#22c55e',
 };
 
 const VWAP_LABELS: Record<string, string> = {
   day: '일간 VWAP',
   week: '주간 VWAP',
   month: '월간 VWAP',
-  quarter: '분기 VWAP',
-  year: '연간 VWAP',
 };
 
 const VWAP_ENGLISH_LABELS: Record<string, string> = {
   day: 'Daily VWAP',
   week: 'Weekly VWAP',
   month: 'Monthly VWAP',
-  quarter: 'Quarterly VWAP',
-  year: 'Yearly VWAP',
 };
 
 const RSI_TARGET_COLORS: Record<TrendPriceLevel['type'], Record<string, string>> = {
@@ -132,7 +125,6 @@ export function TrendPriceChart({
       ...data.flatMap((row) => [row.low, row.high]),
       ...priceLevels.map((level) => level.price),
       ...(vwaps?.vwaps.flatMap(({ value }) => value == null ? [] : [value]) ?? []),
-      ...(vwaps?.rolling_vwaps.flatMap(({ value }) => value == null ? [] : [value]) ?? []),
       ...(vwaps?.vwap_deviation ? Object.values(vwaps.vwap_deviation.bands) : []),
       ...(vpvr ? [vpvr.poc_price_low, vpvr.poc_price_high, vpvr.value_area_low, vpvr.value_area_high] : []),
     ].filter(Number.isFinite);
@@ -201,18 +193,6 @@ export function TrendPriceChart({
         width: 1,
         style: LineStyle.Dashed,
         labelPosition: [20, 40, 60, 80][index] ?? 50,
-      });
-    });
-    vwaps?.rolling_vwaps.forEach(({ window, value }, index) => {
-      if (value == null) return;
-      lines.push({
-        key: `rolling-${window}`,
-        label: isKo ? `${window}봉 VWAP` : `${window}-bar VWAP`,
-        price: value,
-        color: VWAP_COLORS.rolling,
-        width: 1,
-        style: LineStyle.Dashed,
-        labelPosition: 84 - index * 8,
       });
     });
     const deviation = vwaps?.vwap_deviation;

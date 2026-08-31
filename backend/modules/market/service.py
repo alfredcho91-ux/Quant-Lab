@@ -71,7 +71,7 @@ def run_ohlcv_service(
         )
         if df is None or df.empty:
             raise ValueError("No Binance candles were available for the requested range")
-        source = "Binance Spot API"
+        source = "Binance USDT-M Futures"
     else:
         df, source = load_data_for_analysis(coin, interval, use_csv, total_candles=limit)
     df_serialized = df.copy()

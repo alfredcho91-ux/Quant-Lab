@@ -125,5 +125,5 @@ def test_run_ohlcv_service_supports_historical_end_time(monkeypatch):
     )
 
     assert result["success"] is True
-    assert result["source"] == "Binance Spot API"
+    assert result["source"] == "Binance USDT-M Futures"
     assert result["count"] == 1

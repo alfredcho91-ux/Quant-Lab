@@ -27,14 +27,9 @@ PROJECTION_VWAP_ANCHORS = {
     "1h": ("day", "week"),
     "2h": ("day", "week"),
     "4h": ("week", "month"),
-    "1d": ("month", "quarter", "year"),
+    "1d": ("month",),
 }
 
-PROJECTION_ROLLING_VWAP_WINDOWS = {
-    "1h": (200,),
-    "2h": (200,),
-    "4h": (200,),
-}
 
 # Include a possible leap year plus the currently forming daily candle.
 PROJECTION_MIN_CANDLES = {
@@ -82,11 +77,9 @@ def run_indicator_projection_service(coin: str, interval: str) -> Dict[str, Any]
     if interval not in BINANCE_TFS:
         raise ValueError(f"Unsupported Binance interval: {interval}")
 
-    rolling_vwap_windows = PROJECTION_ROLLING_VWAP_WINDOWS.get(interval, ())
     required_candles = max(
         (
             PROJECTION_MIN_CANDLES.get(interval, 101),
-            *(window + 1 for window in rolling_vwap_windows),
         )
     )
     df = fetch_binance_klines(f"{normalized_coin}USDT", interval, total_candles=required_candles)
@@ -97,7 +90,6 @@ def run_indicator_projection_service(coin: str, interval: str) -> Dict[str, Any]
     result = get_indicator_projections(
         df.iloc[:-1].copy(),
         vwap_anchors=vwap_anchors,
-        rolling_vwap_windows=rolling_vwap_windows,
     )
     if "error" in result:
         raise ValueError(str(result["error"]))
@@ -299,7 +291,6 @@ def run_trade_report_service(
             projection_payload = get_indicator_projections(
                 reference_frame,
                 vwap_anchors=PROJECTION_VWAP_ANCHORS.get(interval, ("day", "week")),
-                rolling_vwap_windows=PROJECTION_ROLLING_VWAP_WINDOWS.get(interval, (200,)),
             )
             if "error" in projection_payload:
                 projection_payload = None
@@ -311,7 +302,7 @@ def run_trade_report_service(
 
     return success_response(
         data={
-            "source": "Binance Spot API",
+            "source": "Binance USDT-M Futures",
             "symbol": f"{normalized_coin}/USDT",
             "interval": interval,
             "count": len(chart_frame),

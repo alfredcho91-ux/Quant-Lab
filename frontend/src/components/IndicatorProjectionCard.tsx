@@ -29,13 +29,11 @@ export function IndicatorProjectionCard({ data, interval, isKo, isLoading, isErr
     );
   }
 
-  const { current_price, current_rsi, vwaps, rolling_vwaps, rsi_30_price, rsi_70_price } = data;
+  const { current_price, current_rsi, vwaps, rsi_30_price, rsi_70_price } = data;
   const vwapLabels = {
     day: isKo ? '일간 VWAP' : 'Daily VWAP',
     week: isKo ? '주간 VWAP' : 'Weekly VWAP',
     month: isKo ? '월간 VWAP' : 'Monthly VWAP',
-    quarter: isKo ? '분기 VWAP' : 'Quarterly VWAP',
-    year: isKo ? '연간 VWAP' : 'Yearly VWAP',
   };
 
   const calculateDiff = (target: number, current: number) => {
@@ -89,9 +87,6 @@ export function IndicatorProjectionCard({ data, interval, isKo, isLoading, isErr
         {renderTargetRow('rsi-70', 'RSI 70', rsi_70_price)}
         {vwaps.map(({ anchor, value }) =>
           value != null ? renderTargetRow(`vwap-${anchor}`, vwapLabels[anchor], value) : null,
-        )}
-        {rolling_vwaps.map(({ window, value }) =>
-          value != null ? renderTargetRow(`rolling-vwap-${window}`, `VWAP(${window})`, value) : null,
         )}
       </div>
     </div>

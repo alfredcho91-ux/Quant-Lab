@@ -52,7 +52,6 @@ export interface TrendIndicatorsLatest {
   slow_stoch_20d: number | null;
   stoch_rsi_k: number | null;
   stoch_rsi_d: number | null;
-  vwap_20: number | null;
   supertrend: number | null;
   supertrend_dir: number | null;
 }
@@ -70,11 +69,7 @@ export interface IndicatorProjection {
   current_price: number;
   current_rsi: number | null;
   vwaps: Array<{
-    anchor: 'day' | 'week' | 'month' | 'quarter' | 'year';
-    value: number | null;
-  }>;
-  rolling_vwaps: Array<{
-    window: number;
+    anchor: 'day' | 'week' | 'month';
     value: number | null;
   }>;
   rsi_30_price: number;

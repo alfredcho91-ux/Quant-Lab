@@ -21,11 +21,7 @@ interface IndicatorProjectionPayload {
   current_price: number;
   current_rsi: number | null;
   vwaps: Array<{
-    anchor: 'day' | 'week' | 'month' | 'quarter' | 'year';
-    value: number | null;
-  }>;
-  rolling_vwaps: Array<{
-    window: number;
+    anchor: 'day' | 'week' | 'month';
     value: number | null;
   }>;
   vwap_deviation?: AnchoredVwapDeviation | null;
@@ -84,7 +80,7 @@ export async function getIndicatorProjection(coin: string, interval: string): Pr
     const res = await api.get<ApiResponse<IndicatorProjectionPayload>>(
       `/indicators/projection?coin=${coin}&interval=${interval}`
     );
-    const { current_price, current_rsi, vwaps, rolling_vwaps, vwap_deviation, projections } = unwrapApiResponse(
+    const { current_price, current_rsi, vwaps, vwap_deviation, projections } = unwrapApiResponse(
       res,
       'Failed to load indicator projections.'
     );
@@ -92,7 +88,6 @@ export async function getIndicatorProjection(coin: string, interval: string): Pr
       current_price,
       current_rsi,
       vwaps,
-      rolling_vwaps,
       rsi_30_price: projections.rsi_30,
       rsi_70_price: projections.rsi_70,
       vwap_deviation: vwap_deviation ?? null,

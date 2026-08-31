@@ -10,7 +10,7 @@ import pandas as pd
 import requests
 
 from backend.config.settings import TIMEFRAME_TO_MINUTES
-from backend.modules.journal.market_data import is_market_fallback, load_journal_ohlcv, market_source
+from backend.modules.journal.market_data import load_journal_ohlcv, market_source
 from core.indicator_primitives import compute_vwap_standard_deviation
 from core.indicator_pipelines import compute_trend_judgment_indicators
 from core.vpvr import calculate_vpvr

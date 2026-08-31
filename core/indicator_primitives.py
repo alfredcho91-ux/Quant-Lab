@@ -175,7 +175,7 @@ def compute_vwap_rolling(df: pd.DataFrame, window: int = 20) -> pd.Series:
 
 def compute_vwap_anchored(
     df: pd.DataFrame,
-    anchor: Literal["day", "week", "month", "quarter", "year"],
+    anchor: Literal["day", "week", "month"],
     timestamp_column: str = "open_dt",
 ) -> Optional[float]:
     """Calculate HLC3 VWAP from the selected UTC calendar anchor to the latest bar."""
@@ -197,11 +197,6 @@ def compute_vwap_anchored(
         start = reference.normalize() - pd.Timedelta(days=reference.weekday())
     elif anchor == "month":
         start = reference.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-    elif anchor == "quarter":
-        quarter_month = ((reference.month - 1) // 3) * 3 + 1
-        start = reference.replace(month=quarter_month, day=1, hour=0, minute=0, second=0, microsecond=0)
-    elif anchor == "year":
-        start = reference.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
     else:
         raise ValueError(f"Unsupported VWAP anchor: {anchor}")
     period = df.loc[timestamps >= start]
@@ -218,24 +213,25 @@ def compute_vwap_anchored(
 
 def compute_vwap_standard_deviation(
     df: pd.DataFrame,
-    anchor: Literal["month"] = "month",
+    anchor: Literal["day", "week", "month"] = "month",
     length: int = 14,
     timestamp_column: str = "open_dt",
 ) -> Optional[dict[str, object]]:
     """Return an anchored HLC3 VWAP, deviation bands, and current sigma position.
 
-    The VWAP is volume-weighted from the current calendar month's first bar.
+    The VWAP is volume-weighted from the selected calendar anchor's first bar.
     The standard deviation uses the latest ``length`` completed bars' HLC3
     values, weighted by volume when volume is available. Keeping these inputs
-    explicit makes the calculation identical for weekly, daily, and 4H data.
+    explicit makes the calculation identical for daily, weekly, and monthly
+    anchored VWAP data.
     """
-    if anchor != "month" or length <= 0:
-        raise ValueError("Only the month anchor and a positive length are supported")
+    if anchor not in {"day", "week", "month"} or length <= 0:
+        raise ValueError("A supported calendar anchor and a positive length are required")
     required = {"high", "low", "close", "volume"}
     if df.empty or not required.issubset(df.columns):
         return None
 
-    vwap = compute_vwap_anchored(df, anchor="month", timestamp_column=timestamp_column)
+    vwap = compute_vwap_anchored(df, anchor=anchor, timestamp_column=timestamp_column)
     if vwap is None:
         return None
 
@@ -245,10 +241,15 @@ def compute_vwap_standard_deviation(
         utc=True,
     )
     reference = timestamps.iloc[-1] if isinstance(timestamps, pd.Series) else timestamps[-1]
-    month_start = reference.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-    # Deviation must never include a prior anchor period. Early in a month the
-    # available anchored bars can be fewer than the configured 14-bar window.
-    period = df.loc[timestamps >= month_start]
+    if anchor == "day":
+        anchor_start = reference.normalize()
+    elif anchor == "week":
+        anchor_start = reference.normalize() - pd.Timedelta(days=reference.weekday())
+    else:
+        anchor_start = reference.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    # Deviation must never include a prior anchor period. Early in an anchor
+    # period the available bars can be fewer than the configured 14-bar window.
+    period = df.loc[timestamps >= anchor_start]
     typical = (period["high"] + period["low"] + period["close"]) / 3.0
     sample = pd.DataFrame({"typical": typical, "volume": period["volume"]}).tail(length)
     sample = sample.replace([np.inf, -np.inf], np.nan).dropna()
@@ -281,7 +282,7 @@ def compute_vwap_standard_deviation(
         zone = "center"
     bands = {str(multiplier): vwap + standard_deviation * multiplier for multiplier in (-3, -2, -1, 1, 2, 3)}
     return {
-        "anchor": "month",
+        "anchor": anchor,
         "length": length,
         "sample_count": int(len(sample)),
         "source": "HLC3",

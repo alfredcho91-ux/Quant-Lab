@@ -213,7 +213,6 @@ def run_trend_indicators_analysis(coin: str, interval: str, use_csv: bool) -> Di
         "slow_stoch_20d": slow_20d,
         "stoch_rsi_k": safe_float(row.get("stoch_rsi_k")),
         "stoch_rsi_d": safe_float(row.get("stoch_rsi_d")),
-        "vwap_20": safe_float(row.get("vwap_20")),
         "supertrend": safe_float(row.get("supertrend")),
         "supertrend_dir": safe_float(row.get("supertrend_dir")),
     }
@@ -243,7 +242,6 @@ def run_trend_indicators_analysis(coin: str, interval: str, use_csv: bool) -> Di
         "atr_pct",
         "stoch_rsi_k",
         "stoch_rsi_d",
-        "vwap_20",
         "supertrend",
     ]
     for col in plain_series_columns:
