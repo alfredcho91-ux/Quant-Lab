@@ -39,6 +39,8 @@ import { summarizeTradeStyle } from '../features/journal/tradeStyleSummary';
 import DailyPnlCalendar from '../features/journal/DailyPnlCalendar';
 import TradingStyleSelect from '../features/preferences/TradingStyleSelect';
 
+const VISIBLE_TRADE_INCREMENT = 12;
+
 function formatSignedNumber(value: number | null | undefined, maximumFractionDigits = 4): string {
   if (value == null || !Number.isFinite(value)) {
     return '-';
@@ -708,7 +710,7 @@ export default function JournalPage() {
   const [snapshotEntry, setSnapshotEntry] = useState<JournalEntry | null>(null);
   const [historyPeriod, setHistoryPeriod] = useState<JournalPeriod>(() => buildJournalPeriod());
   const [connectionOpen, setConnectionOpen] = useState(false);
-  const [visibleTradeCount, setVisibleTradeCount] = useState(10);
+  const [visibleTradeCount, setVisibleTradeCount] = useState(VISIBLE_TRADE_INCREMENT);
 
   const { data: entries, isLoading, isError: entriesError, refetch: refetchEntries } = useQuery({
     queryKey: journalQueryKeys.entries,
@@ -1128,10 +1130,10 @@ export default function JournalPage() {
             <div className="mt-4 flex justify-center">
               <button
                 type="button"
-                onClick={() => setVisibleTradeCount((count) => count + 10)}
+                onClick={() => setVisibleTradeCount((count) => count + VISIBLE_TRADE_INCREMENT)}
                 className="border border-dark-600 bg-dark-900 px-4 py-2 text-xs text-dark-200 hover:border-primary-400/60 hover:text-white"
               >
-                {isKo ? `거래 ${Math.min(10, visibleEntries.length - displayedEntries.length)}건 더 보기` : `Show ${Math.min(10, visibleEntries.length - displayedEntries.length)} more`}
+                {isKo ? `거래 ${Math.min(VISIBLE_TRADE_INCREMENT, visibleEntries.length - displayedEntries.length)}건 더 보기` : `Show ${Math.min(VISIBLE_TRADE_INCREMENT, visibleEntries.length - displayedEntries.length)} more`}
               </button>
             </div>
           )}

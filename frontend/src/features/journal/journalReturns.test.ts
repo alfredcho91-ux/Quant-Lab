@@ -44,6 +44,23 @@ describe('journal net returns', () => {
     expect(netReturnPct(entry)).toBeCloseTo(1.0211, 3);
   });
 
+  it('treats derivative position sources consistently across exchanges', () => {
+    const entry: JournalEntry = {
+      source: 'binance_position',
+      direction: 'Long',
+      entry_price: 100,
+      exit_price: 102,
+      realized_pnl: 10,
+      fee: 1,
+      funding_fee: 0,
+      leverage: 5,
+    };
+
+    expect(positionNotional(entry)).toBeCloseTo(550);
+    expect(investedAmount(entry)).toBeCloseTo(110);
+    expect(netReturnPct(entry)).toBeCloseTo(9.0909, 3);
+  });
+
   it('removes signed funding and absolute trading fees before inferring notional', () => {
     const entry: JournalEntry = {
       source: 'deepcoin_position',
