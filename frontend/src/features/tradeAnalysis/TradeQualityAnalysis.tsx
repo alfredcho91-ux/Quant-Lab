@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { AlertTriangle, Loader2, RefreshCw, TrendingDown, TrendingUp } from 'lucide-react';
 
 import type {
@@ -18,7 +19,7 @@ interface Props {
   showRegimes?: boolean;
   showExitAnalysis?: boolean;
   showComparisons?: boolean;
-  onSelectEvidence?: (kind: 'regime' | 'early_exit' | 'late_exit' | 'hold2' | 'poor_entry' | 'mae_greater', value: string, journalIds: number[]) => void;
+  onSelectEvidence?: (kind: 'regime' | 'early_exit' | 'late_exit' | 'hold2' | 'hold_loss' | 'poor_entry' | 'mae_greater', value: string, journalIds: number[]) => void;
 }
 
 const REGIME_LABELS: Record<string, string> = {
@@ -79,6 +80,11 @@ function group(data: TradeQualityGroup[], id: string): TradeQualityGroup | undef
   return data.find((item) => item.id === id);
 }
 
+function holdLabel(id: string, isKo: boolean): string {
+  if (id === 'actual') return isKo ? '실제 청산' : 'Recorded exit';
+  return isKo ? `+${id}개 4H 보유` : `+${id} 4H hold`;
+}
+
 export default function TradeQualityAnalysis({
   data,
   isLoading,
@@ -92,6 +98,7 @@ export default function TradeQualityAnalysis({
   showComparisons = true,
   onSelectEvidence,
 }: Props) {
+  const [selectedLossId, setSelectedLossId] = useState('actual');
   if (isLoading && !data) {
     return (
       <section className="flex min-h-40 items-center justify-center border border-dark-700 bg-dark-900/20 text-xs text-dark-400">
@@ -133,6 +140,33 @@ export default function TradeQualityAnalysis({
     .filter((item) => (item.excursion?.mae_pct ?? 0) > (item.excursion?.mfe_pct ?? 0))
     .map((item) => item.journal_id);
   const exitReviews = new Map(data.items.map((item) => [item.journal_id, buildExitReview(item)]));
+  const lossEvidenceIds = (holdId: string) => directionItems.filter((item) => {
+    const review = exitReviews.get(item.journal_id);
+    const result = holdId === 'actual'
+      ? review?.actual
+      : review?.holds.find((row) => row.id === holdId);
+    return result?.available === true && result.returnPct != null && result.returnPct < 0;
+  }).map((item) => item.journal_id);
+  const lossRows = holdRows.filter((row) => row.loss_rate_pct != null && Number.isFinite(row.loss_rate_pct) && (row.return_sample_count ?? row.available_count) > 0) as Array<typeof holdRows[number] & { loss_rate_pct: number }>;
+  const selectedLoss = lossRows.find((row) => row.id === selectedLossId) || lossRows[0];
+  const actualLoss = lossRows.find((row) => row.id === 'actual');
+  const selectedLossDelta = selectedLoss?.loss_rate_pct != null && actualLoss?.loss_rate_pct != null
+    ? selectedLoss.loss_rate_pct - actualLoss.loss_rate_pct
+    : null;
+  const chartWidth = 640;
+  const chartHeight = 210;
+  const chartLeft = 48;
+  const chartTop = 16;
+  const chartPlotWidth = chartWidth - chartLeft - 22;
+  const chartPlotHeight = 142;
+  const lossPoint = (row: typeof lossRows[number]) => {
+    const index = holdRows.findIndex((candidate) => candidate.id === row.id);
+    return {
+      x: chartLeft + Math.max(0, index) * (chartPlotWidth / Math.max(1, holdRows.length - 1)),
+      y: chartTop + ((100 - row.loss_rate_pct) / 100) * chartPlotHeight,
+    };
+  };
+  const lossPoints = lossRows.map(lossPoint);
   const issueText = summary.issue_balance === 'entry'
     ? (isKo ? '청산보다 진입 문제가 더 많이 발견됨' : 'Entry issues were more common than exit issues')
     : summary.issue_balance === 'exit'
@@ -272,6 +306,16 @@ export default function TradeQualityAnalysis({
             <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-6">
               {holdRows.map((row) => <div key={row.id} className="min-w-0 text-center"><div className="whitespace-nowrap text-xs text-dark-400">{row.id === 'actual' ? (isKo ? '실제 종료' : 'Actual') : `+${row.id}${isKo ? '개 4H' : ' 4H'}`}</div><div className={`mt-2 whitespace-nowrap font-mono text-lg font-semibold leading-none tracking-tight sm:text-xl ${(row.average_return_pct || 0) >= 0 ? 'text-bull' : 'text-bear'}`}>{signed(row.average_return_pct)}%</div><div className="mt-2 text-[11px] text-dark-600">n={row.available_count || 0}</div></div>)}
             </div>
+            {lossRows.length > 0 && <div className="mt-6 border-t border-dark-700 pt-5">
+              <div className="flex flex-wrap items-baseline justify-between gap-2"><div><h3 className="text-sm font-semibold text-white">{isKo ? '손실 거래 비율' : 'Loss trade rate'}</h3><p className="mt-1 text-xs text-dark-500">{isKo ? '각 관찰 시점에서 수익률이 0% 미만인 비교 가능 거래의 비율입니다. 점을 누르면 해당 손실 거래를 확인합니다.' : 'Share of comparable trades with returns below 0% at each point. Select a point to view those losing trades.'}</p></div><span className="font-mono text-xs text-bear">{selectedLoss ? `${number(selectedLoss.loss_rate_pct, 1)}%` : '-'}</span></div>
+              <div className="mt-4 overflow-x-auto"><svg viewBox={`0 0 ${chartWidth} ${chartHeight}`} className="min-w-[560px] w-full" role="img" aria-label={isKo ? '청산 시점별 손실 거래 비율 선 그래프' : 'Loss trade rate by exit timing'}>
+                {[0, 50, 100].map((value) => { const y = chartTop + ((100 - value) / 100) * chartPlotHeight; return <g key={value}><line x1={chartLeft} x2={chartWidth - 22} y1={y} y2={y} stroke="currentColor" className="text-dark-800" /><text x={chartLeft - 8} y={y + 4} textAnchor="end" className="fill-dark-500 text-[11px]">{value}%</text></g>; })}
+                <polyline fill="none" stroke="#f87171" strokeWidth="2.25" points={lossPoints.map((point) => `${point.x},${point.y}`).join(' ')} />
+                {holdRows.map((row, index) => <text key={`loss-axis-${row.id}`} x={chartLeft + index * (chartPlotWidth / Math.max(1, holdRows.length - 1))} y={chartHeight - 24} textAnchor="middle" className={`text-[11px] ${row.loss_rate_pct != null ? 'fill-dark-400' : 'fill-dark-600'}`}>{row.id === 'actual' ? (isKo ? '실제' : 'Actual') : `+${row.id}`}</text>)}
+                {lossRows.map((row, index) => { const point = lossPoints[index]; const chosen = selectedLoss?.id === row.id; const sampleCount = row.return_sample_count ?? row.available_count; const lossCount = row.loss_count ?? 0; return <g key={`loss-${row.id}`} tabIndex={0} role="button" aria-label={`${holdLabel(row.id, isKo)}: ${number(row.loss_rate_pct, 1)}% ${isKo ? '손실률' : 'loss rate'}, ${lossCount}/${sampleCount}`} onFocus={() => setSelectedLossId(row.id)} onClick={() => { setSelectedLossId(row.id); onSelectEvidence?.('hold_loss', row.id, lossEvidenceIds(row.id)); }} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); setSelectedLossId(row.id); onSelectEvidence?.('hold_loss', row.id, lossEvidenceIds(row.id)); } }} className="cursor-pointer outline-none"><title>{`${holdLabel(row.id, isKo)}\n${isKo ? '손실 거래 비율' : 'Loss trade rate'} ${number(row.loss_rate_pct, 1)}%\n${isKo ? '손실 거래' : 'Loss trades'} ${lossCount}/${sampleCount}\n${isKo ? '평균 손실' : 'Average loss'} ${signed(row.average_loss_pct)}%`}</title><circle cx={point.x} cy={point.y} r={chosen ? 7 : 5.5} fill={row.id === 'actual' ? '#fbbf24' : '#f87171'} stroke="#0b1220" strokeWidth="3" /></g>; })}
+              </svg></div>
+              {selectedLoss && <div className="mt-3 grid gap-2 border-t border-dark-700 pt-3 text-xs sm:grid-cols-4"><div><span className="text-dark-500">{isKo ? '선택 시점' : 'Point'}</span><b className="ml-2 text-dark-100">{holdLabel(selectedLoss.id, isKo)}</b></div><div><span className="text-dark-500">{isKo ? '손실 거래' : 'Loss trades'}</span><b className="ml-2 font-mono text-bear">{selectedLoss.loss_count}/{selectedLoss.return_sample_count}</b></div><div><span className="text-dark-500">{isKo ? '평균 손실' : 'Average loss'}</span><b className="ml-2 font-mono text-bear">{signed(selectedLoss.average_loss_pct)}%</b></div><div><span className="text-dark-500">{isKo ? '실제 청산 대비' : 'vs recorded exit'}</span><b className={`ml-2 font-mono ${(selectedLossDelta ?? 0) <= 0 ? 'text-bull' : 'text-bear'}`}>{selectedLossDelta == null ? '-' : `${signed(selectedLossDelta)}%p`}</b></div></div>}
+            </div>}
             <div className="mt-6 rounded-2xl border border-dashed border-[#355070] bg-[#0d192b] px-4 py-3 text-sm leading-6 text-dark-400">
               {isKo ? '집계 결과를 본 뒤 아래 버튼을 눌러 실제 거래까지 내려가 확인합니다.' : 'Use the actions below to inspect the trades behind this result.'}
             </div>

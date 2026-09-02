@@ -108,9 +108,13 @@ export interface TradeQualityPerformance {
 
 export interface TradeQualityHoldAggregate {
   available_count: number;
+  return_sample_count: number;
   average_return_pct?: number | null;
   average_r?: number | null;
   r_sample_count: number;
+  loss_count: number;
+  loss_rate_pct?: number | null;
+  average_loss_pct?: number | null;
 }
 
 export interface TradeQualityStrategyAggregate {

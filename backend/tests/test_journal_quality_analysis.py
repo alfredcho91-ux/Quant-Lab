@@ -2,6 +2,7 @@ from backend.modules.journal.quality_analysis import (
     _assign_quality_classes,
     _direction_breakdown,
     _filter_positions_by_net_return,
+    _hold_aggregates,
     _performance_stats,
 )
 
@@ -43,6 +44,33 @@ def test_performance_stats_does_not_invent_r_multiple():
     assert stats["average_r"] is None
     assert stats["r_sample_count"] == 0
     assert stats["trade_count"] == 1
+
+
+def test_hold_aggregates_include_loss_rate_and_average_loss():
+    complete = _item(2, 1, 1, 0, 1, 50)
+    recent = _item(2, 1, 1, 0, 1, 50)
+    complete["exit_quality"]["hold_results"] = {
+        "actual": {"available": True, "return_pct": 1.0},
+        **{str(index): {"available": True, "return_pct": float(index)} for index in (1, 2, 3, 5, 10)},
+    }
+    recent["exit_quality"]["hold_results"] = {
+        "actual": {"available": True, "return_pct": -1.0},
+        "1": {"available": True, "return_pct": 0.5},
+        "2": {"available": True, "return_pct": 1.5},
+        "3": {"available": False},
+        "5": {"available": False},
+        "10": {"available": False},
+    }
+
+    aggregates = _hold_aggregates([complete, recent])
+
+    assert aggregates["actual"]["available_count"] == 2
+    assert aggregates["actual"]["return_sample_count"] == 2
+    assert aggregates["actual"]["loss_count"] == 1
+    assert aggregates["actual"]["loss_rate_pct"] == 50.0
+    assert aggregates["actual"]["average_loss_pct"] == -1.0
+    assert aggregates["1"]["loss_rate_pct"] == 0.0
+    assert aggregates["1"]["average_loss_pct"] is None
 
 
 def test_direction_breakdown_keeps_long_and_short_statistics_separate():
