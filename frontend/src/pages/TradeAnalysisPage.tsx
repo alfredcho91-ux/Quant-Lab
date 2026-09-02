@@ -46,7 +46,7 @@ import type { JournalEntry, PlanLabData, TradeQualityItem } from '../types';
 type AnalysisMode = 'all' | 'wins' | 'losses' | 'compare';
 type DirectionFilter = 'Long' | 'Short';
 type AnalysisSection = 'overview' | 'entry';
-type EvidenceKind = 'regime' | 'early_exit' | 'late_exit' | 'hold2' | 'condition' | 'indicator' | 'poor_entry' | 'mae_greater';
+type EvidenceKind = 'regime' | 'early_exit' | 'late_exit' | 'hold2' | 'hold_loss' | 'condition' | 'indicator' | 'poor_entry' | 'mae_greater';
 type EvidenceRequest = { title: string; filterLabel: string; tradeIds: number[] };
 
 const DEFAULT_ANALYSIS_DAYS = 90;
@@ -515,6 +515,7 @@ export default function TradeAnalysisPage() {
       early_exit: isKo ? '조기 청산' : 'Early exit',
       late_exit: isKo ? '늦은 청산' : 'Late exit',
       hold2: isKo ? '+2개 4H 보유가 더 나았던 거래' : 'Better after +2 4H holding',
+      hold_loss: isKo ? `${value === 'actual' ? '실제 청산' : `+${value}개 4H 보유`} 시 손실 거래` : `Losing trades at ${value === 'actual' ? 'recorded exit' : `+${value} 4H hold`}`,
       condition: value,
       indicator: value,
       poor_entry: isKo ? '진입 불리' : 'Poor entry',
@@ -766,3 +767,4 @@ export default function TradeAnalysisPage() {
     </div>
   );
 }
+
