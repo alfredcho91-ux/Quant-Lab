@@ -51,8 +51,8 @@ const menuItems = [
   { path: '/streak-analysis', icon: Flame, labelKey: 'menu_streak_analysis' as const },
   // 기타 분석 페이지
   { path: '/compound-calculator', icon: Calculator, labelKey: 'menu_compound_calculator' as const },
-  { path: '/hold-reentry', icon: GitCompareArrows, labelKey: 'menu_hold_reentry' as const },
   { path: '/ai-backtest-lab', icon: Bot, labelKey: 'menu_ai_backtest_lab' as const },
+  { path: '/hold-reentry', icon: GitCompareArrows, labelKey: 'menu_hold_reentry' as const },
 ];
 
 const windowsReleaseUrl = import.meta.env.VITE_WINDOWS_RELEASE_URL?.trim()

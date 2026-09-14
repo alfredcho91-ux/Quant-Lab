@@ -80,7 +80,7 @@ const labels_ko: Labels = {
   menu_multi_tf_squeeze: '📐 멀티 TF 스퀴즈',
   menu_journal: '📝 매매 일지',
   menu_trade_analysis: '매매 분석',
-  menu_risk_lab: 'Risk Lab',
+  menu_risk_lab: '리스크 랩',
   menu_plan_lab: '계획 분석',
   menu_streak_analysis: '🏹 연속 봉 분석',
   menu_trend_judgment: '📊 추세판단',
