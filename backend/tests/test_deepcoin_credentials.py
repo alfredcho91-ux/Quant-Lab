@@ -7,9 +7,17 @@ from backend.modules.deepcoin import credentials, service
 from backend.modules.exchanges import encrypted_store, legacy_env
 
 
-def test_local_credentials_are_written_atomically_with_restricted_mode(monkeypatch, tmp_path):
+def test_protected_save_cleans_legacy_credentials_atomically_with_restricted_mode(monkeypatch, tmp_path):
     env_file = tmp_path / ".env"
-    env_file.write_text("DEEPCOIN_API_BASE_URL=https://example.test\nOTHER=value\n", encoding="utf-8")
+    # Cleanup only rewrites an owned file when legacy secret keys are present.
+    # Without them, its unrelated configuration and permissions stay untouched.
+    env_file.write_text(
+        "DEEPCOIN_API_BASE_URL=https://example.test\nOTHER=value\n"
+        "DEEPCOIN_API_KEY=legacy-fixture-api\n"
+        "DEEPCOIN_SECRET_KEY=legacy-fixture-secret\n"
+        "DEEPCOIN_PASSPHRASE=legacy-fixture-passphrase\n",
+        encoding="utf-8",
+    )
     monkeypatch.setattr(legacy_env, "ENV_FILE", env_file)
     monkeypatch.setattr(legacy_env, "owns_local_credential_env", lambda: True)
     monkeypatch.delenv("DEEPCOIN_API_KEY", raising=False)
