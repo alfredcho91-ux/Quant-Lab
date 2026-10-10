@@ -3,10 +3,10 @@
 [![Tests](https://github.com/alfredcho91-ux/Quant-Lab/actions/workflows/test.yml/badge.svg)](https://github.com/alfredcho91-ux/Quant-Lab/actions/workflows/test.yml)
 ![React](https://img.shields.io/badge/Frontend-React_18-blue)
 ![FastAPI](https://img.shields.io/badge/Backend-FastAPI-009688)
-![Python](https://img.shields.io/badge/Quant-Python_3.9-3776AB)
+![Python](https://img.shields.io/badge/Quant-Python_3.11-3776AB)
 ![TypeScript](https://img.shields.io/badge/Language-TypeScript-3178C6)
 
-개인용 암호화폐 기술 분석 및 전략 검증 도구입니다. React/TypeScript SPA와 FastAPI/Python API를 분리하고, 공통 지표 계산은 `core/`에 둡니다. 현재 지원 코인은 BTC, ETH, SOL이며, 기본 진입 화면은 4시간봉 중심의 `추세판단`입니다. 사이드바는 `매매일지`, `매매분석`을 최상단에 두고 AI 백테스트 랩은 마지막에 배치합니다.
+개인용 암호화폐 기술 분석 및 전략 검증 도구입니다. React/TypeScript SPA와 FastAPI/Python API를 분리하고, 공통 지표 계산은 `core/`에 둡니다. 현재 지원 코인은 BTC, ETH, SOL이며, 기본 진입 화면은 4시간봉 중심의 `추세판단`입니다. 사이드바는 매매일지·매매분석과 저널 관련 기능을 앞에 두고 홀딩/재진입 계산기를 마지막에 배치합니다.
 
 현재 배포 버전: `v1.0.0`
 
@@ -19,6 +19,19 @@
 - 계획 복기: Plan Lab에서 과거 거래의 계획을 입력하고 TP1/TP2 분할 계획을 공식 분석합니다. TP2가 없으면 TP1 100%, TP2가 있으면 TP1 50% + TP2 잔여 50%를 적용합니다. 입력 중에는 계획 손절·진입·목표가로 계산한 목표 손익비를 즉시 미리 볼 수 있으며, 회고 거래에서는 실제 진입가를 참고하되 계획 Entry로 저장하지 않습니다. 이 값은 저장된 공식 Plan R과 별개이며, 분할 계획의 청산 후 분석 불가 거래는 해당 분석 표본에서 제외하고 coverage로 표시합니다.
 - 통합 거래 리포트: 종료 거래의 5m/15m/30m/1h/2h/4h/1d Binance USDT-M Futures 캔들, 진입·종료 마커, 당시 VPVR/VWAP 숫자, RSI·MACD·Stoch RSI·3 Slow Stochastic 그래프를 한 화면에 표시
 - 저널 분석 데이터: 모든 OHLCV·VPVR·VWAP·MFE/MAE 분석에 Binance USDT-M Futures kline을 사용
+
+## 트레이딩 저널 업데이트 반영
+
+Trade Journal `9718c0a` (v1.0.28)의 저널 기능과 회귀 계약을 반영했습니다. Quant Lab의 추세판단·차트·연속봉·복리·AI 백테스트 화면과 제품 버전은 유지합니다.
+
+- 매매일지는 핵심 기간 성과와 거래 목록을 먼저 보여주고 상세 성과·차트·달력을 펼쳐 봅니다. 심리·행동 기록, 일일 저널, 정확한 전략 버전 연결을 지원합니다.
+- 매매분석은 질문을 고르는 안내형 분석으로 시작하며 고급 설정과 근거 거래 탐색으로 이어집니다. 거래 복기는 핵심 발견을 먼저 보여주고 실험 초안·측정으로 연결합니다.
+- 플레이북은 전략과 버전·읽기 쉬운 규칙을 보관합니다. 준수·위반·판정 불가, 준수율과 평가 coverage를 구분합니다. 계획은 진입 전·진입 후·회고 입력과 수정 이력을 보존합니다.
+- 읽기 전용 Deepcoin/Binance 연결과 별도 합성 샘플 작업공간을 제공합니다. 샘플은 실제 키·거래소 동기화·외부 가격 차트를 사용하지 않으며 일반 프로필로 데이터를 옮기지 않습니다.
+- 한영 설명, 최대 소수 둘째 자리 표시, 대화상자 키보드 이동·Escape·미저장 확인, 공통 화면·표 스타일을 적용했습니다. 계산과 저장값은 표시 반올림의 영향을 받지 않습니다.
+- SQLite 연결 종료, 비밀값 로그 마스킹, 프로필별 자격 증명 격리와 검증된 Python 의존성 범위를 반영했습니다.
+
+기존 백테스트 전략 템플릿은 `/api/strategies`, 사용자 플레이북은 `/api/playbook/strategies`로 구분합니다. 이전 Deepcoin 연결 API는 공통 거래소 자격 증명 처리로 이어집니다. 같은 프로필 DB의 기존 암호문은 읽을 수 있고 읽기 과정에서 제거하지 않습니다. 소유 프로필을 확인할 수 없는 전역 `Quant Master` OS vault 값은 자동으로 가져오거나 삭제하지 않습니다. 이 경우 매매일지의 거래소 연결에서 키를 다시 입력하세요. Trade Journal Free의 저장 영역과는 별도입니다.
 
 스캐너, 패턴 스캐너, 전략 스캐너, 통합필터 테스트, 고급 백테스트 UI, 패턴/캔들 통계 UI, 하이브리드 전략 UI는 현재 제품 범위에서 제거되었습니다. `/backtest`와 `/bb-mid`는 직접 접근 경로로만 유지합니다.
 
@@ -129,8 +142,8 @@ core/              순수 지표, VPVR, 백테스트, 지지·저항 계산
 
 ### 요구사항
 
-- Python 3.9+
-- Node.js 18+
+- Python 3.11+
+- Node.js 24 LTS
 - 선택 사항: 로컬 CSV 데이터 `binance_klines/`
 
 ```bash

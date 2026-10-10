@@ -46,7 +46,7 @@ const REASON_LABELS: Record<MajorFailureReasonId, string> = {
 
 function number(value?: number | null, digits = 1): string {
   if (value == null || !Number.isFinite(value)) return '-';
-  return value.toLocaleString(undefined, { maximumFractionDigits: digits });
+  return value.toLocaleString(undefined, { maximumFractionDigits: Math.min(2, digits) });
 }
 
 function signed(value?: number | null, digits = 1): string {
@@ -65,7 +65,7 @@ function caseConclusion(item: MajorFailureCase): string {
   const excursion = item.trade.excursion;
   const parts = [];
   if (item.reasons.includes('poor_entry') && excursion) {
-    parts.push(`진입 후 최대 유리폭 ${number(excursion.mfe_pct)}%보다 최대 불리폭 ${number(excursion.mae_pct)}%가 큼`);
+    parts.push(`MFE ${number(excursion.mfe_pct)}%보다 MAE ${number(excursion.mae_pct)}%가 큼`);
   }
   if (item.reasons.includes('regime_conflict')) parts.push('진입 당시 상위 프레임 충돌');
   if (item.reasons.includes('leverage_amplified')) {
@@ -116,13 +116,8 @@ export default function MajorFailureAnalysis({ trades, qualityItems, allEntries,
             <div className="mt-1 text-sm text-dark-200">{commonFindings.length ? commonFindings.join(' · ') : (isKo ? '공통 원인을 확정할 표본이 부족합니다.' : 'Not enough samples for a common cause.')}</div>
           </div>
 
-          <details className="group">
-            <summary className="flex cursor-pointer list-none items-center justify-between border-b border-dark-800 px-4 py-3 text-xs text-dark-300 hover:text-white">
-              <span>{isKo ? '대표 거래 및 판정 근거 보기' : 'View representative trades and evidence'}</span>
-              <span className="text-dark-500 group-open:rotate-180">⌄</span>
-            </summary>
-            <div>
-            {summary.cases.map((item) => {
+          <div>
+            {summary.cases.slice(0, 2).map((item) => {
               const thresholdLabels = item.reasons
                 .filter((reason) => reason === 'loss_rate_threshold' || reason === 'price_loss_threshold')
                 .map((reason) => REASON_LABELS[reason]);
@@ -150,7 +145,7 @@ export default function MajorFailureAnalysis({ trades, qualityItems, allEntries,
                   <div className="min-w-0 border-t border-dark-800 pt-3 lg:border-l lg:border-t-0 lg:pl-4 lg:pt-0">
                     <div className="text-[10px] text-dark-500">{isKo ? '핵심 판정' : 'Key assessment'}</div>
                     <div className="mt-1 text-sm leading-6 text-dark-200">{caseConclusion(item)}</div>
-                    <details className="mt-2">
+                    <details className="mt-2" open>
                       <summary className="cursor-pointer text-[11px] text-dark-500 hover:text-dark-300">{isKo ? '판정 근거 전체 보기' : 'Show all evidence'}</summary>
                       <div className="mt-1 text-[11px] leading-5 text-dark-500">{assessmentLabels.join(' · ') || (isKo ? '추가 판정 근거 없음' : 'No additional evidence')}</div>
                     </details>
@@ -158,8 +153,7 @@ export default function MajorFailureAnalysis({ trades, qualityItems, allEntries,
                 </article>
               );
             })}
-            </div>
-          </details>
+          </div>
         </>
       )}
 

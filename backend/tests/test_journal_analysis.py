@@ -32,15 +32,20 @@ def _add_position(**overrides):
 
 def _candles():
     opens = pd.to_datetime(
-        ["2026-08-01T00:00:00Z", "2026-08-01T00:15:00Z", "2026-08-01T00:30:00Z"],
+        [
+            "2026-08-01T00:00:00Z",
+            "2026-08-01T00:15:00Z",
+            "2026-08-01T00:30:00Z",
+            "2026-08-01T00:45:00Z",
+        ],
         utc=True,
     )
     return pd.DataFrame(
         {
             "open_time": (opens.astype("int64") // 1_000_000).astype("int64"),
             "close_time": ((opens + pd.Timedelta(minutes=15) - pd.Timedelta(milliseconds=1)).astype("int64") // 1_000_000).astype("int64"),
-            "high": [150.0, 110.0, 108.0],
-            "low": [50.0, 98.0, 99.0],
+            "high": [150.0, 110.0, 108.0, 150.0],
+            "low": [50.0, 98.0, 99.0, 50.0],
         }
     )
 
@@ -68,8 +73,8 @@ def test_short_adverse_excursion_uses_directional_extremes(monkeypatch, isolated
         external_id="position:short",
     )
     frame = _candles()
-    frame.loc[:, "high"] = [150.0, 106.0, 105.0]
-    frame.loc[:, "low"] = [50.0, 99.0, 100.0]
+    frame.loc[:, "high"] = [150.0, 106.0, 105.0, 150.0]
+    frame.loc[:, "low"] = [50.0, 99.0, 100.0, 50.0]
     monkeypatch.setattr("backend.modules.journal.analysis.load_journal_ohlcv", lambda *args, **kwargs: frame)
 
     item = run_journal_excursions_service(1, 2_000_000_000_000)["data"]["items"][0]
@@ -106,6 +111,7 @@ def test_trade_shorter_than_15_minutes_uses_completed_one_minute_candles(monkeyp
     assert item["interval"] == "1m"
     assert item["mfe_pct"] == pytest.approx(7.0)
     assert item["mae_pct"] == pytest.approx(4.0)
+    assert item["candle_count"] == 10
 
 
 def test_sub_minute_trade_is_excluded_without_a_completed_candle(monkeypatch, isolated_store):
@@ -188,3 +194,27 @@ def test_position_batches_preserve_history_beyond_single_request_limit():
     batches = _position_batches(positions)
 
     assert [[item["id"] for item in batch] for batch in batches] == [[1, 2], [3]]
+
+
+def test_excursions_exclude_position_when_history_does_not_reach_entry(monkeypatch, isolated_store):
+    position = _add_position(
+        entry_datetime="2026-07-01T00:02:00Z",
+        external_id="position:truncated",
+    )
+    monkeypatch.setattr("backend.modules.journal.analysis.load_journal_ohlcv", lambda *args, **kwargs: _candles())
+
+    result = run_journal_excursions_service(1, 2_000_000_000_000)["data"]
+
+    assert all(item["journal_id"] != position["id"] for item in result["items"])
+    assert any(f"journal {position['id']}: complete 15m path is unavailable" in warning for warning in result["warnings"])
+
+
+def test_excursions_exclude_position_when_history_has_an_internal_gap(monkeypatch, isolated_store):
+    position = _add_position(external_id="position:gap")
+    frame = _candles().drop(index=1).reset_index(drop=True)
+    monkeypatch.setattr("backend.modules.journal.analysis.load_journal_ohlcv", lambda *args, **kwargs: frame)
+
+    result = run_journal_excursions_service(1, 2_000_000_000_000)["data"]
+
+    assert all(item["journal_id"] != position["id"] for item in result["items"])
+    assert any(f"journal {position['id']}: complete 15m path is unavailable" in warning for warning in result["warnings"])

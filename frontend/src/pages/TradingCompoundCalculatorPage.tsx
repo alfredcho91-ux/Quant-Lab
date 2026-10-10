@@ -26,7 +26,7 @@ export default function TradingCompoundCalculatorPage() {
           </div>
           <div className="rounded-lg border border-dark-700 bg-dark-800/70 px-3 py-2 font-mono text-dark-200">
             EV {calculator.evPerR >= 0 ? '+' : ''}
-            {calculator.evPerR.toFixed(3)}R
+            {calculator.evPerR.toFixed(2)}R
           </div>
         </div>
       </div>

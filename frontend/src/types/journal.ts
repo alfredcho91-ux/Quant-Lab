@@ -108,13 +108,43 @@ export interface TradeQualityPerformance {
 
 export interface TradeQualityHoldAggregate {
   available_count: number;
-  return_sample_count: number;
+  return_sample_count?: number;
   average_return_pct?: number | null;
   average_r?: number | null;
   r_sample_count: number;
-  loss_count: number;
+  loss_count?: number;
   loss_rate_pct?: number | null;
   average_loss_pct?: number | null;
+}
+
+export type ExitHoldInterval = '15m' | '1h' | '2h' | '4h' | '1d';
+
+export interface JournalExitHoldItem {
+  journal_id: number;
+  symbol?: string | null;
+  direction?: 'Long' | 'Short' | null;
+  entry_datetime?: string | null;
+  exit_datetime?: string | null;
+  hold_results: Record<string, {
+    available: boolean;
+    return_pct?: number | null;
+    r_multiple?: number | null;
+    exit_time?: number;
+    exit_price?: number;
+    bars?: number;
+    reason?: string;
+  }>;
+}
+
+export interface JournalExitHoldAnalysisData {
+  interval: ExitHoldInterval;
+  market_data_sources: string[];
+  direction_breakdown: Record<'Long' | 'Short', {
+    hold_results: Record<string, TradeQualityHoldAggregate>;
+  }>;
+  items: JournalExitHoldItem[];
+  return_filter: JournalQualityAnalysisData['return_filter'];
+  warnings: string[];
 }
 
 export interface TradeQualityStrategyAggregate {
@@ -476,8 +506,73 @@ export interface TradeQualityItem {
 export interface DeepcoinStatus {
   configured: boolean;
   mode: 'read_only';
-  credential_storage: 'environment' | 'keyring' | 'encrypted_db' | 'not_configured';
-  deleted?: boolean | null;
+}
+
+export interface JournalPerformanceGroup {
+  id: string;
+  trade_count: number;
+  wins: number;
+  win_rate_pct: number | null;
+  net_pnl: number;
+}
+
+export interface JournalPerformanceTrade {
+  journal_id: number;
+  symbol?: string | null;
+  direction?: string | null;
+  realized_pnl?: number | null;
+}
+
+export interface JournalPerformanceData {
+  closed_trade_count: number;
+  evaluated_trade_count: number;
+  missing_pnl_count: number;
+  wins: number;
+  losses: number;
+  breakevens: number;
+  win_rate_pct: number | null;
+  net_pnl: number;
+  net_return_pct: number | null;
+  return_sample_count: number;
+  gross_profit: number;
+  gross_loss: number;
+  profit_factor: number | null;
+  profit_factor_infinite: boolean;
+  average_win: number | null;
+  average_loss: number | null;
+  expectancy: number | null;
+  fee_impact: number;
+  funding_impact: number;
+  max_win_streak: number;
+  max_loss_streak: number;
+  best_trade: JournalPerformanceTrade | null;
+  worst_trade: JournalPerformanceTrade | null;
+  directions: JournalPerformanceGroup[];
+  symbols: JournalPerformanceGroup[];
+}
+
+export type ExchangeId = 'deepcoin' | 'binance' | 'bybit' | 'okx';
+
+export interface ExchangeStatus {
+  id: ExchangeId;
+  name: string;
+  configured: boolean;
+  mode: 'read_only';
+  instrument_types: Array<'SWAP' | 'SPOT'>;
+  requires_passphrase: boolean;
+  connector: 'native' | 'ccxt';
+  credential_source: 'environment' | 'keyring' | 'encrypted_db' | 'none';
+  credential_error?: string | null;
+}
+
+export interface ExchangeCredentialDeleteResult {
+  exchanges: ExchangeStatus[];
+  deleted: boolean;
+  environment_override: boolean;
+}
+
+export interface ExchangeSyncResult extends DeepcoinSyncResult {
+  exchange: ExchangeId;
 }
 
 export interface DeepcoinSyncResult {
@@ -492,6 +587,7 @@ export interface DeepcoinSyncResult {
   positions_fetched: number;
   positions_imported: number;
   positions_updated: number;
+  positions_snapshots_refreshed: number;
   fills_updated: number;
   positions_skipped: number;
   positions_ignored: number;
@@ -500,8 +596,6 @@ export interface DeepcoinSyncResult {
 
 export interface DeepcoinOpenPosition {
   position_id: string;
-  lifecycle_id?: string | null;
-  lifecycle_available?: boolean;
   symbol: string;
   direction: 'Long' | 'Short';
   size: number;
@@ -511,6 +605,17 @@ export interface DeepcoinOpenPosition {
   leverage?: number | null;
   opened_at?: string | null;
   updated_at?: string | null;
+}
+
+export interface ExchangeOpenPosition extends DeepcoinOpenPosition {
+  exchange: ExchangeId;
+  lifecycle_id?: string | null;
+  lifecycle_available?: boolean;
+}
+
+export interface ExchangeOpenPositionsData {
+  positions: ExchangeOpenPosition[];
+  unavailable_exchanges: ExchangeId[];
 }
 
 export interface TradeExecutionMarker {
@@ -547,6 +652,13 @@ export interface JournalEntry {
   r_multiple?: number;
   outcome?: string;
   emotion?: string;
+  emotion_before?: string | null;
+  emotion_during?: string | null;
+  emotion_after?: string | null;
+  confidence_score?: number | null;
+  focus_score?: number | null;
+  fomo?: boolean | number | string | null;
+  revenge_trade?: boolean | number | string | null;
   tags?: string;
   mistakes?: string;
   planned_stop_pct?: number | null;
@@ -555,9 +667,10 @@ export interface JournalEntry {
   setup_tags?: string[];
   mistake_tags?: string[];
   plan_recorded_at?: string | null;
-  notes?: string;
+  notes?: string | null;
   source?: string;
   external_id?: string;
+  lifecycle_id?: string;
   exchange?: string;
   order_id?: string;
   fee?: number;
@@ -570,6 +683,43 @@ export interface JournalEntry {
   indicator_snapshot?: TradeIndicatorSnapshot;
   created_at?: string;
 }
+
+export interface JournalBehaviorUpdatePayload {
+  planned_stop_pct?: number | null;
+  planned_target_pct?: number | null;
+  planned_entry_reason?: string | null;
+  setup_tags?: string[];
+  mistake_tags?: string[];
+  emotion_before?: string | null;
+  emotion_during?: string | null;
+  emotion_after?: string | null;
+  confidence_score?: number | null;
+  focus_score?: number | null;
+  fomo?: boolean | null;
+  revenge_trade?: boolean | null;
+  notes?: string | null;
+}
+
+export interface DailyJournalEntry {
+  id: number;
+  trade_date: string;
+  market_bias: string | null;
+  session_plan: string | null;
+  max_daily_loss: number | null;
+  max_trade_count: number | null;
+  pre_session_notes: string | null;
+  post_session_notes: string | null;
+  what_went_well: string | null;
+  what_went_wrong: string | null;
+  next_focus: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type DailyJournalUpdatePayload = Partial<Omit<
+  DailyJournalEntry,
+  'id' | 'trade_date' | 'created_at' | 'updated_at'
+>>;
 
 export type JournalBehaviorRuleType = 'trend_direction_forbid' | 'max_stop_pct' | 'min_rr' | 'no_scale_in';
 
@@ -644,25 +794,10 @@ export interface JournalBehaviorItem {
 export interface JournalBehaviorAnalysisData {
   items: JournalBehaviorItem[];
   summary: JournalBehaviorStats;
-  plan_summary: {
-    recorded_trade_count: number;
-    full_plan_trade_count: number;
-    stop_overrun_count: number;
-    target_giveback_count: number;
-    post_exit_record_count: number;
-  };
+  plan_summary: { recorded_trade_count: number; full_plan_trade_count: number; stop_overrun_count: number; target_giveback_count: number; post_exit_record_count: number };
   setup_stats: Array<{ tag: string; evidence_journal_ids: number[] } & JournalBehaviorStats>;
   mistake_stats: Array<{ tag: string; evidence_journal_ids: number[] } & JournalBehaviorStats>;
-  biggest_leaks: Array<{
-    id: string;
-    label: string;
-    loss_impact_pnl: number;
-    loss_impact_r?: number | null;
-    opportunity_sample_count: number;
-    average_opportunity_pct?: number | null;
-    conclusion_eligible: boolean;
-    evidence_journal_ids: number[];
-  } & JournalBehaviorStats>;
+  biggest_leaks: Array<{ id: string; label: string; loss_impact_pnl: number; loss_impact_r?: number | null; opportunity_sample_count: number; average_opportunity_pct?: number | null; conclusion_eligible: boolean; evidence_journal_ids: number[] } & JournalBehaviorStats>;
   rule_status_stats: Record<'compliant' | 'violation' | 'unknown', JournalBehaviorStats>;
   rules: JournalBehaviorRule[];
   condition_options: JournalBehaviorCondition[];
@@ -675,4 +810,3 @@ export interface JournalBehaviorComparisonData {
   left: { condition: JournalBehaviorCondition; stats: JournalBehaviorStats; evidence_journal_ids: number[] };
   right: { condition: JournalBehaviorCondition; stats: JournalBehaviorStats; evidence_journal_ids: number[] };
 }
-

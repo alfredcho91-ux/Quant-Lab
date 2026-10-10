@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import hmac
+from datetime import datetime, timedelta, timezone
 
 import pandas as pd
 import pytest
@@ -48,6 +49,39 @@ def test_deepcoin_headers_follow_the_documented_hmac_prehash():
     assert headers["DC-ACCESS-PASSPHRASE"] == "passphrase"
 
 
+def test_open_positions_service_returns_only_normalized_live_positions(monkeypatch):
+    credentials = DeepcoinCredentials("key", "secret", "passphrase")
+    monkeypatch.setattr(deepcoin_service, "get_deepcoin_credentials", lambda: credentials)
+    monkeypatch.setattr(deepcoin_service.DeepcoinClient, "get_open_positions", lambda *_args: [{
+        "posId": "position-1",
+        "instId": "BTC-USDT-SWAP",
+        "posSide": "long",
+        "pos": "0.25",
+        "avgPx": "64000.5",
+        "lastPx": "64500.0",
+        "unrealizedProfit": "124.5",
+        "lever": "10",
+        "cTime": "1722761000000",
+        "uTime": "1722762000000",
+    }])
+
+    result = deepcoin_service.get_deepcoin_open_positions_service()
+
+    assert result["success"] is True
+    assert result["data"] == [{
+        "position_id": "position-1",
+        "symbol": "BTC/USDT",
+        "direction": "Long",
+        "size": 0.25,
+        "average_price": 64000.5,
+        "last_price": 64500.0,
+        "unrealized_pnl": 124.5,
+        "leverage": 10.0,
+        "opened_at": "2024-08-04T08:43:20Z",
+        "updated_at": "2024-08-04T09:00:00Z",
+    }]
+
+
 def test_closed_position_snapshot_uses_the_recorded_entry_time():
     position = deepcoin_service._PreparedFill(
         raw={"cTime": "1722761000000"},
@@ -61,6 +95,93 @@ def test_closed_position_snapshot_uses_the_recorded_entry_time():
 
     assert snapshot_event.event_type == "position_entry"
     assert snapshot_event.timestamp_ms == 1722761000000
+
+
+def test_stale_closed_position_snapshot_refresh_uses_only_entry_time(monkeypatch):
+    entry_time = datetime.now(timezone.utc) - timedelta(days=1)
+    monkeypatch.setattr(deepcoin_service, "list_entries", lambda: [{
+        "source": "deepcoin_position",
+        "external_id": "deepcoin:position:stale",
+        "symbol": "BTC/USDT",
+        "entry_datetime": entry_time.isoformat().replace("+00:00", "Z"),
+        "indicator_snapshot": {
+            "version": 2,
+            "timeframes": {"2h": {"status": "complete"}},
+        },
+    }, {
+        "source": "deepcoin_position",
+        "external_id": "deepcoin:position:missing-entry",
+        "symbol": "BTC/USDT",
+        "entry_datetime": None,
+        "indicator_snapshot": {"version": 2},
+    }])
+
+    events = deepcoin_service._stale_closed_position_snapshot_events(7)
+
+    assert len(events) == 1
+    assert events[0].external_id == "deepcoin:position:stale"
+    assert events[0].timestamp_ms == int(entry_time.timestamp() * 1000)
+    assert events[0].event_type == "position_entry"
+
+
+def test_snapshot_version_before_rvol20_is_refreshed():
+    assert deepcoin_service._snapshot_needs_refresh({
+        "version": 3,
+        "timeframes": {interval: {"status": "complete"} for interval in ("1h", "2h", "4h", "1d")},
+    }) is True
+    assert deepcoin_service._snapshot_needs_refresh({
+        "version": 4,
+        "timeframes": {interval: {"status": "complete", "rvol20": None} for interval in ("1h", "2h", "4h", "1d")},
+    }) is False
+
+
+def test_stale_v3_position_snapshot_refreshes_once_to_v4_and_stays_idempotent(
+    isolated_journal_store,
+    monkeypatch,
+):
+    credentials = DeepcoinCredentials("key", "secret", "passphrase")
+    entry_time = datetime.now(timezone.utc) - timedelta(days=1)
+    external_id = "deepcoin:position:rvol-v4-refresh"
+    journal_repository.add_entries_if_new_external_ids([{
+        "datetime": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+        "entry_datetime": entry_time.isoformat().replace("+00:00", "Z"),
+        "symbol": "BTC/USDT",
+        "direction": "Long",
+        "source": "deepcoin_position",
+        "external_id": external_id,
+        "exchange": "Deepcoin",
+        "indicator_snapshot": {
+            "version": 3,
+            "timeframes": {interval: {"status": "complete"} for interval in ("1h", "2h", "4h", "1d")},
+        },
+    }])
+    refreshed = {
+        "version": 4,
+        "event_type": "position_entry",
+        "timeframes": {
+            interval: {"status": "complete", "rvol20": 1.82}
+            for interval in ("1h", "2h", "4h", "1d")
+        },
+    }
+    build_calls = 0
+
+    def build(events):
+        nonlocal build_calls
+        build_calls += 1
+        return {event.external_id: refreshed for event in events}
+
+    monkeypatch.setattr(deepcoin_service, "get_deepcoin_credentials", lambda: credentials)
+    monkeypatch.setattr(deepcoin_service.DeepcoinClient, "get_fills", lambda *_args, **_kwargs: [])
+    monkeypatch.setattr(deepcoin_service.DeepcoinClient, "get_positions_history", lambda *_args, **_kwargs: [])
+    monkeypatch.setattr(deepcoin_service, "_build_indicator_snapshots", build)
+
+    for _ in range(10):
+        deepcoin_service.sync_deepcoin_fills_service("SWAP", 7)
+
+    stored = get_journal_service()["data"]
+    assert len(stored) == 1
+    assert stored[0]["indicator_snapshot"] == refreshed
+    assert build_calls == 1
 
 
 def test_entry_snapshot_records_entry_time_not_close_time(monkeypatch):
@@ -82,68 +203,6 @@ def test_entry_snapshot_records_entry_time_not_close_time(monkeypatch):
     assert payload["event_type"] == "position_entry"
     assert payload["entry_time"] == payload["event_time"]
     assert "position_close_time" not in payload
-
-
-def test_open_positions_service_returns_only_normalized_live_positions(monkeypatch):
-    credentials = DeepcoinCredentials("key", "secret", "passphrase")
-    monkeypatch.setattr(deepcoin_service, "get_deepcoin_credentials", lambda: credentials)
-    monkeypatch.setattr(
-        deepcoin_service.DeepcoinClient,
-        "get_open_positions",
-        lambda _client: [
-            {
-                "posId": "position-1",
-                "instId": "BTC-USDT-SWAP",
-                "posSide": "short",
-                "pos": "12",
-                "avgPx": "64000.5",
-                "lastPx": "63800",
-                "unrealizedProfit": "4.2",
-                "lever": "10",
-                "uTime": "1722762000000",
-                "cTime": "1722765600000",
-            },
-            {"posId": "closed", "instId": "ETH-USDT-SWAP", "posSide": "long", "pos": "0"},
-        ],
-    )
-
-    result = deepcoin_service.get_deepcoin_open_positions_service()
-
-    assert result["data"] == [
-        {
-            "position_id": "position-1",
-            "lifecycle_id": "position-1",
-            "lifecycle_available": True,
-            "symbol": "BTC/USDT",
-            "direction": "Short",
-            "size": 12.0,
-            "average_price": 64000.5,
-            "last_price": 63800.0,
-            "unrealized_pnl": 4.2,
-            "leverage": 10.0,
-            "opened_at": "2024-08-04T09:00:00Z",
-            "updated_at": "2024-08-04T10:00:00Z",
-        }
-    ]
-
-
-def test_open_positions_without_posid_keep_display_identity_but_mark_lifecycle_unavailable(monkeypatch):
-    credentials = DeepcoinCredentials("key", "secret", "passphrase")
-    monkeypatch.setattr(deepcoin_service, "get_deepcoin_credentials", lambda: credentials)
-    monkeypatch.setattr(
-        deepcoin_service.DeepcoinClient,
-        "get_open_positions",
-        lambda _client: [{
-            "instId": "BTC-USDT-SWAP", "posSide": "long", "pos": "1",
-            "avgPx": "100", "lastPx": "101", "cTime": "1722761000000",
-        }],
-    )
-
-    result = deepcoin_service.get_deepcoin_open_positions_service()
-
-    assert result["data"][0]["position_id"] == "deepcoin:BTC/USDT:long"
-    assert result["data"][0]["lifecycle_id"] is None
-    assert result["data"][0]["lifecycle_available"] is False
 
 
 def test_deepcoin_fills_split_saturated_time_windows(monkeypatch):

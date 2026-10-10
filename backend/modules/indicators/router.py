@@ -45,6 +45,8 @@ async def get_trade_report(
         query.as_of,
         query.profile_candles,
         query.bin_count,
+        query.exchange,
+        query.instrument_type,
     )
 
 
@@ -64,7 +66,7 @@ async def get_projection(
             "interval": interval,
             "data": result
         }
-        
+
     except HTTPException:
         raise
     except Exception:

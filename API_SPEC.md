@@ -4,6 +4,25 @@
 
 ## 공통 규칙
 
+## 추가 저널 API
+
+현재 저널 통합과 호환 경계는 [JOURNAL_SYNC.md](./docs/JOURNAL_SYNC.md)를 봅니다. 요청·응답 필드의 기준은 도메인 스키마와 OpenAPI입니다.
+
+| 기능 | 주요 경로 | 소유 모듈 |
+| --- | --- | --- |
+| 사용자 전략·버전 | `/api/playbook/strategies`, `/api/playbook/strategies/{strategy_id}/versions` | `strategies` |
+| 거래 전략 배정·규칙 평가 | `/api/journal/{journal_entry_id}/strategy-version`, `/api/journal/{journal_entry_id}/strategy-evaluation`, `/api/rule-engine/metadata` | `strategy_assignments`, `rule_engine` |
+| 기간 성과·일일 기록 | `/api/journal/performance`, `/api/journal/daily` | `journal` |
+| 구조화 분석 | `GET /api/analytics/metadata`, `POST /api/analytics/query` | `analytics` |
+| 복기 | `POST /api/review/trading`, `/api/review/patterns`, `/api/review/strategy-execution` | `review` |
+| 실험·측정 | `/api/experiments`, `/api/experiments/{identifier}/measurement` | `experiments` |
+| 거래소·동기화 | `/api/exchanges`, `/api/exchanges/{exchange_id}/credentials`, `/api/exchanges/{exchange_id}/sync` | `exchanges` |
+| 샘플·프로필 | `/api/workspace`, `/api/workspace/sample`, `/api/workspace/acknowledge` | `sample` |
+
+`/api/strategies`는 기존 백테스트 템플릿 목록을 유지합니다. 관찰 연관성, 추정 기회비용과 반사실 시뮬레이션을 구분하며 샘플 수·판정 가능 범위를 함께 반환합니다. 분석 입력 검증과 계산은 서버의 결정적 엔진이 담당합니다.
+
+## 공통 응답
+
 - 기본 성공 형식: `{ "success": true, ... }`
 - 오류는 FastAPI HTTP 상태 코드와 표준 오류 payload를 사용합니다.
 - `coin`은 `BTC`, `ETH`, `SOL` 같은 base symbol을 사용합니다. 내부 데이터 요청은 `USDT` 페어로 정규화합니다.

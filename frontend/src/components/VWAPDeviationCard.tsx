@@ -4,8 +4,6 @@ import type { IndicatorProjection } from '../types';
 import { anchoredVwapSampleLabel, anchoredVwapZoneLabel } from '../utils/indicatorLabels';
 
 function formatPrice(value: number): string {
-  if (value < 1) return value.toFixed(6);
-  if (value < 10) return value.toFixed(4);
   return value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 

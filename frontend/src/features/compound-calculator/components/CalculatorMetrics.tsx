@@ -35,7 +35,7 @@ export function CalculatorMetrics({
     <div className="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-5">
       <MetricTile
         label={isKo ? '기대값 (EV per R)' : 'EV per R'}
-        value={`${evPerR >= 0 ? '+' : ''}${evPerR.toFixed(3)}R`}
+        value={`${evPerR >= 0 ? '+' : ''}${evPerR.toFixed(2)}R`}
         tone={evPerR > 0 ? 'positive' : evPerR < 0 ? 'negative' : 'warning'}
       />
       <MetricTile

@@ -5,7 +5,7 @@ from pydantic import ValidationError
 
 from backend.modules.journal import repository as journal_repository
 from backend.modules.plan_lab import repository
-from backend.modules.plan_lab.schemas import PlanRevisionInput, RetrospectivePlanCreate
+from backend.modules.plan_lab.schemas import InTradePlanCreate, PlanRevisionInput, RetrospectivePlanCreate
 
 
 def _revision(entry_price=100.0):
@@ -86,31 +86,121 @@ def test_retrospective_schema_allows_missing_plan_entry_only():
         PlanRevisionInput.model_validate(_revision(None))
 
 
-def test_generic_revision_enforces_plan_source_entry_rules(tmp_path):
-    db_path = tmp_path / "journal.db"
-    in_trade = repository.create_plan(_plan_payload(), db_path=db_path)
-    with sqlite3.connect(db_path) as conn:
-        conn.execute("UPDATE trading_plans SET source='IN_TRADE' WHERE id=?", (in_trade["id"],))
-    with pytest.raises(ValueError, match="IN_TRADE revisions cannot use"):
-        repository.add_revision(in_trade["id"], _revision(101.0), db_path=db_path)
-
-    entry = _closed_entry(db_path, external_id="binance:position:revision-source")
-    retrospective = repository.create_retrospective_plan(
-        _retrospective_payload(), entry["id"], db_path=db_path,
-    )
-
-    with pytest.raises(ValueError, match="must keep planned entry empty"):
-        repository.add_revision(retrospective["id"], _revision(101.0), db_path=db_path)
-
-    revised = repository.add_revision(retrospective["id"], _revision(None), db_path=db_path)
-    assert revised["latest_revision"]["entry_price"] is None
-
-
 def test_secondary_target_is_optional_and_uses_primary_target_validation():
     assert PlanRevisionInput.model_validate(_revision()).take_profit_2 is None
     assert PlanRevisionInput.model_validate({**_revision(), "take_profit_2": 108.0}).take_profit_2 == 108.0
     with pytest.raises(ValidationError):
         PlanRevisionInput.model_validate({**_revision(), "take_profit_2": 0})
+
+
+def _live_position(position_id="deepcoin-live-1"):
+    return {
+        "exchange": "deepcoin",
+        "position_id": position_id,
+        "symbol": "BTC/USDT",
+        "direction": "Long",
+        "average_price": 100.0,
+        "last_price": 101.0,
+        "opened_at": "2026-01-01T10:00:00+00:00",
+    }
+
+
+def test_in_trade_plan_never_persists_actual_entry_as_user_plan(tmp_path):
+    db_path = tmp_path / "journal.db"
+    position = _live_position()
+    payload = {
+        "exchange": "deepcoin",
+        "position_id": position["position_id"],
+        "symbol": position["symbol"],
+        "side": position["direction"],
+        "revision": _revision(None),
+    }
+
+    created = repository.create_in_trade_plan(payload, position, db_path=db_path)
+    annotated = repository.annotate_revisions(
+        created, position["opened_at"], "2026-01-01T12:00:00+00:00",
+    )
+
+    assert created["source"] == "IN_TRADE"
+    assert created["live_position_id"] == position["position_id"]
+    assert created["latest_revision"]["entry_price"] is None
+    assert annotated["plan_effective_at_entry"] is None
+    assert InTradePlanCreate.model_validate({
+        "exchange": "deepcoin", "position_id": position["position_id"], "revision": _revision(None),
+    }).revision.entry_price is None
+
+
+def test_in_trade_plan_reuses_same_open_position_and_requires_a_match(tmp_path):
+    db_path = tmp_path / "journal.db"
+    position = _live_position()
+    payload = {
+        "exchange": "deepcoin", "position_id": position["position_id"],
+        "symbol": position["symbol"], "side": position["direction"], "revision": _revision(None),
+    }
+    first = repository.create_in_trade_plan(payload, position, db_path=db_path)
+    duplicate = repository.create_in_trade_plan(payload, position, db_path=db_path)
+
+    assert duplicate["id"] == first["id"]
+    assert _table_counts(db_path) == (1, 1, 0)
+    with pytest.raises(ValueError, match="does not match"):
+        repository.create_in_trade_plan({**payload, "position_id": "other"}, position, db_path=db_path)
+
+
+def test_generic_revision_cannot_bypass_in_trade_or_retrospective_entry_rules(tmp_path):
+    db_path = tmp_path / "journal.db"
+    position = _live_position()
+    payload = {
+        "exchange": "deepcoin", "position_id": position["position_id"],
+        "symbol": position["symbol"], "side": position["direction"], "revision": _revision(None),
+    }
+    in_trade = repository.create_in_trade_plan(payload, position, db_path=db_path)
+
+    with pytest.raises(ValueError, match="IN_TRADE revisions cannot use"):
+        repository.add_revision(in_trade["id"], _revision(101.0), db_path=db_path)
+
+    stored_in_trade = repository.get_plan(in_trade["id"], db_path=db_path)
+    assert len(stored_in_trade["revisions"]) == 1
+    assert stored_in_trade["latest_revision"]["entry_price"] is None
+
+    entry = _closed_entry(db_path, external_id="binance:position:revision-guard")
+    retrospective = repository.create_retrospective_plan(
+        _retrospective_payload(), entry["id"], db_path=db_path,
+    )
+    with pytest.raises(ValueError, match="must keep planned entry empty"):
+        repository.add_revision(retrospective["id"], _revision(101.0), db_path=db_path)
+
+    revised_retrospective = repository.add_revision(
+        retrospective["id"], {**_revision(None), "take_profit": 105.0}, db_path=db_path,
+    )
+
+    assert len(revised_retrospective["revisions"]) == 2
+    assert revised_retrospective["latest_revision"]["entry_price"] is None
+    assert revised_retrospective["latest_revision"]["take_profit"] == 105.0
+
+
+def test_deepcoin_in_trade_plan_links_after_a_stable_closed_position_sync(tmp_path):
+    db_path = tmp_path / "journal.db"
+    position = _live_position("stable-live")
+    payload = {
+        "exchange": "deepcoin", "position_id": position["position_id"],
+        "symbol": position["symbol"], "side": position["direction"], "revision": _revision(None),
+    }
+    plan = repository.create_in_trade_plan(payload, position, db_path=db_path)
+    entry, _ = journal_repository.add_entry_if_new_external_id(
+        {
+            "external_id": "deepcoin:position:stable-live", "exchange": "deepcoin",
+            "source": "deepcoin_position", "symbol": "BTC/USDT", "direction": "Long",
+            "entry_datetime": position["opened_at"], "datetime": "2026-01-01T12:00:00+00:00",
+            "entry_price": 100.0, "exit_price": 104.0,
+        }, db_path=db_path,
+    )
+
+    repository.reconcile_links(db_path=db_path)
+    linked = repository.get_plan(plan["id"], db_path=db_path)
+
+    assert linked["source"] == "IN_TRADE"
+    assert linked["status"] == "linked"
+    assert linked["link"]["journal_entry_id"] == entry["id"]
 
 
 def test_secondary_target_persists_across_create_and_immutable_revisions(tmp_path):

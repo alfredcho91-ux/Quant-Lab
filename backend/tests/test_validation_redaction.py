@@ -4,10 +4,10 @@ from backend.main import app
 
 
 def test_credential_validation_error_does_not_echo_secret():
-    secret = "s" * 513
+    secret = "sensitive-value-" * 50
     response = TestClient(app).post(
-        "/api/deepcoin/credentials",
-        json={"api_key": "key", "secret_key": secret, "passphrase": "phrase"},
+        "/api/exchanges/deepcoin/credentials",
+        json={"api_key": "api", "secret_key": secret, "passphrase": "pass"},
     )
 
     assert response.status_code == 422

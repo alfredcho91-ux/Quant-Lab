@@ -10,7 +10,6 @@ export interface TradePathEvent {
   raw_move_pct: number;
   elapsed_ms: number;
 }
-
 export interface TradePathSummary {
   interval: TradePathInterval;
   candle_count: number;
@@ -212,4 +211,3 @@ export function tradePathMarkerLabel(event: TradePathEvent, isKo: boolean): stri
   if (event.kind === 'adverse_peak') return isKo ? '최대 불리' : 'MAX ADVERSE';
   return 'EXIT';
 }
-

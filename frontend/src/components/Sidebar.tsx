@@ -12,6 +12,8 @@ import {
   Palette,
   Globe,
   BookOpen,
+  BookMarked,
+  Search,
   Flame,
   Bot,
   Calculator,
@@ -39,12 +41,15 @@ import type { Language } from '../types';
 import type { BackgroundTheme, Interval } from '../store/useStore';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import { MARKET_COINS, MARKET_INTERVALS } from '../constants/market';
+import { isSampleWorkspace } from '../features/onboarding/workspaceSession';
 
 const menuItems = [
   { path: '/journal', icon: BookOpen, labelKey: 'menu_journal' as const },
   { path: '/trade-analysis', icon: BarChart3, labelKey: 'menu_trade_analysis' as const },
   { path: '/risk-lab', icon: ShieldAlert, labelKey: 'menu_risk_lab' as const },
   { path: '/plan-lab', icon: ClipboardCheck, labelKey: 'menu_plan_lab' as const },
+  { path: '/trade-explorer', icon: Search, labelKey: 'menu_trade_explorer' as const },
+  { path: '/playbook', icon: BookMarked, labelKey: 'menu_playbook' as const },
   // 주요 분석 페이지
   { path: '/trend-judgment', icon: Activity, labelKey: 'menu_trend_judgment' as const },
   { path: '/trend-chart', icon: CandlestickChart, labelKey: 'menu_trend_chart' as const },
@@ -76,12 +81,13 @@ export default function Sidebar() {
   const toggleSidebar = useToggleSidebar();
 
   const labels = getLabels(language);
-  const usesMarketSelection = location.pathname !== '/journal';
+  const usesMarketSelection = !['/journal', '/trade-analysis', '/playbook', '/trade-explorer'].includes(location.pathname);
 
   // Fetch market prices
   const { data: prices } = useQuery({
     queryKey: ['marketPrices'],
     queryFn: getMarketPrices,
+    enabled: !isSampleWorkspace(),
     refetchInterval: 30000,
   });
 
@@ -89,6 +95,7 @@ export default function Sidebar() {
   const { data: fng } = useQuery({
     queryKey: ['fearGreed'],
     queryFn: getFearGreedIndex,
+    enabled: !isSampleWorkspace(),
     refetchInterval: 300000,
   });
 
@@ -115,14 +122,14 @@ export default function Sidebar() {
           {isSidebarCollapsed ? (
             <BarChart3 className="h-6 w-6 text-primary-400" aria-hidden="true" />
           ) : (
-            <h1 className="text-lg font-bold" style={{ color: '#072ac8' }}>
+            <h1 className={`text-lg font-semibold ${backgroundTheme === 'white' ? 'text-slate-900' : 'text-dark-100'}`}>
               {labels.sidebar_title}
             </h1>
           )}
           <button
             onClick={toggleSidebar}
             className="hidden rounded-lg p-2 transition-colors hover:bg-dark-700 md:block"
-            aria-label={isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            aria-label={language === 'ko' ? (isSidebarCollapsed ? '사이드바 펼치기' : '사이드바 접기') : (isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar')}
           >
             {isSidebarCollapsed ? (
               <ChevronRight className="w-5 h-5 text-dark-400" />
@@ -304,7 +311,7 @@ export default function Sidebar() {
       </div>
 
       {/* Menu */}
-      <nav className="flex-1 p-2 overflow-y-auto">
+      <nav className="flex-1 p-2 overflow-y-auto" aria-label={language === 'ko' ? '주요 메뉴' : 'Primary'}>
         <div className="space-y-1">
           {menuItems.map((item) => {
             const Icon = item.icon;
@@ -312,10 +319,11 @@ export default function Sidebar() {
             return (
               <button
                 key={item.path}
-                onClick={() => navigate(item.path)}
+                  onClick={() => navigate(item.path)}
+                  disabled={isSampleWorkspace() && !['/journal', '/trade-analysis', '/risk-lab', '/plan-lab', '/trade-explorer', '/playbook', '/hold-reentry', '/compound-calculator'].includes(item.path)}
                 aria-label={labels[item.labelKey]}
                 title={isSidebarCollapsed ? labels[item.labelKey] : undefined}
-                className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl transition-all ${
+                  className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl transition-all disabled:cursor-not-allowed disabled:opacity-50 ${
                   isActive
                     ? 'bg-gradient-to-r from-primary-500/20 to-primary-500/10 text-primary-400 border border-primary-500/20'
                     : 'text-dark-300 hover:bg-dark-800 hover:text-dark-100'

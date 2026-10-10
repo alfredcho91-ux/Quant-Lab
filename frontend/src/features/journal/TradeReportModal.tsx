@@ -1,9 +1,11 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useDialogFocus } from '../../hooks/useDialogFocus';
 import { useQuery } from '@tanstack/react-query';
 import { AlertCircle, Loader2, X } from 'lucide-react';
+import { useNavigate } from '../../router-context';
 
 import { getTradeReport } from '../../api/client';
-import { getDeepcoinTradeMarkers } from '../../api/journal';
+import { getDeepcoinTradeMarkers, getExchangeExecutions } from '../../api/journal';
 import PositionReviewChart, { type TradePathChartMarker } from '../../components/PositionReviewChart';
 import TradeIndicatorCharts from '../../components/TradeIndicatorCharts';
 import TradeReferenceSummary from '../../components/TradeReferenceSummary';
@@ -13,7 +15,12 @@ import { resolvePositionEntryTime } from '../../utils/positionReview';
 import { ENTRY_REASON_FIELDS, formatEntryReason } from './entryReasons';
 import { isClosedPosition } from './journalEntries';
 import { tradeOutcomeAssessment } from './tradeOutcomeAssessment';
+import StrategyAssignmentEditor from './StrategyAssignmentEditor';
 import TradeBehaviorEditor from './TradeBehaviorEditor';
+import PlanningContextPanel from '../planLab/PlanningContextPanel';
+import RuleAdherencePanel from './RuleAdherencePanel';
+import UnsavedChangesDialog from './UnsavedChangesDialog';
+import { isSampleWorkspace } from '../onboarding/workspaceSession';
 import {
   buildTradePathSummary,
   tradePathMarkerLabel,
@@ -33,7 +40,7 @@ import {
 
 function formatSignedNumber(value: number | null | undefined, maximumFractionDigits = 4): string {
   if (value == null || !Number.isFinite(value)) return '-';
-  return `${value >= 0 ? '+' : ''}${value.toLocaleString(undefined, { maximumFractionDigits })}`;
+  return `${value >= 0 ? '+' : ''}${value.toLocaleString(undefined, { maximumFractionDigits: Math.min(2, maximumFractionDigits) })}`;
 }
 
 function macdCrossLabel(
@@ -100,13 +107,21 @@ function holdingDurationLabel(entryTime: number, exitTime: number, isKo: boolean
 function CompactSection({
   title,
   children,
+  collapsible = false,
 }: {
   title: string;
   children: React.ReactNode;
+  collapsible?: boolean;
 }) {
+  if (collapsible) return (
+    <details className="min-w-0 border-t border-dark-700 pt-3">
+      <summary className="cursor-pointer text-sm font-semibold text-dark-200">{title}</summary>
+      <div className="pt-3">{children}</div>
+    </details>
+  );
   return (
-    <section className="border border-dark-700 bg-dark-900/25 p-3 sm:p-4">
-      <h3 className="border-b border-dark-700 pb-2 text-xs font-semibold text-dark-200">{title}</h3>
+    <section className="min-w-0 border-t border-dark-700 pt-3">
+      <h3 className="text-sm font-semibold text-dark-200">{title}</h3>
       <div className="pt-3">{children}</div>
     </section>
   );
@@ -122,9 +137,9 @@ function CompactMetric({
   tone?: string;
 }) {
   return (
-    <div className="border border-dark-800 bg-dark-950/45 px-2.5 py-2">
-      <div className="text-[10px] text-dark-500">{label}</div>
-      <div className={`mt-1 break-words font-mono text-xs font-semibold ${tone}`}>{value}</div>
+    <div className="min-w-0 py-2">
+      <div className="text-xs text-dark-500">{label}</div>
+      <div className={`mt-1 break-words font-mono text-sm font-semibold ${tone}`}>{value}</div>
     </div>
   );
 }
@@ -148,11 +163,53 @@ export default function TradeReportModal({
   onClose: () => void;
   onBehaviorUpdated?: () => void;
 }) {
+  const navigate = useNavigate();
+  const sample = isSampleWorkspace();
   const [reviewMoment, setReviewMoment] = useState<ReviewMoment>('entry');
   const [reportInterval, setReportInterval] = useState<ReportInterval>('4h');
+  const [assignmentDirty, setAssignmentDirty] = useState(false);
+  const [behaviorDirty, setBehaviorDirty] = useState(false);
+  type ExitTarget = 'close' | 'plan' | 'plan-prefill' | 'plan-prefill-price' | 'playbook';
+  const [pendingExit, setPendingExit] = useState<ExitTarget | null>(null);
+  const hasUnsavedChanges = assignmentDirty || behaviorDirty;
+  useEffect(() => {
+    setAssignmentDirty(false);
+    setBehaviorDirty(false);
+    setPendingExit(null);
+  }, [entry.id]);
+  const completeExit = (exit: ExitTarget) => {
+    onClose();
+    if (exit === 'plan' && entry.id != null) navigate(`/plan-lab?journalId=${entry.id}`);
+    if (exit.startsWith('plan-prefill') && entry.id != null) navigate(`/plan-lab?journalId=${entry.id}&prefill=1&pricePercent=${exit === 'plan-prefill-price' ? '1' : '0'}`);
+    if (exit === 'playbook') navigate('/playbook');
+  };
+  const requestExit = (exit: ExitTarget) => {
+    if (hasUnsavedChanges) {
+      setPendingExit(exit);
+      return;
+    }
+    completeExit(exit);
+  };
+  const dialogRef = useDialogFocus(() => requestExit('close'));
+  const isGenericExchange = Boolean(entry.exchange && entry.exchange !== 'Deepcoin');
+  const executionQuery = useQuery({
+    queryKey: ['exchange-executions', entry.exchange, entry.symbol, entry.entry_datetime, entry.datetime],
+    queryFn: () => getExchangeExecutions({
+      exchange: entry.exchange,
+      symbol: entry.symbol,
+      start_time: entry.entry_datetime,
+      end_time: entry.datetime,
+    }),
+    enabled: isGenericExchange && Boolean(entry.symbol && entry.datetime),
+    staleTime: 5 * 60_000,
+  });
+  const reviewEntries = useMemo(
+    () => [...allEntries, ...(executionQuery.data || [])],
+    [allEntries, executionQuery.data],
+  );
   const resolvedEntryTime = useMemo(
-    () => resolvePositionEntryTime(entry, allEntries),
-    [allEntries, entry],
+    () => resolvePositionEntryTime(entry, reviewEntries),
+    [entry, reviewEntries],
   );
   const matchedEntry = resolvedEntryTime.matchedEntry;
   const splitEntryMarkers = useMemo(
@@ -168,6 +225,30 @@ export default function TradeReportModal({
     }),
     [resolvedEntryTime.entryFills],
   );
+  const exchangeExitMarkers = useMemo(() => {
+    if (entry.exchange === 'Deepcoin' || !resolvedEntryTime.datetime || !entry.datetime) return [];
+    const entryMs = new Date(resolvedEntryTime.datetime).getTime();
+    const exitMs = new Date(entry.datetime).getTime();
+    return reviewEntries
+      .filter((candidate) => {
+        if (!candidate.source?.endsWith('_fill')) return false;
+        if (candidate.exchange !== entry.exchange || candidate.symbol !== entry.symbol) return false;
+        if (candidate.direction === entry.direction || !candidate.datetime) return false;
+        const candidateMs = new Date(candidate.datetime).getTime();
+        return Number.isFinite(candidateMs) && candidateMs >= entryMs && candidateMs <= exitMs;
+      })
+      .sort((left, right) => new Date(left.datetime as string).getTime() - new Date(right.datetime as string).getTime())
+      .flatMap((fill, index) => {
+        if (!fill.datetime || fill.entry_price == null || !Number.isFinite(fill.entry_price)) return [];
+        return [{
+          datetime: fill.datetime,
+          price: fill.entry_price,
+          size: fill.size,
+          order_id: fill.order_id,
+          label: `EXIT${index + 1}`,
+        }];
+      });
+  }, [entry, resolvedEntryTime.datetime, reviewEntries]);
   const entrySnapshot = matchedEntry?.indicator_snapshot || null;
   const exitSnapshot = isClosedPosition(entry) ? entry.indicator_snapshot || null : null;
   const activeSnapshot = reviewMoment === 'entry' ? entrySnapshot : exitSnapshot;
@@ -199,6 +280,13 @@ export default function TradeReportModal({
   const endTime = Number.isFinite(exitMs)
     ? exitMs + REPORT_INTERVAL_MS[reportInterval] * 60
     : undefined;
+  const exchangeId = String(entry.exchange || '').trim().toLowerCase();
+  const reportExchange = ['deepcoin', 'binance', 'bybit', 'okx'].includes(exchangeId)
+    ? exchangeId as 'deepcoin' | 'binance' | 'bybit' | 'okx'
+    : undefined;
+  const reportInstrumentType = String(entry.tags || '').split(',').map((tag) => tag.trim().toLowerCase()).includes('spot')
+    ? 'SPOT' as const
+    : 'SWAP' as const;
   const reportQuery = useQuery({
     queryKey: [
       'trade-report',
@@ -207,25 +295,31 @@ export default function TradeReportModal({
       endTime,
       Number.isFinite(referenceMs) ? referenceMs : null,
       candleLimit,
+      reportExchange,
+      reportInstrumentType,
     ],
     queryFn: () => getTradeReport(coin as string, reportInterval, {
       limit: candleLimit,
       end_time: endTime,
       as_of: Number.isFinite(referenceMs) ? referenceMs : undefined,
       profile_candles: profileCandleLimit,
+      exchange: reportExchange,
+      instrument_type: reportInstrumentType,
     }),
-    enabled: Boolean(coin && endTime),
+    enabled: !sample && Boolean(coin && endTime),
     staleTime: 5 * 60_000,
   });
   const pathQuery = useQuery({
-    queryKey: ['trade-path-summary', coin, pathConfig?.interval, pathConfig?.limit, entryMs, exitMs, entry.entry_price, entry.exit_price, entry.direction],
+    queryKey: ['trade-path-summary', coin, pathConfig?.interval, pathConfig?.limit, entryMs, exitMs, entry.entry_price, entry.exit_price, entry.direction, reportExchange, reportInstrumentType],
     queryFn: () => getTradeReport(coin as string, pathConfig!.interval, {
       limit: pathConfig!.limit,
       end_time: exitMs + PATH_INTERVAL_MS[pathConfig!.interval] * 2,
       as_of: entryMs,
       profile_candles: 100,
+      exchange: reportExchange,
+      instrument_type: reportInstrumentType,
     }),
-    enabled: Boolean(
+    enabled: !sample && Boolean(
       isClosedPosition(entry)
       && coin
       && pathConfig
@@ -294,10 +388,10 @@ export default function TradeReportModal({
     {
       id: 'rvol20',
       label: 'RVOL20',
-      group: isKo ? '가격·거래량' : 'Price · Volume',
       description: isKo
         ? '진입 직전 완료봉의 거래량을 그 이전 20개 완료봉 평균 거래량과 비교한 값입니다.'
         : 'Volume of the last completed candle before entry, divided by the average volume of the previous 20 completed candles.',
+      group: isKo ? '가격·거래량' : 'Price · Volume',
       hasData: () => reviewMoment === 'entry',
     },
     {
@@ -381,7 +475,10 @@ export default function TradeReportModal({
     indicatorId: string,
   ): Array<{ label: string; value: string }> => {
     if (indicatorId === 'rvol20') {
-      return [{ label: 'RVOL20', value: formatRvol20(snapshot.rvol20) }];
+      return [{
+        label: 'RVOL20',
+        value: formatRvol20(snapshot.rvol20),
+      }];
     }
 
     if (indicatorId === 'rsi') {
@@ -484,14 +581,16 @@ export default function TradeReportModal({
     { label: isKo ? '계획 손익비' : 'Planned RR', value: entry.planned_stop_pct && entry.planned_target_pct ? `1 : ${(entry.planned_target_pct / entry.planned_stop_pct).toFixed(2)}` : '-' },
   ];
 
+  const hasPriceChart = !sample && !reportQuery.isError && (reportQuery.isLoading || Boolean(reportQuery.data?.candles.length));
+
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/75 p-2 sm:p-4">
-      <div className="flex h-[94vh] w-full max-w-[1600px] flex-col overflow-hidden border border-dark-700 bg-dark-900 shadow-2xl">
+      <div ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-hidden={pendingExit ? true : undefined} aria-label={isKo ? '거래 리포트' : 'Trade report'} className="flex h-[94vh] w-full max-w-[1600px] flex-col overflow-hidden rounded-xl border border-dark-700 bg-dark-900 shadow-md">
         <header className="border-b border-dark-700 bg-dark-950/35 px-4 py-3 sm:px-5 sm:py-4">
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
-                <h2 className="text-lg font-bold text-white">{entry.symbol || (isKo ? '거래 리포트' : 'Trade Report')}</h2>
+                <h2 className="min-w-0 break-words text-lg font-bold text-white">{entry.symbol || (isKo ? '거래 리포트' : 'Trade Report')}</h2>
                 <span className={`border px-1.5 py-0.5 text-[10px] font-semibold ${entry.direction === 'Long' ? 'border-bull/30 bg-bull/10 text-bull' : 'border-bear/30 bg-bear/10 text-bear'}`}>{entry.direction || '-'}</span>
                 {isClosedPosition(entry) && <span className="border border-dark-600 bg-dark-800 px-1.5 py-0.5 text-[10px] text-dark-300">CLOSED</span>}
               </div>
@@ -506,36 +605,47 @@ export default function TradeReportModal({
                 {pathSummary && <span className="border border-primary-400/25 bg-primary-500/10 px-2 py-1 text-[10px] text-primary-200">{tradePathSummaryText(pathSummary, isKo)}</span>}
               </div>}
             </div>
-            <button type="button" onClick={onClose} className="shrink-0 text-dark-400 transition-colors hover:text-white" title={isKo ? '닫기' : 'Close'}><X className="h-5 w-5" /></button>
+            <div className="flex shrink-0 items-center gap-2">
+              {isClosedPosition(entry) && entry.id != null && (
+                <button
+                  type="button"
+                  onClick={() => requestExit('plan')}
+                  className="border border-primary-400/35 px-2.5 py-1.5 text-[11px] text-primary-200 transition-colors hover:border-primary-300 hover:text-white"
+                >
+                  {isKo ? '당시 계획 입력' : 'Enter historical plan'}
+                </button>
+              )}
+              <button data-dialog-initial-focus type="button" onClick={() => requestExit('close')} className="btn-icon" title={isKo ? '닫기' : 'Close'} aria-label={isKo ? '닫기' : 'Close'}><X className="h-4 w-4" aria-hidden="true" /></button>
+            </div>
           </div>
         </header>
 
-        <div className="min-h-0 flex-1 overflow-y-auto lg:grid lg:grid-cols-[minmax(0,2.2fr)_minmax(340px,1fr)]">
-          <main className="min-w-0 space-y-4 p-3 sm:p-5 lg:border-r lg:border-dark-700">
+        <div className={`min-h-0 flex-1 overflow-y-auto ${hasPriceChart ? 'lg:grid lg:grid-cols-[minmax(0,2.2fr)_minmax(340px,1fr)]' : ''}`}>
+          <main className={`min-w-0 space-y-4 p-3 sm:p-5 ${hasPriceChart ? 'lg:border-r lg:border-dark-700' : ''}`}>
             <section>
-              <div className="mb-3 flex flex-col gap-3 border-y border-dark-700 py-3 sm:flex-row sm:items-center sm:justify-between">
+              {!sample && <div className="mb-3 flex flex-col gap-3 border-y border-dark-700 py-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="grid grid-cols-3 border border-dark-700 bg-dark-900/40 p-1 sm:grid-cols-9">
                   {REPORT_INTERVALS.map((interval) => <button key={interval} type="button" onClick={() => setReportInterval(interval)} className={`min-w-0 px-2.5 py-1.5 text-xs font-semibold uppercase transition-colors sm:min-w-14 ${reportInterval === interval ? 'bg-primary-500 text-white' : 'text-dark-400 hover:text-white'}`}>{interval}</button>)}
                 </div>
                 <div className="text-[11px] text-dark-500">{reportQuery.data?.source || 'Binance USDT-M Futures'} · {candleLimit}{isKo ? '봉' : ' bars'}{reportQuery.data?.profile_as_of ? ` · VPVR/VWAP ${new Date(reportQuery.data.profile_as_of).toLocaleString()}` : ''}</div>
-              </div>
+              </div>}
 
-              {reportQuery.isLoading ? (
-                <div className="flex h-[520px] items-center justify-center gap-2 border border-dark-700 bg-[#0b1220] text-sm text-dark-400"><Loader2 className="h-4 w-4 animate-spin" />{isKo ? '거래 리포트 불러오는 중' : 'Loading trade report'}</div>
+              {sample ? <div className="rounded border border-dark-700 p-5 text-sm text-dark-300">{isKo ? '가상의 샘플 거래입니다. 실시간 가격 차트는 제공하지 않습니다. 거래의 전략, 심리와 계획 기록을 살펴보세요.' : 'This is a synthetic sample trade. Live price charts are unavailable. Explore the recorded strategy, psychology and plan.'}</div> : reportQuery.isLoading ? (
+                <div className="flex h-[520px] items-center justify-center gap-2 border border-dark-700 bg-dark-900 text-sm text-dark-400"><Loader2 className="h-4 w-4 animate-spin" />{isKo ? '거래 리포트 불러오는 중' : 'Loading trade report'}</div>
               ) : reportQuery.isError ? (
-                <div className="flex h-48 items-center justify-center border border-dark-700 bg-[#0b1220] px-5 text-sm text-bear"><AlertCircle className="mr-2 h-4 w-4" />{isKo ? '거래 리포트 데이터를 불러오지 못했습니다.' : 'Could not load trade report data.'}</div>
+                <div className="flex h-48 items-center justify-center border border-dark-700 bg-dark-900 px-5 text-sm text-bear"><AlertCircle className="mr-2 h-4 w-4" />{isKo ? '거래 리포트 데이터를 불러오지 못했습니다.' : 'Could not load trade report data.'}</div>
               ) : reportQuery.data?.candles.length ? (
                 <div className="space-y-4">
                   {!Number.isFinite(referenceMs) && <div className="border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-xs text-amber-200">{isKo ? '진입시간 확인 불가: 캔들은 표시하지만 진입 시점 VPVR/VWAP는 계산하지 않습니다.' : 'Entry time unavailable: candles are shown without entry-time VPVR/VWAP.'}</div>}
-                  <PositionReviewChart data={reportQuery.data.candles} direction={entry.direction} entryTime={resolvedEntryTime.datetime} entryTimeConfidence={resolvedEntryTime.confidence} exitTime={entry.datetime as string} entryPrice={entry.entry_price} exitPrice={entry.exit_price} entryEvents={splitEntryMarkers} takeProfitEvents={tradeMarkerQuery.data?.take_profits || []} pathEvents={pathEvents} />
+                  <PositionReviewChart data={reportQuery.data.candles} direction={entry.direction} entryTime={resolvedEntryTime.datetime} entryTimeConfidence={resolvedEntryTime.confidence} exitTime={entry.datetime as string} entryPrice={entry.entry_price} exitPrice={entry.exit_price} entryEvents={splitEntryMarkers} takeProfitEvents={tradeMarkerQuery.data?.take_profits || exchangeExitMarkers} pathEvents={pathEvents} />
                   {tradeMarkerQuery.data?.warnings.map((warning) => <div key={warning} className="border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-xs text-amber-200">{warning}</div>)}
                   <TradeIndicatorCharts series={reportQuery.data.series} latest={reportQuery.data.latest} entryTime={resolvedEntryTime.datetime} exitTime={entry.datetime || null} referenceLabel={reviewMoment === 'entry' ? 'ENTRY' : 'EXIT'} />
                 </div>
-              ) : <div className="flex h-48 items-center justify-center border border-dark-700 bg-[#0b1220] text-sm text-dark-500">{isKo ? '표시할 거래 리포트 데이터가 없습니다.' : 'No trade report data is available.'}</div>}
+              ) : <div className="flex h-48 items-center justify-center border border-dark-700 bg-dark-900 text-sm text-dark-500">{isKo ? '표시할 거래 리포트 데이터가 없습니다.' : 'No trade report data is available.'}</div>}
             </section>
           </main>
 
-          <aside className="min-w-0 space-y-4 bg-dark-950/25 p-3 sm:p-5">
+          <aside className={`min-w-0 bg-dark-950/25 p-3 sm:p-5 ${hasPriceChart ? 'space-y-4' : 'grid items-start gap-4 md:grid-cols-2'}`}>
             <CompactSection title={isKo ? '거래 세부 정보' : 'Trade Details'}>
               <div className="grid grid-cols-2 gap-2">{tradeDetailMetrics.map((metric) => <CompactMetric key={metric.label} {...metric} />)}</div>
             </CompactSection>
@@ -550,7 +660,7 @@ export default function TradeReportModal({
 
             {reportQuery.data && <TradeReferenceSummary vpvr={reportQuery.data.vpvr} vwaps={reportQuery.data.vwaps} isKo={isKo} />}
 
-            <CompactSection title={isKo ? '진입 · 종료 시점 지표' : 'Entry · Exit Indicator Snapshot'}>
+            <CompactSection collapsible title={isKo ? '진입 · 종료 시점 지표' : 'Entry · Exit Indicator Snapshot'}>
               <p className="mb-3 text-[10px] leading-4 text-dark-500">
                 {isKo
                   ? '보조지표는 Binance USDT-M Futures 가격 데이터를 기준으로 계산·갱신됩니다.'
@@ -567,16 +677,43 @@ export default function TradeReportModal({
               </> : <div className="mt-3 text-xs text-dark-500">{isKo ? '이 거래의 지표 스냅샷이 없습니다.' : 'This trade has no indicator snapshot.'}</div>}
             </CompactSection>
 
-            {isClosedPosition(entry) && <CompactSection title={isKo ? '보유 후 복기' : 'Post-Exit Review'}>
+            {isClosedPosition(entry) && <CompactSection collapsible title={isKo ? '보유 후 복기' : 'Post-Exit Review'}>
               {pathQuery.isLoading ? <div className="flex items-center gap-2 text-xs text-dark-500"><Loader2 className="h-3.5 w-3.5 animate-spin" />{isKo ? '실제 보유 구간의 가격 흐름을 계산 중' : 'Calculating the price path during the position'}</div> : pathSummary ? <><div className="text-xs font-semibold leading-5 text-dark-200">{tradePathSummaryText(pathSummary, isKo)}</div><div className="mt-1 text-[10px] text-dark-500">{pathSummary.interval} {isKo ? '봉의 실제 보유 구간만 사용 · 봉 고가/저가 기준 · 수수료·펀딩 제외' : 'bars fully inside holding period · high/low basis · fees and funding excluded'}{pathQuery.data?.source ? ` · ${pathQuery.data.source}` : ''}</div></> : <div className="text-xs text-dark-500">{pathConfig == null ? (isKo ? '보유 시간이 길거나 진입·청산 시간이 없어 가격 흐름을 계산하지 못했습니다.' : 'The holding period is too long or entry/exit timing is unavailable.') : pathQuery.isError ? (isKo ? '가격 흐름 데이터를 불러오지 못했습니다.' : 'Could not load the price path data.') : (isKo ? '이 거래의 보유 후 복기 데이터가 없습니다.' : 'This trade has no post-exit review data.')}</div>}
               <div className="mt-3"><TradeExitReview qualityItem={qualityItem} isKo={isKo} /></div>
             </CompactSection>}
 
-            {isClosedPosition(entry) && <TradeBehaviorEditor entry={entry} isKo={isKo} onUpdated={onBehaviorUpdated} />}
-            {entry.notes && <CompactSection title={isKo ? '메모' : 'Memo'}><p className="whitespace-pre-wrap text-xs leading-5 text-dark-300">{entry.notes}</p></CompactSection>}
+            {entry.id != null && <StrategyAssignmentEditor
+              entryId={entry.id}
+              isKo={isKo}
+              onDirtyChange={setAssignmentDirty}
+              onViewPlaybook={() => requestExit('playbook')}
+            />}
+
+            {entry.id != null && <RuleAdherencePanel entryId={entry.id} isKo={isKo} />}
+
+            {isClosedPosition(entry) && entry.id != null && <PlanningContextPanel key={entry.id} entryId={entry.id} isKo={isKo}
+              onOpenPlan={() => requestExit('plan')}
+              onStartPlan={(_, confirmed) => requestExit(confirmed ? 'plan-prefill-price' : 'plan-prefill')} />}
+            {isClosedPosition(entry) && <TradeBehaviorEditor
+              entry={entry}
+              isKo={isKo}
+              onUpdated={onBehaviorUpdated}
+              onDirtyChange={setBehaviorDirty}
+            />}
           </aside>
         </div>
       </div>
+      {pendingExit && <UnsavedChangesDialog
+        isKo={isKo}
+        onKeepEditing={() => setPendingExit(null)}
+        onDiscard={() => {
+          const exit = pendingExit;
+          setPendingExit(null);
+          setAssignmentDirty(false);
+          setBehaviorDirty(false);
+          completeExit(exit);
+        }}
+      />}
     </div>
   );
 }

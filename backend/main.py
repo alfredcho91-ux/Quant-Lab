@@ -8,6 +8,7 @@ import os
 import time
 import logging
 import secrets
+from contextlib import asynccontextmanager
 from typing import Optional
 
 from fastapi import FastAPI, Request, Depends, HTTPException, status
@@ -15,10 +16,10 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import ORJSONResponse
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
-from fastapi.staticfiles import StaticFiles
 from backend.config.settings import (
     CORS_ORIGINS,
-    PROJECT_ROOT,
+    FRONTEND_DIST_DIR,
+    IS_FROZEN,
     get_app_environment,
     get_basic_auth_credentials,
 )
@@ -37,6 +38,19 @@ from backend.modules.deepcoin.router import router as deepcoin_router
 from backend.modules.indicators.router import router as indicators_router
 from backend.modules.plan_lab.router import router as plan_lab_router
 from backend.utils.log_redaction import install_log_redaction
+from backend.config.sample_policy import IS_SAMPLE, install_offline_boundary
+from backend.modules.analytics.router import router as analytics_router
+from backend.modules.review.router import router as review_router
+from backend.modules.experiments.router import router as experiments_router
+from backend.modules.experiments.repository import initialize_schema as initialize_experiment_schema
+from backend.modules.exchanges.router import router as exchanges_router
+from backend.modules.rule_engine.router import router as rule_engine_router
+from backend.modules.strategies.router import router as strategies_router
+from backend.modules.strategy_assignments.router import router as strategy_assignments_router
+from backend.modules.strategy_assignments.repository import initialize_schema as initialize_assignment_schema
+from backend.modules.sample.workspace import router as workspace_router, sample_process
+from backend.utils.local_request_security import LocalRequestSecurityMiddleware
+from backend.utils.frontend_static import FrontendStaticFiles
 
 install_log_redaction()
 
@@ -45,6 +59,20 @@ security = HTTPBasic(auto_error=False)
 # Production credentials must be present before the application can accept traffic.
 if get_app_environment() == "production":
     get_basic_auth_credentials()
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    if IS_SAMPLE:
+        install_offline_boundary()
+        from backend.modules.sample.fixture import build_fixture
+        build_fixture()
+    initialize_assignment_schema()
+    initialize_experiment_schema()
+    try:
+        yield
+    finally:
+        sample_process.close()
 
 
 def verify_credentials(
@@ -86,6 +114,7 @@ app = FastAPI(
     version="1.0.0",
     default_response_class=ORJSONResponse,  # orjson 사용으로 JSON 직렬화 성능 향상
     dependencies=[Depends(verify_credentials)],
+    lifespan=lifespan,
 )
 
 LOG_LEVEL = os.getenv("APP_LOG_LEVEL", "INFO").upper()
@@ -104,6 +133,34 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(LocalRequestSecurityMiddleware)
+
+
+@app.middleware("http")
+async def sample_exchange_boundary(request: Request, call_next):
+    journal_api = ("/api/health", "/api/desktop/", "/api/workspace", "/api/journal", "/api/plans", "/api/plan-lab", "/api/playbook/", "/api/rule-engine/", "/api/analytics/", "/api/review/", "/api/experiments", "/api/exchanges", "/api/deepcoin", "/api/indicators/")
+    if IS_SAMPLE and request.url.path.startswith("/api/") and not request.url.path.startswith(journal_api):
+        return ORJSONResponse(status_code=403, content={"success": False, "error": "Quant research tools are unavailable in the journal sample workspace", "error_code": "SAMPLE_OFFLINE"})
+    if IS_SAMPLE and request.url.path.startswith(("/api/exchanges", "/api/deepcoin")) and request.method != "GET":
+        return ORJSONResponse(status_code=403, content={"success": False, "error": "Exchange connections and sync are disabled in the sample workspace", "error_code": "SAMPLE_OFFLINE"})
+    return await call_next(request)
+
+
+@app.get("/api/health", dependencies=[])
+def health():
+    return {"success": True, "data": {"service": "quant-lab"}}
+
+
+@app.post("/api/desktop/shutdown", dependencies=[])
+def desktop_shutdown(request: Request):
+    client_host = request.client.host if request.client else ""
+    if client_host not in {"127.0.0.1", "::1", "testclient"}:
+        raise HTTPException(status_code=403, detail="Local requests only")
+    server = getattr(request.app.state, "desktop_server", None)
+    if server is None:
+        raise HTTPException(status_code=409, detail="Desktop shutdown is unavailable")
+    server.should_exit = True
+    return {"success": True, "data": {"shutting_down": True}}
 
 
 @app.exception_handler(RequestValidationError)
@@ -181,11 +238,21 @@ app.include_router(deepcoin_router)  # /api/deepcoin/*
 app.include_router(ai_lab_router)  # /api/ai/research
 app.include_router(indicators_router)  # /api/indicators
 app.include_router(plan_lab_router)  # /api/plans and /api/plan-lab
+app.include_router(workspace_router)
+app.include_router(strategies_router)
+app.include_router(strategy_assignments_router)
+app.include_router(rule_engine_router)
+app.include_router(analytics_router)
+app.include_router(review_router)
+app.include_router(experiments_router)
+app.include_router(exchanges_router)
 
 # Serve frontend static files
-frontend_dist = PROJECT_ROOT / "frontend" / "dist"
-frontend_dist.mkdir(parents=True, exist_ok=True)
-app.mount("/", StaticFiles(directory=str(frontend_dist), html=True), name="frontend")
+if not FRONTEND_DIST_DIR.exists() and not IS_FROZEN:
+    FRONTEND_DIST_DIR.mkdir(parents=True, exist_ok=True)
+if not FRONTEND_DIST_DIR.is_dir():
+    raise RuntimeError("Quant Lab frontend files are missing from this installation.")
+app.mount("/", FrontendStaticFiles(directory=str(FRONTEND_DIST_DIR), html=True), name="frontend")
 
 
 if __name__ == "__main__":

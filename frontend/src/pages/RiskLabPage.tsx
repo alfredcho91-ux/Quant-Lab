@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { ChevronDown, ShieldAlert } from 'lucide-react';
+import { ChevronDown, Loader2, ShieldAlert } from 'lucide-react';
 
 import { getJournal, getJournalQualityAnalysis, getJournalStopLossAnalysis, getJournalStopOptimization } from '../api/client';
+import { buildAnalyzedTrades } from '../features/tradeAnalysis/tradeAnalysis';
 import SlTpExpectationAnalysis from '../features/tradeAnalysis/SlTpExpectationAnalysis';
 import StopLossAnalysis from '../features/tradeAnalysis/StopLossAnalysis';
 import StopLossExpectationTool from '../features/tradeAnalysis/StopLossExpectationTool';
 import StopOptimizationAnalysis from '../features/tradeAnalysis/StopOptimizationAnalysis';
-import { buildAnalyzedTrades } from '../features/tradeAnalysis/tradeAnalysis';
 import { journalQueryKeys } from '../features/journal/journalQueryKeys';
 import {
   buildJournalPeriod,
@@ -17,20 +17,20 @@ import {
   toDateInputValue,
   type JournalPeriod,
 } from '../features/journal/journalPeriod';
-import { usePageCommon } from '../hooks/usePageCommon';
+import { useLanguage } from '../store/useStore';
 
 type DirectionFilter = 'Long' | 'Short';
 
 const DEFAULT_ANALYSIS_DAYS = 90;
 
 export default function RiskLabPage() {
-  const { isKo } = usePageCommon();
+  const isKo = useLanguage() === 'ko';
   const [period, setPeriod] = useState<JournalPeriod>(() => buildJournalPeriod(DEFAULT_ANALYSIS_DAYS));
   const [draftPeriod, setDraftPeriod] = useState<JournalPeriod>(() => buildJournalPeriod(DEFAULT_ANALYSIS_DAYS));
   const [usesRollingPeriod, setUsesRollingPeriod] = useState(true);
   const [direction, setDirection] = useState<DirectionFilter>('Long');
   const [periodError, setPeriodError] = useState<string | null>(null);
-  const [stopDetailsOpen, setStopDetailsOpen] = useState(false);
+  const [stopDetailsOpen, setStopDetailsOpen] = useState(true);
   const lastDailyRefreshDateRef = useRef(toDateInputValue(new Date()));
 
   const { data: entries = [], isLoading: isJournalLoading, refetch: refetchJournal } = useQuery({
@@ -143,8 +143,8 @@ export default function RiskLabPage() {
     <div className="space-y-4">
       <header className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <h1 className="flex items-center gap-2 text-xl font-bold text-white"><ShieldAlert className="h-5 w-5 text-amber-300" />Risk Lab</h1>
-          <div className="mt-1 text-xs text-dark-500">{period.start} ~ {period.end} · {isKo ? '종료 포지션 위험 관리 복기' : 'Risk review of closed positions'}</div>
+          <h1 className="flex items-center gap-2 text-xl font-bold text-white"><ShieldAlert className="h-5 w-5 text-amber-300" />{isKo ? '리스크 랩' : 'Risk Lab'}</h1>
+          <div className="mt-1 text-xs text-dark-500">{period.start} ~ {period.end} · {isKo ? '연결 거래소 종료 포지션의 위험 관리 복기' : 'Risk review of connected exchange closed positions'}</div>
         </div>
         <div className="flex flex-wrap items-end gap-2">
           <button type="button" onClick={applyRollingPeriod} className="border border-dark-700 bg-dark-800 px-3 py-2 text-xs text-dark-300 hover:text-white">{DEFAULT_ANALYSIS_DAYS}{isKo ? '일' : 'D'}</button>
@@ -175,6 +175,7 @@ export default function RiskLabPage() {
           <span className="flex items-center gap-2 text-[11px] text-dark-500">{direction.toUpperCase()} · {stopLossQuery.data?.direction_breakdown[direction].summary.confirmed_stop_count || 0}{isKo ? '개 확정 손절' : ' confirmed stops'}<ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180" /></span>
         </summary>
         <div className="mt-3 space-y-3">
+          {stopDetailsOpen && (stopLossQuery.isLoading || stopOptimizationQuery.isLoading) && <div className="flex items-center gap-2 text-xs text-dark-400"><Loader2 className="h-4 w-4 animate-spin" />{isKo ? '손절 데이터를 계산 중입니다.' : 'Calculating stop data.'}</div>}
           <StopLossAnalysis data={stopLossQuery.data} direction={direction} isLoading={stopLossQuery.isLoading || stopLossQuery.isFetching} isError={stopLossQuery.isError} isKo={isKo} onRetry={() => void stopLossQuery.refetch()} />
           <StopOptimizationAnalysis data={stopOptimizationQuery.data} direction={direction} isLoading={stopOptimizationQuery.isLoading || stopOptimizationQuery.isFetching} isError={stopOptimizationQuery.isError} isKo={isKo} onRetry={() => void stopOptimizationQuery.refetch()} />
         </div>

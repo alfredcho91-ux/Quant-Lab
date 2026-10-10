@@ -77,7 +77,7 @@ class RetrospectivePlanCreate(BaseModel):
 
 
 class InTradePlanCreate(BaseModel):
-    """Plan recorded after a confirmed live entry, before final exit."""
+    """Plan recorded after a confirmed live entry, before its final exit."""
 
     exchange: str = Field(min_length=1, max_length=40)
     position_id: str = Field(min_length=1, max_length=160)

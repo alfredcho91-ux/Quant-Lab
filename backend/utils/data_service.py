@@ -15,9 +15,10 @@ import logging
 import hashlib
 import json
 from functools import wraps
-from typing import Optional
+from typing import Any, Optional, Sequence
 
 from backend.utils.cache import DataCache
+from backend.config.sample_policy import IS_SAMPLE, SAMPLE_ROOT
 
 # 로깅 설정
 logger = logging.getLogger(__name__)
@@ -30,7 +31,25 @@ BINANCE_TFS = [
 ]
 MARKET_TICKER_SYMBOLS = ("BTC/USDT", "ETH/USDT", "SOL/USDT")
 
-BASE_DIR = Path(__file__).parent.parent.parent / "binance_klines"
+# Binance USDT-M kline payload indexes.  ``volume`` is the canonical OHLCV
+# volume field; the remaining volume fields stay available for consumers that
+# need exchange-specific context such as VPVR.
+BINANCE_USDT_M_KLINE_COLUMNS = (
+    "open_time",
+    "open",
+    "high",
+    "low",
+    "close",
+    "volume",
+    "close_time",
+    "quote_volume",
+    "trade_count",
+    "taker_buy_base_volume",
+    "taker_buy_quote_volume",
+    "ignore",
+)
+
+BASE_DIR = SAMPLE_ROOT / "market" if IS_SAMPLE else Path(__file__).parent.parent.parent / "binance_klines"
 
 
 def _tf_weight(tf: str) -> int:
@@ -91,7 +110,7 @@ def discover_timeframes(coin_name: str, base_dir: Path = BASE_DIR):
                     csv_tfs.add(m.group(1))
     except OSError as exc:
         logger.warning("Failed to scan timeframe CSV files for %s: %s", coin_name, exc)
-    
+
     all_tfs = sorted(set(BINANCE_TFS) | csv_tfs, key=_tf_weight)
     return all_tfs, set(BINANCE_TFS), sorted(csv_tfs, key=_tf_weight)
 
@@ -99,6 +118,8 @@ def discover_timeframes(coin_name: str, base_dir: Path = BASE_DIR):
 @cached(ttl_seconds=300)
 def get_fear_and_greed_index():
     """Get Fear & Greed Index from alternative.me API"""
+    if IS_SAMPLE:
+        return None
     try:
         r = requests.get("https://api.alternative.me/fng/", timeout=5)
         r.raise_for_status()
@@ -112,6 +133,8 @@ def get_fear_and_greed_index():
 @cached(ttl_seconds=30)
 def get_market_prices():
     """Get market prices from Binance"""
+    if IS_SAMPLE:
+        return None
     try:
         ex = ccxt.binance()
         return ex.fetch_tickers(list(MARKET_TICKER_SYMBOLS))
@@ -143,6 +166,8 @@ def fetch_binance_klines(
     ``end_time`` is a Unix timestamp in milliseconds.  It permits historical
     point-in-time analyses without changing the recent-candle callers.
     """
+    if IS_SAMPLE:
+        return None
     if timeframe not in BINANCE_TFS:
         raise ValueError(f"Unsupported Binance interval: {timeframe}")
 
@@ -186,73 +211,95 @@ def fetch_binance_klines(
         if not rows:
             return None
 
-        columns = [
-            "open_time",
-            "open",
-            "high",
-            "low",
-            "close",
-            "volume",
-            "close_time",
-            "quote_volume",
-            "trade_count",
-            "taker_buy_base_volume",
-            "taker_buy_quote_volume",
-            "ignore",
-        ]
-        df = pd.DataFrame(rows, columns=columns)
-        df.drop_duplicates(subset=["open_time"], inplace=True)
-        df.sort_values("open_time", inplace=True)
-        df = df.tail(requested_candles).reset_index(drop=True)
-
-        int_columns = ["open_time", "close_time", "trade_count"]
-        float_columns = [
-            "open",
-            "high",
-            "low",
-            "close",
-            "volume",
-            "quote_volume",
-            "taker_buy_base_volume",
-            "taker_buy_quote_volume",
-        ]
-        for column in int_columns + float_columns:
-            df[column] = pd.to_numeric(df[column], errors="coerce")
-        df.dropna(subset=["open_time", "open", "high", "low", "close", "volume"], inplace=True)
-        df["open_time"] = df["open_time"].astype("int64")
-        df["close_time"] = df["close_time"].astype("int64")
-        df["trade_count"] = df["trade_count"].astype("int64")
-        df["open_dt"] = pd.to_datetime(df["open_time"], unit="ms")
-        return df
+        return normalize_binance_usdt_m_klines(rows, requested_candles)
     except (requests.RequestException, ValueError, TypeError) as exc:
         logger.warning("Binance Kline request failed for %s %s: %s", normalized_symbol, timeframe, exc)
         return None
+
+
+def normalize_binance_usdt_m_klines(
+    rows: Sequence[Sequence[Any]],
+    requested_candles: int,
+) -> Optional[pd.DataFrame]:
+    """Normalize raw Binance USDT-M klines without inventing volume values.
+
+    Binance normally supplies all canonical OHLCV values.  If a malformed raw
+    row has no numeric volume, the candle is unavailable and is excluded rather
+    than being converted to a zero-volume candle.  A genuine numeric ``0``
+    remains a valid value and is preserved.
+    """
+    if not rows:
+        return None
+
+    df = pd.DataFrame(rows, columns=BINANCE_USDT_M_KLINE_COLUMNS)
+    df.drop_duplicates(subset=["open_time"], inplace=True)
+    df.sort_values("open_time", inplace=True)
+    df = df.tail(max(1, int(requested_candles))).reset_index(drop=True)
+
+    int_columns = ["open_time", "close_time", "trade_count"]
+    float_columns = [
+        "open",
+        "high",
+        "low",
+        "close",
+        "volume",
+        "quote_volume",
+        "taker_buy_base_volume",
+        "taker_buy_quote_volume",
+    ]
+    for column in int_columns + float_columns:
+        df[column] = pd.to_numeric(df[column], errors="coerce")
+
+    unavailable_volume = df["volume"].isna()
+    missing_volume_close_times = [
+        int(value)
+        for value in df.loc[unavailable_volume, "close_time"].tolist()
+        if pd.notna(value)
+    ]
+    if unavailable_volume.any():
+        logger.warning(
+            "Discarding %s Binance USDT-M kline(s) with unavailable volume",
+            int(unavailable_volume.sum()),
+        )
+    df.dropna(subset=["open_time", "open", "high", "low", "close", "volume"], inplace=True)
+    if df.empty:
+        return None
+    df["open_time"] = df["open_time"].astype("int64")
+    df["close_time"] = df["close_time"].astype("int64")
+    df["trade_count"] = df["trade_count"].astype("int64")
+    df["open_dt"] = pd.to_datetime(df["open_time"], unit="ms")
+    result = df.reset_index(drop=True)
+    # Keep malformed-volume candle identities out of every existing indicator
+    # input while retaining enough point-in-time metadata for RVOL20 to reject
+    # an incomplete 20+1 volume window instead of silently shifting backwards.
+    result.attrs["missing_volume_close_times"] = missing_volume_close_times
+    return result
 
 
 def load_csv_data(coin_name: str, interval: str, base_dir: Path = BASE_DIR):
     """Load historical data from local CSV files"""
     # coin_name에서 USDT 접미사 제거 (중복 방지)
     coin_name = coin_name.replace("USDT", "").replace("usdt", "")
-    
+
     # interval 매핑 (API 표기 → CSV 파일명 표기)
     interval_map = {
         "1M": "1mo",  # 월봉: API는 1M, CSV는 1mo
     }
     csv_interval = interval_map.get(interval, interval)
-    
+
     fp = base_dir / f"{coin_name}USDT-{csv_interval}-merged.csv"
-    
+
     if not fp.exists():
         return None, str(fp)
-    
+
     try:
         df = pd.read_csv(fp)
         df.columns = df.columns.str.strip().str.lower()
-        
+
         ot = pd.to_numeric(df["open_time"], errors="coerce")
         if (ot > 2_000_000_000_000).any():
             ot = np.where(ot > 2_000_000_000_000, ot // 1000, ot)
-        
+
         df["open_time"] = ot
         df["open_dt"] = pd.to_datetime(df["open_time"], unit="ms")
         df.sort_values("open_dt", inplace=True)

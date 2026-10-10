@@ -1,4 +1,4 @@
-import type { Strategy } from '../../../../types';
+import type { BacktestStrategy as Strategy } from '../../../../types';
 import type { Direction } from '../../types';
 
 interface StrategyControlsSectionProps {

@@ -19,7 +19,7 @@ export function formatSnapshotNumber(
   maximumFractionDigits = 2,
 ): string {
   if (value == null || !Number.isFinite(value)) return '-';
-  return value.toLocaleString(undefined, { maximumFractionDigits });
+  return value.toLocaleString(undefined, { maximumFractionDigits: Math.min(2, maximumFractionDigits) });
 }
 
 export function formatRvol20(value: number | null | undefined): string {
@@ -28,13 +28,13 @@ export function formatRvol20(value: number | null | undefined): string {
 
 export function entryRvol20(entry: JournalEntry | undefined, entries: JournalEntry[]): number | null {
   if (!entry) return null;
-  const resolved = resolvePositionEntryTime(entry, entries).matchedEntry?.indicator_snapshot;
+  const matchedSnapshot = resolvePositionEntryTime(entry, entries).matchedEntry?.indicator_snapshot;
   const ownSnapshot = entry.indicator_snapshot;
   const ownSnapshotIsEntry = ownSnapshot?.event_type === 'position_entry'
     || ownSnapshot?.event_type === 'fill'
     || ownSnapshot?.reference?.includes('_position_entry')
     || ownSnapshot?.reference?.includes('_fill');
-  const snapshot = resolved || (ownSnapshotIsEntry ? ownSnapshot : null);
+  const snapshot = matchedSnapshot || (ownSnapshotIsEntry ? ownSnapshot : null);
   const value = snapshot?.timeframes?.['4h']?.rvol20;
   return value != null && Number.isFinite(value) ? value : null;
 }

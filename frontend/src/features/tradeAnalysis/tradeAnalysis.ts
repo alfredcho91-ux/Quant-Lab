@@ -6,6 +6,7 @@ import type {
 import { resolvePositionEntryTime, type EntryTimeConfidence } from '../../utils/positionReview';
 import { isClosedPosition } from '../journal/journalEntries';
 import { feeImpact, fundingImpact, netReturnPct } from '../journal/journalReturns';
+import { sampleQuality } from './statisticalConfidence';
 
 export const ANALYSIS_TIMEFRAMES = ['1h', '2h', '4h', '1d'] as const;
 export type AnalysisTimeframe = (typeof ANALYSIS_TIMEFRAMES)[number];
@@ -65,7 +66,9 @@ export interface ConditionComparison {
   lossCount: number;
   winMatched: number;
   lossMatched: number;
-  lift: number | null;
+  conditionCount: number;
+  conditionalWinRate: number | null;
+  occurrenceRatio: number | null;
 }
 
 export interface ReturnRangeBreakdown {
@@ -351,9 +354,24 @@ export function conditionComparisons(
       lossCount: loss.available,
       winMatched: win.matched,
       lossMatched: loss.matched,
-      lift: loss.frequency > 0 ? win.frequency / loss.frequency : null,
+      conditionCount: win.matched + loss.matched,
+      conditionalWinRate: win.matched + loss.matched > 0
+        ? (win.matched / (win.matched + loss.matched)) * 100
+        : null,
+      occurrenceRatio: loss.frequency > 0 ? win.frequency / loss.frequency : null,
     }];
   }).sort((a, b) => Math.abs(b.difference) - Math.abs(a.difference));
+}
+
+export function strongestReliableCondition(conditions: ConditionComparison[]): ConditionComparison | null {
+  return [...conditions]
+    .filter((condition) => (
+      sampleQuality(Math.min(condition.winCount, condition.lossCount)) !== 'low'
+      && condition.occurrenceRatio != null
+      && condition.occurrenceRatio >= 1.2
+      && condition.difference >= 10
+    ))
+    .sort((left, right) => right.difference - left.difference)[0] || null;
 }
 
 export function filterTradesByIndicatorMetric(
@@ -364,8 +382,9 @@ export function filterTradesByIndicatorMetric(
   const metric = INDICATOR_METRICS.find((item) => item.id === metricId);
   if (!metric) return [];
   return trades.filter((trade) => {
+    const pnl = finite(trade.entry.realized_pnl);
     const snapshot = snapshotAt(trade, timeframe);
-    return snapshot != null && metric.value(snapshot) != null;
+    return pnl != null && pnl !== 0 && snapshot != null && metric.value(snapshot) != null;
   });
 }
 
@@ -377,8 +396,9 @@ export function filterTradesByCondition(
   const condition = CONDITIONS.find((item) => item.id === conditionId);
   if (!condition) return [];
   return trades.filter((trade) => {
+    const pnl = finite(trade.entry.realized_pnl);
     const snapshot = snapshotAt(trade, timeframe);
-    return snapshot != null && condition.test(snapshot) === true;
+    return pnl != null && pnl !== 0 && snapshot != null && condition.test(snapshot) === true;
   });
 }
 

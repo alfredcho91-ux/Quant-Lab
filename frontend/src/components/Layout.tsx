@@ -15,7 +15,7 @@ export default function Layout({ children }: { children: ReactNode }) {
   }, [backgroundTheme]);
 
   return (
-    <div className="flex min-h-screen">
+    <div className="flex min-h-screen overflow-x-clip">
       <Sidebar />
       <main
         className={`min-w-0 flex-1 transition-all duration-300 ${

@@ -208,6 +208,7 @@ def test_split_plan_does_not_silently_use_tp1_only_post_exit_analysis():
 
     assert result["planned_result_r"] == 2.0
     assert result["post_exit_outcome"] == "NOT_EVALUABLE"
+    assert result["primary_execution_category"] == "NOT_EVALUABLE"
 
 
 def test_evaluation_uses_official_usdt_r_and_tp_first():

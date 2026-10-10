@@ -23,3 +23,5 @@ export * from './streak';
 // 매매 일지
 export * from './journal';
 export * from './planLab';
+export * from './strategyAssignment';
+export * from './ruleEvaluation';

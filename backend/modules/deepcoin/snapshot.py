@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import math
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional, Protocol
+from typing import Any, Dict, List, Optional, Protocol, Tuple
 
 import pandas as pd
 import requests
@@ -58,7 +58,13 @@ def _json_number(value: Any) -> Optional[float]:
 
 
 def _entry_rvol20(completed: pd.DataFrame) -> Optional[float]:
-    """Return RVOL20 from the last completed candle and its 20 predecessors."""
+    """Return entry RVOL20 from completed candles only.
+
+    The last completed candle is the numerator. Its own volume is deliberately
+    excluded from the preceding 20-candle baseline so the value remains known
+    at the actual entry time and cannot use an in-progress candle's final
+    volume.
+    """
     if "volume" not in completed.columns or len(completed) < RVOL20_WINDOW + 1:
         return None
     volumes = pd.to_numeric(completed["volume"], errors="coerce")
@@ -73,6 +79,35 @@ def _entry_rvol20(completed: pd.DataFrame) -> Optional[float]:
     if average <= 0:
         return None
     return _json_number(reference / average)
+
+
+def _entry_rvol20_for_event(
+    candles: pd.DataFrame,
+    completed: pd.DataFrame,
+    event_timestamp_ms: int,
+) -> Optional[float]:
+    """Reject RVOL20 when a normalized-away missing volume is in its window."""
+    missing_times: List[int] = []
+    for value in candles.attrs.get("missing_volume_close_times", []):
+        parsed = _json_number(value)
+        if parsed is not None and parsed < event_timestamp_ms:
+            missing_times.append(int(parsed))
+
+    if missing_times and "close_time" in completed.columns:
+        valid_times = [
+            int(value)
+            for value in pd.to_numeric(completed["close_time"], errors="coerce").tolist()
+            if _json_number(value) is not None
+        ]
+        latest_window = sorted(
+            [(value, False) for value in valid_times]
+            + [(value, True) for value in missing_times],
+            key=lambda item: item[0],
+        )[-(RVOL20_WINDOW + 1):]
+        if len(latest_window) < RVOL20_WINDOW + 1 or any(item[1] for item in latest_window):
+            return None
+
+    return _entry_rvol20(completed)
 
 
 def snapshot_candle_count(events: List[SnapshotEvent], interval: str) -> int:
@@ -171,7 +206,7 @@ def indicator_snapshot_for_event(
         "anchored_vwap": anchored_vwap,
     }
     if event.event_type in {"fill", "position_entry", "current_market"}:
-        snapshot["rvol20"] = _entry_rvol20(completed)
+        snapshot["rvol20"] = _entry_rvol20_for_event(candles, completed, event.timestamp_ms)
     return snapshot
 
 
@@ -179,7 +214,7 @@ def anchored_vwap_snapshots_for_event(
     frames: Dict[str, Optional[pd.DataFrame]],
     event: SnapshotEvent,
 ) -> Dict[str, Dict[str, object]]:
-    """Build the three report VWAP anchors from their dedicated source frames."""
+    """Build report VWAP anchors from their dedicated completed-candle frames."""
     snapshots: Dict[str, Dict[str, object]] = {}
     for anchor, interval in VWAP_ANCHOR_INTERVALS.items():
         frame = frames.get(interval)
@@ -194,11 +229,13 @@ def anchored_vwap_snapshots_for_event(
 
 def build_indicator_snapshots(events: List[SnapshotEvent]) -> Dict[str, Dict[str, Any]]:
     snapshots: Dict[str, Dict[str, Any]] = {}
-    events_by_coin: Dict[str, List[SnapshotEvent]] = {}
+    events_by_market: Dict[Tuple[str, str, str], List[SnapshotEvent]] = {}
     for event in events:
-        events_by_coin.setdefault(event.coin, []).append(event)
+        exchange = str(getattr(event, "exchange", "Deepcoin") or "Deepcoin")
+        instrument_type = str(getattr(event, "instrument_type", "SWAP") or "SWAP").upper()
+        events_by_market.setdefault((event.coin, exchange, instrument_type), []).append(event)
 
-    for coin, coin_events in events_by_coin.items():
+    for (coin, exchange, instrument_type), coin_events in events_by_market.items():
         frames: Dict[str, Optional[pd.DataFrame]] = {}
         latest_event_time = max(item.timestamp_ms for item in coin_events)
         for interval in SNAPSHOT_INTERVALS:
@@ -208,6 +245,8 @@ def build_indicator_snapshots(events: List[SnapshotEvent]) -> Dict[str, Dict[str
                     interval,
                     total_candles=snapshot_candle_count(coin_events, interval),
                     end_time=latest_event_time,
+                    exchange=exchange,
+                    instrument_type=instrument_type,
                 )
             except (ValueError, requests.RequestException):
                 frames[interval] = None
@@ -228,7 +267,7 @@ def build_indicator_snapshots(events: List[SnapshotEvent]) -> Dict[str, Dict[str
                 "version": SNAPSHOT_VERSION,
                 "market_source": market_source(next((frame for frame in frames.values() if frame is not None), None)),
                 "market_source_fallback": False,
-                "reference": f"last_completed_candle_before_deepcoin_{event.event_type}",
+                "reference": f"last_completed_candle_before_{exchange.lower()}_{event.event_type}",
                 "event_type": event.event_type,
                 "event_time": _timestamp_to_iso(event.timestamp_ms),
                 "timeframes": timeframes,
@@ -250,6 +289,7 @@ __all__ = [
     "SNAPSHOT_INTERVALS",
     "SNAPSHOT_VERSION",
     "SNAPSHOT_VPVR_CANDLES",
+    "anchored_vwap_snapshots_for_event",
     "build_indicator_snapshots",
     "indicator_snapshot_for_event",
     "snapshot_candle_count",

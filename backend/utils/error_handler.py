@@ -6,6 +6,8 @@ import traceback
 import sys
 import logging
 
+from backend.utils.log_redaction import redact_data, redact_text
+
 logger = logging.getLogger(__name__)
 
 
@@ -78,12 +80,12 @@ def create_error_response(
 ) -> Dict[str, Any]:
     """
     표준화된 에러 응답 생성
-    
+
     Args:
         error: 발생한 예외
         include_traceback: traceback 포함 여부
         error_code: 커스텀 에러 코드 (None이면 자동 감지)
-    
+
     Returns:
         표준화된 에러 응답 딕셔너리
     """
@@ -96,26 +98,26 @@ def create_error_response(
         )
         response = {
             "success": False,
-            "error": public_message,
+            "error": redact_text(public_message),
             "error_code": error.error_code,
         }
         if error.details:
-            response["details"] = error.details
+            response["details"] = redact_data(error.details)
         if include_traceback or sys.flags.debug:
-            response["traceback"] = traceback.format_exc()
+            response["traceback"] = redact_text(traceback.format_exc())
         return response
-    
+
     # ValueError인 경우 (검증 에러로 간주)
     if isinstance(error, ValueError):
         response = {
             "success": False,
-            "error": str(error),
+            "error": redact_text(error),
             "error_code": error_code or "VALIDATION_ERROR",
         }
         if include_traceback or sys.flags.debug:
-            response["traceback"] = traceback.format_exc()
+            response["traceback"] = redact_text(traceback.format_exc())
         return response
-    
+
     # 기타 예외
     response = {
         "success": False,
@@ -123,11 +125,11 @@ def create_error_response(
         "error_code": error_code or "INTERNAL_ERROR",
     }
     if include_traceback or sys.flags.debug:
-        response["traceback"] = traceback.format_exc()
-    
+        response["traceback"] = redact_text(traceback.format_exc())
+
     # 에러 로깅
-    logger.error(f"Unhandled error: {error}", exc_info=True)
-    
+    logger.error("Unhandled error: %s", redact_text(error), exc_info=True)
+
     return response
 
 
@@ -138,12 +140,12 @@ def handle_error(
 ) -> Dict[str, Any]:
     """
     에러를 처리하고 표준화된 응답 반환 (create_error_response의 별칭)
-    
+
     Args:
         error: 발생한 예외
         include_traceback: traceback 포함 여부
         error_code: 커스텀 에러 코드
-    
+
     Returns:
         표준화된 에러 응답 딕셔너리
     """

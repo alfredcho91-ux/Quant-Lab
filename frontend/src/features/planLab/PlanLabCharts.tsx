@@ -68,6 +68,7 @@ export function DeltaDistribution({ buckets, onSelect, isKo: _isKo }: {
     <span className="text-[10px] text-dark-500">{bucket.label}</span>
   </button>)}</div>;
 }
+
 export function ActualPlanRows({ rows, onSelect, isKo }: {
   rows: PlanSetupStats[];
   onSelect: (row: PlanSetupStats) => void;

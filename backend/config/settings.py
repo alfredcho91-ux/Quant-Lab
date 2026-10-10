@@ -2,11 +2,83 @@
 """Application settings and configuration"""
 
 import os
+import hashlib
+import shlex
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Optional
 
-PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+from backend.config.sample_policy import IS_SAMPLE, SAMPLE_ROOT
+
+SOURCE_ROOT = Path(__file__).resolve().parent.parent.parent
+IS_FROZEN = bool(getattr(sys, "frozen", False))
+BUNDLE_ROOT = Path(getattr(sys, "_MEIPASS", SOURCE_ROOT))
+
+
+def _default_app_data_dir() -> Path:
+    """Return the per-user writable directory for the packaged application."""
+    if sys.platform == "darwin":
+        return Path.home() / "Library" / "Application Support" / "Quant Lab"
+    if sys.platform == "win32":
+        return Path(os.getenv("APPDATA", str(Path.home()))) / "Quant Lab"
+    return Path(os.getenv("XDG_DATA_HOME", str(Path.home() / ".local" / "share"))) / "quant-lab"
+
+
+APP_DATA_DIR = Path(os.getenv("TRADE_JOURNAL_DATA_DIR", str(_default_app_data_dir()))).expanduser()
+# Source runs keep files beside the project. Packaged runs never write into the application bundle.
+PROJECT_ROOT = APP_DATA_DIR if IS_FROZEN or IS_SAMPLE else SOURCE_ROOT
+FRONTEND_DIST_DIR = BUNDLE_ROOT / "frontend" / "dist" if IS_FROZEN else SOURCE_ROOT / "frontend" / "dist"
+LOCAL_ENV_PATH = PROJECT_ROOT / ".env"
+LOCAL_ENV_KEYS_LOADED: set[str] = set()
+
+
+def _profile_path(value) -> str:
+    return os.path.normcase(str(Path(value).expanduser().resolve()))
+
+
+def _local_env_owned() -> bool:
+    """A redirected DB/profile must not inherit the default profile's .env."""
+    return not IS_SAMPLE and (
+        _profile_path(APP_DATA_DIR) == _profile_path(_default_app_data_dir())
+        and _profile_path(os.getenv("TRADE_JOURNAL_DATA_DIR", str(APP_DATA_DIR))) == _profile_path(_default_app_data_dir())
+        and _profile_path(os.getenv("JOURNAL_DIR", str(PROJECT_ROOT / "journal"))) == _profile_path(PROJECT_ROOT / "journal")
+        and _profile_path(os.getenv("JOURNAL_DB_PATH", str(PROJECT_ROOT / "journal" / "trade_journal.db"))) == _profile_path(PROJECT_ROOT / "journal" / "trade_journal.db")
+    )
+
+
+def _load_local_env() -> None:
+    """Load persisted credentials without overriding explicit environment values."""
+    if not _local_env_owned() or not LOCAL_ENV_PATH.is_file():
+        return
+
+    for raw_line in LOCAL_ENV_PATH.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        try:
+            parts = shlex.split(line, comments=True, posix=True)
+        except ValueError:
+            continue
+        if len(parts) != 1 or "=" not in parts[0]:
+            continue
+        key, value = parts[0].split("=", 1)
+        if key and key.replace("_", "").isalnum():
+            if key not in os.environ:
+                os.environ[key] = value
+                LOCAL_ENV_KEYS_LOADED.add(key)
+
+    # A path override loaded from this file also changes ownership. Do not let
+    # the former profile's credentials/key follow it into the new one. Retain
+    # non-secret configuration (especially APP_ENV; never downgrade auth mode).
+    if not _local_env_owned():
+        for key in tuple(LOCAL_ENV_KEYS_LOADED):
+            if key.endswith(("_API_KEY", "_SECRET_KEY", "_PASSPHRASE")) or key in {"CREDENTIAL_MASTER_KEY", "DEMO_USERNAME", "DEMO_PASSWORD"}:
+                os.environ.pop(key, None)
+                LOCAL_ENV_KEYS_LOADED.discard(key)
+
+
+_load_local_env()
 
 
 def get_app_environment() -> str:
@@ -27,6 +99,7 @@ def get_basic_auth_credentials() -> tuple[str, str]:
 # CORS settings
 _DEFAULT_CORS_ORIGINS = [
     "http://localhost:5173",
+    "http://127.0.0.1:5173",
     "http://localhost:3000",
 ]
 
@@ -37,9 +110,6 @@ CORS_ORIGINS: List[str] = (
     else _DEFAULT_CORS_ORIGINS
 )
 
-# Analysis timezone (DST-aware in streak distribution via pytz)
-ANALYSIS_TIMEZONE = os.getenv("ANALYSIS_TIMEZONE", "America/New_York")
-
 # Journal settings
 JOURNAL_DIR = Path(os.getenv("JOURNAL_DIR", str(PROJECT_ROOT / "journal"))).expanduser()
 JOURNAL_DB_PATH = Path(
@@ -49,6 +119,29 @@ JOURNAL_CSV_PATH = Path(
     os.getenv("JOURNAL_CSV_PATH", str(JOURNAL_DIR / "trade_journal.csv"))
 ).expanduser()
 JOURNAL_PATH = JOURNAL_CSV_PATH
+
+
+def credential_profile_id() -> str:
+    """Keep the legacy vault only for the canonical normal-user data profile.
+
+    Source checkouts and custom paths have their own stable namespace. Moving
+    one is deliberately not implicit permission to adopt another profile's keys.
+    """
+    if IS_SAMPLE:
+        return "sample:" + hashlib.sha256(str(SAMPLE_ROOT).encode("utf-8")).hexdigest()
+    normal = _default_app_data_dir()
+    identity = [_profile_path(APP_DATA_DIR), _profile_path(PROJECT_ROOT), _profile_path(JOURNAL_DIR), _profile_path(JOURNAL_DB_PATH)]
+    if _local_env_owned() and identity == [_profile_path(normal), _profile_path(normal), _profile_path(normal / "journal"), _profile_path(normal / "journal" / "trade_journal.db")]:
+        return "normal"
+    return hashlib.sha256("\0".join(identity).encode("utf-8")).hexdigest()
+
+
+def owns_local_credential_env() -> bool:
+    return _local_env_owned() and (
+        _profile_path(JOURNAL_DIR) == _profile_path(PROJECT_ROOT / "journal")
+        and _profile_path(JOURNAL_DB_PATH) == _profile_path(PROJECT_ROOT / "journal" / "trade_journal.db")
+    )
+
 JOURNAL_COLUMNS = [
     "id",
     "datetime",
@@ -70,6 +163,13 @@ JOURNAL_COLUMNS = [
     "r_multiple",
     "outcome",
     "emotion",
+    "emotion_before",
+    "emotion_during",
+    "emotion_after",
+    "confidence_score",
+    "focus_score",
+    "fomo",
+    "revenge_trade",
     "tags",
     "mistakes",
     "planned_stop_pct",
@@ -81,6 +181,7 @@ JOURNAL_COLUMNS = [
     "notes",
     "source",
     "external_id",
+    "lifecycle_id",
     "exchange",
     "order_id",
     "fee",
@@ -105,14 +206,11 @@ class DeepcoinCredentials:
 
 
 def get_deepcoin_credentials() -> Optional[DeepcoinCredentials]:
-    """Return environment or protected local credentials without exposing storage details."""
-    try:
-        from backend.modules.deepcoin.secure_credentials import CredentialStorageError, load_stored_credentials
+    """Return complete Deepcoin credentials, or ``None`` when not configured."""
+    from backend.modules.exchanges.credentials import load_exchange_credentials
 
-        stored, _source = load_stored_credentials()
-    except CredentialStorageError:
-        return None
-    if stored is None:
+    stored = load_exchange_credentials("deepcoin")
+    if stored is None or not stored.passphrase:
         return None
     return DeepcoinCredentials(
         api_key=stored.api_key,
@@ -125,13 +223,6 @@ def get_deepcoin_api_base_url() -> str:
     """Return the configurable Deepcoin REST base URL without a trailing slash."""
     return os.getenv("DEEPCOIN_API_BASE_URL", "https://api.deepcoin.com").rstrip("/")
 
-# Preset settings
-PRESET_DIR = Path(os.getenv("PRESET_DIR", str(PROJECT_ROOT / "data"))).expanduser()
-PRESETS_FILE = Path(
-    os.getenv("PRESETS_FILE", str(PRESET_DIR / "presets.json"))
-).expanduser()
-LEGACY_PRESETS_FILE = PROJECT_ROOT / "presets.json"
-
 # Timeframe to minutes mapping
 TIMEFRAME_TO_MINUTES = {
     "1m": 1, "3m": 3, "5m": 5, "15m": 15, "30m": 30, "1h": 60,
@@ -139,5 +230,9 @@ TIMEFRAME_TO_MINUTES = {
     "1w": 10_080, "1M": 43_200,
 }
 
-# AI Settings
+# Quant Lab research settings retained alongside the journal profile.
+ANALYSIS_TIMEZONE = os.getenv("ANALYSIS_TIMEZONE", "America/New_York")
+PRESET_DIR = Path(os.getenv("PRESET_DIR", str(PROJECT_ROOT / "data"))).expanduser()
+PRESETS_FILE = Path(os.getenv("PRESETS_FILE", str(PRESET_DIR / "presets.json"))).expanduser()
+LEGACY_PRESETS_FILE = PROJECT_ROOT / "presets.json" if IS_SAMPLE else SOURCE_ROOT / "presets.json"
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")

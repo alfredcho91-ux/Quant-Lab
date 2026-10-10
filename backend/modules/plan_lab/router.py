@@ -15,22 +15,28 @@ from backend.modules.plan_lab.schemas import (
     PlanLabQuery, PlanLinkRequest, PlanListEnvelope, PlanRevisionCreate, PlanStatusUpdate,
     RetrospectivePlanCreate,
 )
-from backend.modules.deepcoin.service import get_deepcoin_open_positions_service
+from backend.modules.exchanges.service import exchange_open_positions_service
 from backend.utils.decorators import handle_api_errors
 
 router = APIRouter(prefix="/api", tags=["plan-lab"])
 
 
 def _confirmed_open_position(exchange: str, position_id: str):
-    if exchange.lower() != "deepcoin":
-        raise HTTPException(status_code=409, detail="Only Deepcoin live positions are supported in Quant Lab")
-    result = get_deepcoin_open_positions_service().get("data") or []
-    for position in result:
-        if str(position.get("position_id") or "") == position_id:
+    """Read the live account state again on the server; never trust the client lifecycle."""
+    result = exchange_open_positions_service().get("data") or {}
+    for position in result.get("positions") or []:
+        if (
+            str(position.get("exchange") or "").lower() == exchange.lower()
+            and str(position.get("position_id") or "") == position_id
+        ):
             if position.get("lifecycle_available") is False:
+                exchange_name = exchange.capitalize()
                 raise HTTPException(
                     status_code=409,
-                    detail="Deepcoin lifecycle identity is unavailable. Synchronize fills before saving an in-trade plan.",
+                    detail=(
+                        f"{exchange_name} lifecycle identity is unavailable. "
+                        "Synchronize fills or exchange history before saving an in-trade plan."
+                    ),
                 )
             return position
     raise HTTPException(
@@ -86,7 +92,7 @@ async def api_create_retrospective_plan(payload: RetrospectivePlanCreate):
 async def api_create_in_trade_plan(payload: InTradePlanCreate):
     position = await run_in_threadpool(_confirmed_open_position, payload.exchange, payload.position_id)
     plan_payload = {
-        "exchange": payload.exchange,
+        "exchange": str(position.get("exchange") or payload.exchange),
         "position_id": str(position.get("position_id") or payload.position_id),
         "symbol": str(position.get("symbol") or ""),
         "side": position.get("direction"),
@@ -96,6 +102,8 @@ async def api_create_in_trade_plan(payload: InTradePlanCreate):
         "success": True,
         "data": await run_in_threadpool(create_in_trade_plan, plan_payload, position),
     }
+
+
 @router.get("/plans/{plan_id}", response_model=PlanEnvelope)
 @handle_api_errors()
 async def api_get_plan(plan_id: int):

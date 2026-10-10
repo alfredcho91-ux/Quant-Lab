@@ -3,6 +3,8 @@ import { Suspense, lazy, type ReactNode } from 'react';
 import Layout from './components/Layout';
 import { BrowserRouter, Navigate } from './router';
 import { useLocation } from './router-context';
+import WorkspaceExperience from './features/onboarding/WorkspaceExperience';
+import { isSampleWorkspace } from './features/onboarding/workspaceSession';
 
 const AIStrategyLabPage = lazy(() => import('./pages/AIStrategyLabPage'));
 const TrendJudgmentPage = lazy(() => import('./pages/TrendJudgmentPage'));
@@ -16,8 +18,10 @@ const JournalPage = lazy(() => import('./pages/JournalPage'));
 const TradeAnalysisPage = lazy(() => import('./pages/TradeAnalysisPage'));
 const RiskLabPage = lazy(() => import('./pages/RiskLabPage'));
 const PlanLabPage = lazy(() => import('./pages/PlanLabPage'));
+const PlaybookPage = lazy(() => import('./pages/PlaybookPage'));
+const TradeExplorerPage = lazy(() => import('./pages/TradeExplorerPage'));
 
-const routeFallback = <div className="card p-6 text-center text-dark-400">Loading...</div>;
+const routeFallback = <div className="card p-6 text-center text-dark-400">불러오는 중...</div>;
 
 function AppRoutes() {
   const { pathname } = useLocation();
@@ -34,14 +38,19 @@ function AppRoutes() {
     '/trade-analysis': <TradeAnalysisPage />,
     '/risk-lab': <RiskLabPage />,
     '/plan-lab': <PlanLabPage />,
+    '/playbook': <PlaybookPage />,
+    '/trade-explorer': <TradeExplorerPage />,
   };
 
-  if (pathname === '/') return <Navigate to="/trend-judgment" replace />;
+  const sample = isSampleWorkspace();
+  const journalWorkspace = ['/journal', '/trade-analysis', '/risk-lab', '/plan-lab', '/playbook', '/trade-explorer'].includes(pathname);
+  if (pathname === '/') return <Navigate to={sample ? '/journal' : '/trend-judgment'} replace />;
+  if (sample && !journalWorkspace && !['/hold-reentry', '/compound-calculator'].includes(pathname)) return <Navigate to="/journal" replace />;
   if (pathname === '/ai-backtest-builder') {
     return <Navigate to="/ai-backtest-lab?tab=builder" replace />;
   }
 
-  return <Layout>{pages[pathname] ?? <Navigate to="/trend-judgment" replace />}</Layout>;
+  return <Layout>{journalWorkspace || sample ? <WorkspaceExperience>{pages[pathname]}</WorkspaceExperience> : (pages[pathname] ?? <Navigate to="/trend-judgment" replace />)}</Layout>;
 }
 
 function App() {

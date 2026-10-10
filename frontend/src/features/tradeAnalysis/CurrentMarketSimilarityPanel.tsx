@@ -27,7 +27,7 @@ interface CurrentMarketSimilarityPanelProps {
 
 function percent(value: number | null, digits = 1): string {
   if (value == null || !Number.isFinite(value)) return '-';
-  return `${value >= 0 ? '+' : ''}${value.toFixed(digits)}%`;
+  return `${value >= 0 ? '+' : ''}${value.toFixed(Math.min(2, digits))}%`;
 }
 
 function similarity(value: number | null): string {
@@ -164,7 +164,7 @@ export default function CurrentMarketSimilarityPanel({
                   <th className="py-2 text-right">{isKo ? '일치도' : 'Similarity'}</th>
                   <th className="py-2 text-center">{isKo ? '결과' : 'Result'}</th>
                   <th className="py-2 text-right">{isKo ? '순수익률' : 'Net Return'}</th>
-                  <th className="py-2 text-right">{isKo ? '진입 후 최대 유리폭' : 'Max favorable move'}</th>
+                  <th className="py-2 text-right">MFE</th>
                   <th className="px-4 py-2 text-right">{isKo ? '청산 후 추가폭' : 'Post-exit Move'}</th>
                 </tr>
               </thead>
@@ -229,7 +229,7 @@ export default function CurrentMarketSimilarityPanel({
         </>
       )}
       {!isLoading && !query.isError && (
-        <details className="border-t border-dark-800 px-4 py-2 text-[10px] text-dark-500">
+        <details className="border-t border-dark-800 px-4 py-2 text-[10px] text-dark-500" open>
           <summary className="cursor-pointer select-none hover:text-dark-300">{isKo ? '유사도 계산 기준' : 'Similarity methodology'}</summary>
           <div className="mt-2 grid gap-1 leading-5 md:grid-cols-2">
             <span>{isKo ? '후보: 같은 종목 · 확정 최초 진입 · 7개 타임프레임 전체 데이터' : 'Candidates: same symbol, confirmed first entry, complete seven-timeframe data'}</span>

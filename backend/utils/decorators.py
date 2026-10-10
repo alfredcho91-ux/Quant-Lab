@@ -56,10 +56,10 @@ def _raise_legacy_error(result: Any) -> None:
 def handle_api_errors(include_traceback: bool = False):
     """
     API 엔드포인트의 공통 에러 처리 데코레이터
-    
+
     Args:
         include_traceback: traceback 포함 여부 (기본값: False, 개발 환경용)
-    
+
     Usage:
         @router.post("/endpoint")
         @handle_api_errors()

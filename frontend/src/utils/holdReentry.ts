@@ -1,4 +1,5 @@
 export type TradeDirection = 'long' | 'short';
+
 export const BASE_FEE_PERCENT = 0.04;
 export const MAX_LEVERAGE = 50;
 
@@ -15,7 +16,6 @@ export interface HoldReentryInputs {
 
 export interface HoldReentryResult {
   isValid: boolean;
-  direction: TradeDirection;
   positionQuantity: number;
   reentryQuantity: number;
   positionNotional: number;
@@ -36,28 +36,15 @@ export function calculateHoldReentry(inputs: HoldReentryInputs): HoldReentryResu
   const { direction, entryPrice, currentPrice, reentryPrice, targetPrice, marginUsd, leverage } = inputs;
   const feePercent = inputs.feePercent ?? leverage * BASE_FEE_PERCENT;
   const isValid = [entryPrice, currentPrice, reentryPrice, targetPrice, marginUsd].every(
-    (value) => Number.isFinite(value) && value > 0
+    (value) => Number.isFinite(value) && value > 0,
   ) && Number.isFinite(leverage) && leverage >= 1 && leverage <= MAX_LEVERAGE
     && Number.isFinite(feePercent) && feePercent >= 0 && feePercent <= 10;
 
   if (!isValid) {
     return {
-      isValid: false,
-      direction,
-      positionQuantity: 0,
-      reentryQuantity: 0,
-      positionNotional: 0,
-      effectiveFeePercent: 0,
-      currentPnl: 0,
-      currentPnlPercent: 0,
-      holdingPnl: 0,
-      holdingPnlPercent: 0,
-      realizedPnl: 0,
-      reentryPnl: 0,
-      reentryFinalPnl: 0,
-      grossReentryAdvantage: 0,
-      incrementalFees: 0,
-      netReentryAdvantage: 0,
+      isValid: false, positionQuantity: 0, reentryQuantity: 0, positionNotional: 0, effectiveFeePercent: 0,
+      currentPnl: 0, currentPnlPercent: 0, holdingPnl: 0, holdingPnlPercent: 0, realizedPnl: 0,
+      reentryPnl: 0, reentryFinalPnl: 0, grossReentryAdvantage: 0, incrementalFees: 0, netReentryAdvantage: 0,
     };
   }
 
@@ -72,16 +59,11 @@ export function calculateHoldReentry(inputs: HoldReentryInputs): HoldReentryResu
   const grossReentryAdvantage = reentryFinalPnl - holdingPnl;
   const feeRate = feePercent / 100;
   const holdingExitFee = targetPrice * positionQuantity * feeRate;
-  const reentryScenarioFees = (
-    currentPrice * positionQuantity +
-    reentryPrice * reentryQuantity +
-    targetPrice * reentryQuantity
-  ) * feeRate;
+  const reentryScenarioFees = (currentPrice * positionQuantity + reentryPrice * reentryQuantity + targetPrice * reentryQuantity) * feeRate;
   const incrementalFees = reentryScenarioFees - holdingExitFee;
 
   return {
     isValid: true,
-    direction,
     positionQuantity,
     reentryQuantity,
     positionNotional,

@@ -85,6 +85,7 @@ def _short_trade_excursion(
     position: Dict[str, Any],
     *,
     exchange: str,
+    instrument_type: str,
     symbol: str,
     warnings: List[str],
 ) -> Optional[Dict[str, Any]]:
@@ -99,6 +100,7 @@ def _short_trade_excursion(
         total_candles=requested,
         end_time=close_time,
         exchange=exchange,
+        instrument_type=instrument_type,
     )
     if candles is None or candles.empty:
         warnings.append(f"journal {position['id']}: {SHORT_TRADE_INTERVAL} market data unavailable")
@@ -118,14 +120,14 @@ def run_journal_excursions_service(start_time: int, end_time: int) -> Dict[str, 
         raise ValueError("start_time must be before end_time")
 
     positions = _closed_positions(repository.list_entries(), start_time, end_time)
-    by_market: Dict[tuple[str, str], List[Dict[str, Any]]] = defaultdict(list)
+    by_market: Dict[tuple[str, str, str], List[Dict[str, Any]]] = defaultdict(list)
     for position in positions:
         if position.get("symbol"):
             by_market[market_group_key(position)].append(position)
 
     excursions: List[Dict[str, Any]] = []
     warnings: List[str] = []
-    for (exchange, symbol), symbol_positions in by_market.items():
+    for (exchange, instrument_type, symbol), symbol_positions in by_market.items():
         for batch_index, batch in enumerate(_position_batches(symbol_positions), start=1):
             short_positions = [
                 item for item in batch
@@ -134,7 +136,13 @@ def run_journal_excursions_service(start_time: int, end_time: int) -> Dict[str, 
             ]
             regular_positions = [item for item in batch if item not in short_positions]
             for position in short_positions:
-                result = _short_trade_excursion(position, exchange=exchange, symbol=symbol, warnings=warnings)
+                result = _short_trade_excursion(
+                    position,
+                    exchange=exchange,
+                    instrument_type=instrument_type,
+                    symbol=symbol,
+                    warnings=warnings,
+                )
                 if result is not None:
                     excursions.append(result)
 
@@ -152,6 +160,7 @@ def run_journal_excursions_service(start_time: int, end_time: int) -> Dict[str, 
                 total_candles=requested,
                 end_time=latest_close,
                 exchange=exchange,
+                instrument_type=instrument_type,
             )
             if candles is None or candles.empty:
                 warnings.append(f"{symbol} batch {batch_index}: market data unavailable")
@@ -171,7 +180,13 @@ def run_journal_excursions_service(start_time: int, end_time: int) -> Dict[str, 
                 if result is not None:
                     excursions.append(result)
                 elif close_time - entry_time < EXCURSION_INTERVAL_MS * 2:
-                    fine_grained = _short_trade_excursion(position, exchange=exchange, symbol=symbol, warnings=warnings)
+                    fine_grained = _short_trade_excursion(
+                        position,
+                        exchange=exchange,
+                        instrument_type=instrument_type,
+                        symbol=symbol,
+                        warnings=warnings,
+                    )
                     if fine_grained is not None:
                         excursions.append(fine_grained)
                 else:

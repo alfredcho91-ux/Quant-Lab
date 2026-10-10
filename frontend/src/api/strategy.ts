@@ -7,7 +7,7 @@ import {
   toApiClientError,
   unwrapApiResponse,
 } from './config';
-import type { Strategy, StrategyInfo, Preset, BacktestParams } from '../types';
+import type { BacktestStrategy as Strategy, StrategyInfo, Preset, BacktestParams } from '../types';
 
 export async function getStrategies(): Promise<Strategy[]> {
   try {

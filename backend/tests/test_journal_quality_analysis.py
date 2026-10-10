@@ -1,8 +1,9 @@
+from backend.modules.journal import quality_analysis
 from backend.modules.journal.quality_analysis import (
+    _analysis_bundle,
     _assign_quality_classes,
     _direction_breakdown,
     _filter_positions_by_net_return,
-    _hold_aggregates,
     _performance_stats,
 )
 
@@ -46,31 +47,24 @@ def test_performance_stats_does_not_invent_r_multiple():
     assert stats["trade_count"] == 1
 
 
-def test_hold_aggregates_include_loss_rate_and_average_loss():
-    complete = _item(2, 1, 1, 0, 1, 50)
-    recent = _item(2, 1, 1, 0, 1, 50)
-    complete["exit_quality"]["hold_results"] = {
-        "actual": {"available": True, "return_pct": 1.0},
-        **{str(index): {"available": True, "return_pct": float(index)} for index in (1, 2, 3, 5, 10)},
-    }
-    recent["exit_quality"]["hold_results"] = {
-        "actual": {"available": True, "return_pct": -1.0},
-        "1": {"available": True, "return_pct": 0.5},
-        "2": {"available": True, "return_pct": 1.5},
-        "3": {"available": False},
-        "5": {"available": False},
-        "10": {"available": False},
-    }
+def test_quality_aggregates_allow_missing_excursion_data():
+    item = _item(2, 1, 1, 0, 1, 50)
+    item.update({
+        "excursion": None,
+        "exit_quality": None,
+        "quality_class": "unavailable",
+        "direction": "Long",
+        "regime_alignment": "unavailable",
+        "trade_alignment": "neutral",
+        "market_regime": {"id": "unavailable", "alignment": "unavailable", "trade_bias": "neutral"},
+    })
 
-    aggregates = _hold_aggregates([complete, recent])
+    analysis = _analysis_bundle([item])
 
-    assert aggregates["actual"]["available_count"] == 2
-    assert aggregates["actual"]["return_sample_count"] == 2
-    assert aggregates["actual"]["loss_count"] == 1
-    assert aggregates["actual"]["loss_rate_pct"] == 50.0
-    assert aggregates["actual"]["average_loss_pct"] == -1.0
-    assert aggregates["1"]["loss_rate_pct"] == 0.0
-    assert aggregates["1"]["average_loss_pct"] is None
+    assert analysis["summary"]["average_mfe_pct"] is None
+    assert analysis["summary"]["average_mae_pct"] is None
+    assert analysis["summary"]["average_capture_ratio_pct"] is None
+    assert analysis["hold_results"]["actual"]["available_count"] == 0
 
 
 def test_direction_breakdown_keeps_long_and_short_statistics_separate():
@@ -111,3 +105,39 @@ def test_return_filter_uses_absolute_net_return_on_invested_margin():
     assert metadata["excluded_below_threshold_count"] == 2
     assert metadata["excluded_return_unavailable_count"] == 1
 
+
+def test_return_filter_does_not_assume_unleveraged_margin_for_derivative_position():
+    positions = [{
+        "id": 1,
+        "source": "bybit_position",
+        "direction": "Long",
+        "entry_price": 100.0,
+        "exit_price": 110.0,
+        "realized_pnl": 10.0,
+        "fee": 0.0,
+        "funding_fee": 0.0,
+        "leverage": None,
+        "invested_amount": None,
+    }]
+
+    included, metadata = _filter_positions_by_net_return(positions, 1.0)
+
+    assert included == []
+    assert metadata["excluded_return_unavailable_count"] == 1
+
+
+def test_quality_analysis_rebuilds_each_request_without_derived_cache(monkeypatch):
+    calculation_count = 0
+    monkeypatch.setattr(quality_analysis.repository, "list_entries", lambda: [])
+
+    def calculate(*_args):
+        nonlocal calculation_count
+        calculation_count += 1
+        return {"success": True, "data": {"items": []}}
+
+    monkeypatch.setattr(quality_analysis, "run_journal_excursions_service", calculate)
+    first = quality_analysis.run_journal_quality_analysis_service(1, 2, 2)
+    second = quality_analysis.run_journal_quality_analysis_service(1, 2, 2)
+    assert first == second
+    assert first is not second
+    assert calculation_count == 2

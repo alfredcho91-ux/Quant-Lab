@@ -42,8 +42,6 @@ export function IndicatorProjectionCard({ data, interval, isKo, isLoading, isErr
   };
 
   const formatPrice = (price: number) => {
-    if (price < 1) return price.toFixed(6);
-    if (price < 10) return price.toFixed(4);
     return price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   };
   

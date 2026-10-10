@@ -13,7 +13,7 @@ type Props = {
 
 function number(value: number | null, digits = 1): string {
   if (value == null || !Number.isFinite(value)) return '-';
-  return value.toLocaleString(undefined, { maximumFractionDigits: digits });
+  return value.toLocaleString(undefined, { maximumFractionDigits: Math.min(2, digits) });
 }
 
 function signed(value: number | null, digits = 2): string {
@@ -137,7 +137,7 @@ export default function StopLossExpectationTool({ trades, direction, isLoading, 
         </>
       )}
 
-      <details className="border-t border-dark-800 px-4 py-2 text-[10px] leading-4 text-dark-600">
+      <details className="border-t border-dark-800 px-4 py-2 text-[10px] leading-4 text-dark-600" open>
         <summary className="flex cursor-pointer items-center gap-1 text-dark-500"><Info className="h-3 w-3" />{isKo ? '계산 기준과 한계' : 'Method and limitations'}</summary>
         <p className="mt-2">
           {isKo

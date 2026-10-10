@@ -4,8 +4,12 @@ import { api, ApiResponse, ensureApiSuccess, toApiClientError, unwrapApiResponse
 import type {
   DeepcoinStatus,
   DeepcoinOpenPosition,
+  ExchangeOpenPositionsData,
   DeepcoinSyncResult,
   DeepcoinTradeMarkers,
+  ExchangeId,
+  ExchangeStatus,
+  ExchangeSyncResult,
   JournalExcursionData,
   JournalCurrentMarketData,
   JournalBehaviorAnalysisData,
@@ -17,13 +21,33 @@ import type {
   JournalStopLossAnalysisData,
   JournalStopOptimizationData,
   JournalEntry,
+  JournalBehaviorUpdatePayload,
+  DailyJournalEntry,
+  DailyJournalUpdatePayload,
+  JournalExitHoldAnalysisData,
+  ExitHoldInterval,
+  JournalPerformanceData,
   PlanLabData,
   PlanRevisionInput,
   PlanSide,
   PlanSource,
   PlanStatus,
   TradingPlan,
+  JournalStrategyEvaluation,
 } from '../types';
+
+export async function getJournalStrategyEvaluation(
+  journalEntryId: number,
+): Promise<JournalStrategyEvaluation | null> {
+  try {
+    const res = await api.get<ApiResponse<JournalStrategyEvaluation | null>>(
+      `/journal/${journalEntryId}/strategy-evaluation`,
+    );
+    return unwrapApiResponse(res, 'Failed to load Strategy rule adherence.');
+  } catch (error: unknown) {
+    throw toApiClientError(error, 'Failed to load Strategy rule adherence.');
+  }
+}
 
 export async function getPlans(): Promise<TradingPlan[]> {
   try {
@@ -48,7 +72,10 @@ export async function createPlan(payload: {
   }
 }
 
-export async function createRetrospectivePlan(journalEntryId: number, revision: PlanRevisionInput): Promise<TradingPlan> {
+export async function createRetrospectivePlan(
+  journalEntryId: number,
+  revision: PlanRevisionInput,
+): Promise<TradingPlan> {
   try {
     const res = await api.post<ApiResponse<TradingPlan>>('/plans/retrospective', {
       journal_entry_id: journalEntryId,
@@ -134,6 +161,18 @@ export async function getJournal(): Promise<JournalEntry[]> {
   }
 }
 
+export async function getJournalPerformance(params: {
+  start_time: number;
+  end_time: number;
+}): Promise<JournalPerformanceData> {
+  try {
+    const res = await api.get<ApiResponse<JournalPerformanceData>>('/journal/performance', { params });
+    return unwrapApiResponse(res, 'Failed to load journal performance.');
+  } catch (error: unknown) {
+    throw toApiClientError(error, 'Failed to load journal performance.');
+  }
+}
+
 export async function getJournalCurrentMarket(coin: string): Promise<JournalCurrentMarketData> {
   try {
     const res = await api.get<ApiResponse<JournalCurrentMarketData>>('/journal/current-market', {
@@ -174,16 +213,30 @@ export async function getJournalQualityAnalysis(params: {
   }
 }
 
+export async function getJournalExitHoldAnalysis(params: {
+  start_time: number;
+  end_time: number;
+  interval: ExitHoldInterval;
+  min_abs_net_return_pct?: number;
+}): Promise<JournalExitHoldAnalysisData> {
+  try {
+    const res = await api.get<ApiResponse<JournalExitHoldAnalysisData>>('/journal/exit-hold-analysis', {
+      params,
+      timeout: 120_000,
+    });
+    return unwrapApiResponse(res, 'Failed to load post-exit holding analysis.');
+  } catch (error: unknown) {
+    throw toApiClientError(error, 'Failed to load post-exit holding analysis.');
+  }
+}
+
 export async function getJournalBehaviorAnalysis(params: {
   start_time: number;
   end_time: number;
   min_abs_net_return_pct?: number;
 }): Promise<JournalBehaviorAnalysisData> {
   try {
-    const res = await api.get<ApiResponse<JournalBehaviorAnalysisData>>('/journal/behavior-analysis', {
-      params,
-      timeout: 120_000,
-    });
+    const res = await api.get<ApiResponse<JournalBehaviorAnalysisData>>('/journal/behavior-analysis', { params, timeout: 120_000 });
     return unwrapApiResponse(res, 'Failed to load trade behavior analysis.');
   } catch (error: unknown) {
     throw toApiClientError(error, 'Failed to load trade behavior analysis.');
@@ -205,18 +258,57 @@ export async function compareJournalBehavior(payload: {
   }
 }
 
-export async function updateJournalBehavior(id: number, payload: {
-  planned_stop_pct?: number | null;
-  planned_target_pct?: number | null;
-  planned_entry_reason?: string | null;
-  setup_tags?: string[];
-  mistake_tags?: string[];
-}): Promise<JournalEntry> {
+export async function updateJournalBehavior(id: number, payload: JournalBehaviorUpdatePayload): Promise<JournalEntry> {
   try {
     const res = await api.patch<ApiResponse<JournalEntry>>(`/journal/${id}/behavior`, payload);
     return unwrapApiResponse(res, 'Failed to update trade behavior.');
   } catch (error: unknown) {
     throw toApiClientError(error, 'Failed to update trade behavior.');
+  }
+}
+
+export async function getDailyJournals(params: {
+  start_date?: string;
+  end_date?: string;
+} = {}): Promise<DailyJournalEntry[]> {
+  try {
+    const res = await api.get<ApiResponse<DailyJournalEntry[]>>('/journal/daily', { params });
+    return unwrapApiResponse(res, 'Failed to load daily journal entries.');
+  } catch (error: unknown) {
+    throw toApiClientError(error, 'Failed to load daily journal entries.');
+  }
+}
+
+export async function getDailyJournal(tradeDate: string, signal?: AbortSignal): Promise<DailyJournalEntry | null> {
+  try {
+    const res = await api.get<ApiResponse<DailyJournalEntry>>(`/journal/daily/${tradeDate}`, { signal });
+    return unwrapApiResponse(res, 'Failed to load the daily journal.');
+  } catch (error: unknown) {
+    const apiError = toApiClientError(error, 'Failed to load the daily journal.');
+    if (apiError.status === 404) return null;
+    throw apiError;
+  }
+}
+
+export async function saveDailyJournal(
+  tradeDate: string,
+  payload: DailyJournalUpdatePayload,
+): Promise<DailyJournalEntry> {
+  try {
+    const res = await api.put<ApiResponse<DailyJournalEntry>>(`/journal/daily/${tradeDate}`, payload);
+    return unwrapApiResponse(res, 'Failed to save the daily journal.');
+  } catch (error: unknown) {
+    throw toApiClientError(error, 'Failed to save the daily journal.');
+  }
+}
+
+export async function deleteDailyJournal(tradeDate: string): Promise<boolean> {
+  try {
+    const res = await api.delete<ApiResponse<null>>(`/journal/daily/${tradeDate}`);
+    ensureApiSuccess(res, 'Failed to delete the daily journal.');
+    return true;
+  } catch (error: unknown) {
+    throw toApiClientError(error, 'Failed to delete the daily journal.');
   }
 }
 
@@ -338,25 +430,12 @@ export async function getDeepcoinOpenPositions(): Promise<DeepcoinOpenPosition[]
   }
 }
 
-export async function configureDeepcoinCredentials(params: {
-  api_key: string;
-  secret_key: string;
-  passphrase: string;
-}): Promise<DeepcoinStatus> {
+export async function getExchangeOpenPositions(): Promise<ExchangeOpenPositionsData> {
   try {
-    const res = await api.post<ApiResponse<DeepcoinStatus>>('/deepcoin/credentials', params, { timeout: 30_000 });
-    return unwrapApiResponse(res, 'Failed to verify and save Deepcoin credentials.');
+    const res = await api.get<ApiResponse<ExchangeOpenPositionsData>>('/exchanges/open-positions');
+    return unwrapApiResponse(res, 'Failed to load exchange open positions.');
   } catch (error: unknown) {
-    throw toApiClientError(error, 'Failed to verify and save Deepcoin credentials.');
-  }
-}
-
-export async function deleteDeepcoinCredentials(): Promise<DeepcoinStatus> {
-  try {
-    const res = await api.delete<ApiResponse<DeepcoinStatus>>('/deepcoin/credentials');
-    return unwrapApiResponse(res, 'Failed to delete Deepcoin credentials.');
-  } catch (error: unknown) {
-    throw toApiClientError(error, 'Failed to delete Deepcoin credentials.');
+    throw toApiClientError(error, 'Failed to load exchange open positions.');
   }
 }
 
@@ -388,5 +467,77 @@ export async function getDeepcoinTradeMarkers(params: {
     return unwrapApiResponse(res, 'Failed to load Deepcoin trade markers.');
   } catch (error: unknown) {
     throw toApiClientError(error, 'Failed to load Deepcoin trade markers.');
+  }
+}
+
+export async function getExchangeStatuses(): Promise<ExchangeStatus[]> {
+  try {
+    const res = await api.get<ApiResponse<{ exchanges: ExchangeStatus[] }>>('/exchanges');
+    return unwrapApiResponse(res, 'Failed to load exchange connection status.').exchanges;
+  } catch (error: unknown) {
+    throw toApiClientError(error, 'Failed to load exchange connection status.');
+  }
+}
+
+export async function getExchangeExecutions(params: {
+  exchange?: string;
+  symbol?: string;
+  start_time?: string;
+  end_time?: string;
+}): Promise<JournalEntry[]> {
+  try {
+    const res = await api.get<ApiResponse<JournalEntry[]>>('/exchanges/executions', { params });
+    return unwrapApiResponse(res, 'Failed to load exchange executions.');
+  } catch (error: unknown) {
+    throw toApiClientError(error, 'Failed to load exchange executions.');
+  }
+}
+
+export async function configureExchangeCredentials(params: {
+  exchange: ExchangeId;
+  api_key: string;
+  secret_key: string;
+  passphrase?: string;
+}): Promise<ExchangeStatus[]> {
+  try {
+    const { exchange, ...body } = params;
+    const res = await api.post<ApiResponse<{ exchanges: ExchangeStatus[] }>>(`/exchanges/${exchange}/credentials`, body, { timeout: 30_000 });
+    return unwrapApiResponse(res, 'Failed to verify and save exchange credentials.').exchanges;
+  } catch (error: unknown) {
+    throw toApiClientError(error, 'Failed to verify and save exchange credentials.');
+  }
+}
+
+export async function deleteExchangeCredentials(exchange: ExchangeId): Promise<{
+  exchanges: ExchangeStatus[];
+  deleted: boolean;
+  environment_override: boolean;
+}> {
+  try {
+    const res = await api.delete<ApiResponse<{
+      exchanges: ExchangeStatus[];
+      deleted: boolean;
+      environment_override: boolean;
+    }>>(`/exchanges/${exchange}/credentials`);
+    return unwrapApiResponse(res, 'Failed to remove exchange credentials.');
+  } catch (error: unknown) {
+    throw toApiClientError(error, 'Failed to remove exchange credentials.');
+  }
+}
+
+export async function syncExchange(params: {
+  exchange: ExchangeId;
+  inst_type: 'SWAP' | 'SPOT';
+  lookback_days: number;
+  symbols: string[];
+}): Promise<ExchangeSyncResult> {
+  try {
+    const { exchange, ...body } = params;
+    const res = await api.post<ApiResponse<ExchangeSyncResult>>(`/exchanges/${exchange}/sync`, body, {
+      timeout: 360_000,
+    });
+    return unwrapApiResponse(res, 'Failed to sync exchange trades.');
+  } catch (error: unknown) {
+    throw toApiClientError(error, 'Failed to sync exchange trades.');
   }
 }

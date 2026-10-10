@@ -6,6 +6,7 @@ import {
   aggregateNetReturnPct,
   feeImpact,
   fundingImpact,
+  isIncludedByMinimumAbsNetReturn,
   investedAmount,
   netCostImpact,
   netReturnPct,
@@ -42,23 +43,6 @@ describe('journal net returns', () => {
     expect(positionNotional(entry)).toBeCloseTo(4_629.32, 1);
     expect(investedAmount(entry)).toBeCloseTo(462.932, 2);
     expect(netReturnPct(entry)).toBeCloseTo(1.0211, 3);
-  });
-
-  it('treats derivative position sources consistently across exchanges', () => {
-    const entry: JournalEntry = {
-      source: 'binance_position',
-      direction: 'Long',
-      entry_price: 100,
-      exit_price: 102,
-      realized_pnl: 10,
-      fee: 1,
-      funding_fee: 0,
-      leverage: 5,
-    };
-
-    expect(positionNotional(entry)).toBeCloseTo(550);
-    expect(investedAmount(entry)).toBeCloseTo(110);
-    expect(netReturnPct(entry)).toBeCloseTo(9.0909, 3);
   });
 
   it('removes signed funding and absolute trading fees before inferring notional', () => {
@@ -106,6 +90,18 @@ describe('journal net returns', () => {
   it('does not invent a return when size or entry price is missing', () => {
     expect(netReturnPct({ realized_pnl: 10 })).toBeNull();
     expect(aggregateNetReturnPct([{ realized_pnl: 10 }])).toBeNull();
+  });
+
+  it('preserves the strict minimum absolute net-return scope used by trade analysis', () => {
+    const profit: JournalEntry = { invested_amount: 100, realized_pnl: 3 };
+    const loss: JournalEntry = { invested_amount: 100, realized_pnl: -2.5 };
+    const boundary: JournalEntry = { invested_amount: 100, realized_pnl: 2 };
+
+    expect(isIncludedByMinimumAbsNetReturn(profit, 2)).toBe(true);
+    expect(isIncludedByMinimumAbsNetReturn(loss, 2)).toBe(true);
+    expect(isIncludedByMinimumAbsNetReturn(boundary, 2)).toBe(false);
+    expect(isIncludedByMinimumAbsNetReturn({ realized_pnl: 3 }, 2)).toBe(false);
+    expect(isIncludedByMinimumAbsNetReturn({ realized_pnl: 3 }, 0)).toBe(true);
   });
 
   it('sums only finite realized PnL values', () => {

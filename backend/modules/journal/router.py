@@ -1,26 +1,33 @@
 """Trading Journal API router."""
 
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from typing import Annotated
 
 from fastapi import APIRouter, Depends
 from fastapi.concurrency import run_in_threadpool
 
 from backend.modules.journal.schemas import (
-    JournalCurrentMarketEnvelope,
+    JournalBehaviorComparisonRequest,
+    JournalBehaviorEnvelope,
+    JournalBehaviorQuery,
     JournalBehaviorRuleCreate,
     JournalBehaviorRuleEnvelope,
     JournalBehaviorRulesEnvelope,
     JournalBehaviorRuleUpdate,
     JournalBehaviorUpdate,
     JournalBehaviorUpdateEnvelope,
-    JournalBehaviorComparisonRequest,
-    JournalBehaviorEnvelope,
-    JournalBehaviorQuery,
+    JournalCurrentMarketEnvelope,
+    DailyJournalEnvelope,
+    DailyJournalListEnvelope,
+    DailyJournalRangeQuery,
+    DailyJournalUpsert,
     JournalDeleteEnvelope,
+    JournalExitHoldEnvelope,
+    JournalExitHoldQuery,
     JournalExcursionEnvelope,
     JournalExcursionQuery,
     JournalListEnvelope,
+    JournalPerformanceEnvelope,
     JournalQualityEnvelope,
     JournalQualityQuery,
     JournalSlTpEnvelope,
@@ -33,8 +40,10 @@ from backend.modules.journal.behavior_analysis import (
     run_journal_behavior_analysis_service,
     run_journal_behavior_comparison_service,
 )
+from backend.modules.journal.performance import run_journal_performance_service
 from backend.modules.journal.current_market import run_current_market_snapshot_service
 from backend.modules.journal.quality_analysis import run_journal_quality_analysis_service
+from backend.modules.journal.exit_hold_analysis import run_journal_exit_hold_analysis_service
 from backend.modules.journal.sl_tp_analysis import run_journal_sl_tp_analysis_service
 from backend.modules.journal.stop_loss_analysis import run_journal_stop_loss_analysis_service
 from backend.modules.journal.stop_optimization import run_journal_stop_optimization_service
@@ -44,10 +53,25 @@ from backend.modules.journal.repository import (
     list_behavior_rules,
     update_behavior_rule,
 )
-from backend.modules.journal.service import delete_journal_service, get_journal_service, update_journal_behavior_service
+from backend.modules.journal.service import (
+    delete_daily_journal_service,
+    delete_journal_service,
+    get_daily_journal_service,
+    get_journal_service,
+    list_daily_journals_service,
+    upsert_daily_journal_service,
+    update_journal_behavior_service,
+)
 from backend.utils.decorators import handle_api_errors
+from backend.modules.journal.planning_context import PlanningContextEnvelope, get_planning_context
 
 router = APIRouter(prefix="/api", tags=["journal"])
+
+
+@router.get("/journal/{entry_id}/planning-context", response_model=PlanningContextEnvelope)
+@handle_api_errors()
+async def api_planning_context(entry_id: int):
+    return (await run_in_threadpool(get_planning_context, entry_id)).model_dump(mode="json")
 
 
 @router.get("/journal", response_model=JournalListEnvelope)
@@ -55,6 +79,13 @@ router = APIRouter(prefix="/api", tags=["journal"])
 async def api_get_journal():
     """Get all journal entries."""
     return await run_in_threadpool(get_journal_service)
+
+
+@router.get("/journal/performance", response_model=JournalPerformanceEnvelope)
+@handle_api_errors()
+async def api_get_journal_performance(query: Annotated[JournalExcursionQuery, Depends()]):
+    """Return canonical period performance used by journal and analysis screens."""
+    return await run_in_threadpool(run_journal_performance_service, query.start_time, query.end_time)
 
 
 @router.get("/journal/current-market", response_model=JournalCurrentMarketEnvelope)
@@ -83,6 +114,19 @@ async def api_get_journal_quality_analysis(query: Annotated[JournalQualityQuery,
         run_journal_quality_analysis_service,
         query.start_time,
         query.end_time,
+        query.min_abs_net_return_pct,
+    )
+
+
+@router.get("/journal/exit-hold-analysis", response_model=JournalExitHoldEnvelope)
+@handle_api_errors()
+async def api_get_journal_exit_hold_analysis(query: Annotated[JournalExitHoldQuery, Depends()]):
+    """Replay post-exit holding results on a selected completed-candle interval."""
+    return await run_in_threadpool(
+        run_journal_exit_hold_analysis_service,
+        query.start_time,
+        query.end_time,
+        query.interval,
         query.min_abs_net_return_pct,
     )
 
@@ -148,6 +192,38 @@ async def api_get_journal_sl_tp_analysis(query: Annotated[JournalSlTpQuery, Depe
         query.tp_max,
         query.tp_step,
     )
+
+
+@router.get("/journal/daily", response_model=DailyJournalListEnvelope)
+@handle_api_errors()
+async def api_list_daily_journals(query: Annotated[DailyJournalRangeQuery, Depends()]):
+    if query.start_date is not None and query.end_date is not None and query.start_date > query.end_date:
+        raise ValueError("start_date must be on or before end_date")
+    start_date = query.start_date.isoformat() if query.start_date is not None else None
+    end_date = query.end_date.isoformat() if query.end_date is not None else None
+    return await run_in_threadpool(list_daily_journals_service, start_date, end_date)
+
+
+@router.get("/journal/daily/{trade_date}", response_model=DailyJournalEnvelope)
+@handle_api_errors()
+async def api_get_daily_journal(trade_date: date):
+    return await run_in_threadpool(get_daily_journal_service, trade_date.isoformat())
+
+
+@router.put("/journal/daily/{trade_date}", response_model=DailyJournalEnvelope)
+@handle_api_errors()
+async def api_upsert_daily_journal(trade_date: date, payload: DailyJournalUpsert):
+    return await run_in_threadpool(
+        upsert_daily_journal_service,
+        trade_date.isoformat(),
+        payload.model_dump(exclude_unset=True),
+    )
+
+
+@router.delete("/journal/daily/{trade_date}", response_model=JournalDeleteEnvelope)
+@handle_api_errors()
+async def api_delete_daily_journal(trade_date: date):
+    return await run_in_threadpool(delete_daily_journal_service, trade_date.isoformat())
 
 
 @router.delete("/journal/{entry_id}", response_model=JournalDeleteEnvelope)

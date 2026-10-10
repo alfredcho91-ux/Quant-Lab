@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import threading
 from collections import defaultdict
 from typing import Any, Dict, Iterable, List, Optional
 
@@ -10,7 +9,7 @@ import numpy as np
 
 from backend.modules.journal import repository
 from backend.modules.journal.analysis import run_journal_excursions_service
-from backend.modules.journal.cache_keys import position_analysis_cache_key
+from backend.modules.journal.closed_position_returns import closed_position_net_return_pct
 from backend.modules.journal.market_context import load_market_frames
 from backend.modules.journal.trade_selection import closed_positions, market_group_key
 from backend.modules.journal.quality_market import (
@@ -23,16 +22,8 @@ from backend.modules.journal.quality_market import (
     point_in_time_trend_state,
     trade_alignment,
 )
-from backend.config.settings import PROJECT_ROOT
-from backend.utils.cache import DataCache
 
 MIN_REGIME_CONCLUSION_SAMPLE = 5
-QUALITY_ANALYSIS_CACHE_VERSION = 8
-QUALITY_ANALYSIS_CACHE = DataCache(
-    ttl_minutes=10,
-    cache_dir=str(PROJECT_ROOT / ".cache" / "journal_quality"),
-)
-QUALITY_ANALYSIS_LOCK = threading.Lock()
 
 
 def _mean(values: Iterable[Any]) -> Optional[float]:
@@ -47,6 +38,11 @@ def _percentile(values: Iterable[Any], percentile: float) -> Optional[float]:
 
 def _sample_quality(count: int) -> str:
     return "high" if count >= 30 else "medium" if count >= 10 else "low"
+
+
+def _mapping(value: Any) -> Dict[str, Any]:
+    """Treat incomplete optional analysis fields as empty mappings."""
+    return value if isinstance(value, dict) else {}
 
 
 def _performance_stats(items: List[Dict[str, Any]]) -> Dict[str, Any]:
@@ -65,12 +61,12 @@ def _performance_stats(items: List[Dict[str, Any]]) -> Dict[str, Any]:
         "r_sample_count": len(r_values),
         "average_pnl": float(np.mean(pnls)) if pnls else None,
         "profit_factor": sum(wins) / gross_loss if gross_loss > 0 else None,
-        "average_mfe_pct": _mean((item.get("excursion") or {}).get("mfe_pct") for item in items),
-        "average_mae_pct": _mean((item.get("excursion") or {}).get("mae_pct") for item in items),
+        "average_mfe_pct": _mean(_mapping(item.get("excursion")).get("mfe_pct") for item in items),
+        "average_mae_pct": _mean(_mapping(item.get("excursion")).get("mae_pct") for item in items),
         "average_holding_minutes": _mean(item.get("holding_minutes") for item in items),
         "early_exit_ratio_pct": early_count / len(items) * 100 if items else None,
         "late_exit_ratio_pct": late_count / len(items) * 100 if items else None,
-        "average_capture_ratio_pct": _mean((item.get("exit_quality") or {}).get("capture_ratio_pct") for item in items),
+        "average_capture_ratio_pct": _mean(_mapping(item.get("exit_quality")).get("capture_ratio_pct") for item in items),
         "sample_quality": _sample_quality(len(items)),
     }
 
@@ -81,23 +77,13 @@ def _hold_aggregates(items: List[Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:
         results = [
             result
             for item in items
-            if (result := (item.get("exit_quality") or {}).get("hold_results", {}).get(key, {})).get("available")
+            if (result := _mapping(_mapping(item.get("exit_quality")).get("hold_results")).get(key, {})).get("available")
         ]
-        returns = [
-            value
-            for result in results
-            if (value := finite(result.get("return_pct"))) is not None
-        ]
-        losses = [value for value in returns if value < 0]
         output[key] = {
             "available_count": len(results),
-            "return_sample_count": len(returns),
-            "average_return_pct": _mean(returns),
+            "average_return_pct": _mean(result.get("return_pct") for result in results),
             "average_r": _mean(result.get("r_multiple") for result in results),
             "r_sample_count": sum(finite(result.get("r_multiple")) is not None for result in results),
-            "loss_count": len(losses),
-            "loss_rate_pct": len(losses) / len(returns) * 100 if returns else None,
-            "average_loss_pct": _mean(losses),
         }
     return output
 
@@ -106,14 +92,14 @@ def _strategy_aggregates(items: List[Dict[str, Any]]) -> Dict[str, Dict[str, Any
     strategy_ids = sorted({
         strategy_id
         for item in items
-        for strategy_id in item.get("exit_quality", {}).get("virtual_exits", {})
+        for strategy_id in _mapping(_mapping(item.get("exit_quality")).get("virtual_exits"))
     })
     output: Dict[str, Dict[str, Any]] = {}
     for strategy_id in strategy_ids:
         results = [
             result
             for item in items
-            if (result := (item.get("exit_quality") or {}).get("virtual_exits", {}).get(strategy_id, {})).get("available")
+            if (result := _mapping(_mapping(item.get("exit_quality")).get("virtual_exits")).get(strategy_id, {})).get("available")
         ]
         output[strategy_id] = {
             "triggered_count": len(results),
@@ -140,11 +126,11 @@ def _best_exit_method(items: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
 def _quality_thresholds(items: List[Dict[str, Any]]) -> Dict[str, Any]:
     return {
         "method": "selected_period_distribution",
-        "mfe_low_pct": _percentile(((item.get("excursion") or {}).get("mfe_pct") for item in items), 25),
-        "mae_typical_pct": _percentile(((item.get("excursion") or {}).get("mae_pct") for item in items), 50),
-        "post_exit_high_pct": _percentile(((item.get("exit_quality") or {}).get("additional_profit_potential_pct") for item in items), 75),
-        "give_up_high_pct": _percentile(((item.get("exit_quality") or {}).get("profit_give_up_pct") for item in items), 75),
-        "capture_typical_pct": _percentile(((item.get("exit_quality") or {}).get("capture_ratio_pct") for item in items), 50),
+        "mfe_low_pct": _percentile((_mapping(item.get("excursion")).get("mfe_pct") for item in items), 25),
+        "mae_typical_pct": _percentile((_mapping(item.get("excursion")).get("mae_pct") for item in items), 50),
+        "post_exit_high_pct": _percentile((_mapping(item.get("exit_quality")).get("additional_profit_potential_pct") for item in items), 75),
+        "give_up_high_pct": _percentile((_mapping(item.get("exit_quality")).get("profit_give_up_pct") for item in items), 75),
+        "capture_typical_pct": _percentile((_mapping(item.get("exit_quality")).get("capture_ratio_pct") for item in items), 50),
     }
 
 
@@ -242,11 +228,11 @@ def _analysis_bundle(items: List[Dict[str, Any]]) -> Dict[str, Any]:
             "early_exit_ratio_pct": quality_counts["good_entry_early_exit"] / analyzed_count * 100 if analyzed_count else None,
             "late_exit_ratio_pct": quality_counts["good_entry_late_exit"] / analyzed_count * 100 if analyzed_count else None,
             "average_capture_ratio_pct": _mean(
-                item.get("exit_quality", {}).get("capture_ratio_pct") for item in items
+                _mapping(item.get("exit_quality")).get("capture_ratio_pct") for item in items
             ),
             "issue_balance": issue_balance,
             "r_available_count": sum(
-                item.get("exit_quality", {}).get("r_available") is True for item in items
+                _mapping(item.get("exit_quality")).get("r_available") is True for item in items
             ),
         },
         "regimes": regimes,
@@ -266,6 +252,9 @@ def _direction_breakdown(items: List[Dict[str, Any]]) -> Dict[str, Dict[str, Any
 
 def _net_return_pct(entry: Dict[str, Any]) -> Optional[float]:
     """Match the journal UI's net-return basis without using price movement as a proxy."""
+    if str(entry.get("source") or "").endswith("_position"):
+        return closed_position_net_return_pct(entry)
+
     net_pnl = finite(entry.get("realized_pnl"))
     if net_pnl is None:
         return None
@@ -274,19 +263,8 @@ def _net_return_pct(entry: Dict[str, Any]) -> Optional[float]:
     if invested is None or invested <= 0:
         entry_price = finite(entry.get("entry_price"))
         size = finite(entry.get("size"))
-        source = str(entry.get("source") or "")
         notional: Optional[float] = None
-        if source.endswith("_position") and entry_price is not None and entry_price > 0:
-            exit_price = finite(entry.get("exit_price"))
-            direction = -1 if entry.get("direction") == "Short" else 1
-            if exit_price is not None:
-                price_return = ((exit_price - entry_price) / entry_price) * direction
-                fee = abs(finite(entry.get("fee")) or 0.0)
-                funding = finite(entry.get("funding_fee")) or 0.0
-                gross_pnl = net_pnl + fee - funding
-                if abs(price_return) > np.finfo(float).eps and abs(gross_pnl) > np.finfo(float).eps:
-                    notional = abs(gross_pnl / price_return)
-        elif entry_price is not None and entry_price > 0 and size is not None:
+        if entry_price is not None and entry_price > 0 and size is not None:
             notional = abs(entry_price * size)
 
         leverage = finite(entry.get("leverage"))
@@ -324,38 +302,6 @@ def _filter_positions_by_net_return(
         "excluded_below_threshold_count": below_threshold_count,
         "excluded_return_unavailable_count": unavailable_count,
     }
-
-
-def _analysis_cache_key(
-    start_time: int,
-    end_time: int,
-    positions: List[Dict[str, Any]],
-    min_abs_net_return_pct: float,
-) -> str:
-    return position_analysis_cache_key(
-        f"journal_quality:return-filter:{min_abs_net_return_pct:.6f}",
-        QUALITY_ANALYSIS_CACHE_VERSION,
-        start_time,
-        end_time,
-        positions,
-        (
-            "id",
-            "symbol",
-            "direction",
-            "entry_datetime",
-            "datetime",
-            "entry_price",
-            "exit_price",
-            "realized_pnl",
-            "invested_amount",
-            "leverage",
-            "fee",
-            "funding_fee",
-            "source",
-            "size",
-            "r_multiple",
-        ),
-    )
 
 
 def _build_item(
@@ -411,37 +357,19 @@ def run_journal_quality_analysis_service(
 
     all_positions = closed_positions(repository.list_entries(), start_time, end_time)
     positions, return_filter = _filter_positions_by_net_return(all_positions, min_abs_net_return_pct)
-    cache_key = _analysis_cache_key(start_time, end_time, positions, return_filter["minimum_abs_net_return_pct"])
-    cached_result = QUALITY_ANALYSIS_CACHE.get(cache_key)
-    if cached_result is not None:
-        return cached_result
-    with QUALITY_ANALYSIS_LOCK:
-        cached_result = QUALITY_ANALYSIS_CACHE.get(cache_key)
-        if cached_result is not None:
-            return cached_result
-        return _run_uncached_quality_analysis(start_time, end_time, positions, return_filter, cache_key)
-
-
-def _run_uncached_quality_analysis(
-    start_time: int,
-    end_time: int,
-    positions: List[Dict[str, Any]],
-    return_filter: Dict[str, Any],
-    cache_key: str,
-) -> Dict[str, Any]:
     excursion_response = run_journal_excursions_service(start_time, end_time)
     excursion_data = excursion_response["data"]
     excursions = {item["journal_id"]: item for item in excursion_data["items"]}
     warnings = list(excursion_data.get("warnings") or [])
-    by_market: Dict[tuple[str, str], List[Dict[str, Any]]] = defaultdict(list)
+    by_market: Dict[tuple[str, str, str], List[Dict[str, Any]]] = defaultdict(list)
     for position in positions:
         if position.get("symbol"):
             by_market[market_group_key(position)].append(position)
 
     items: List[Dict[str, Any]] = []
     market_data_sources = set()
-    for (_exchange, symbol), symbol_positions in by_market.items():
-        frames = load_market_frames(symbol, symbol_positions, warnings)
+    for (_exchange, instrument_type, symbol), symbol_positions in by_market.items():
+        frames = load_market_frames(symbol, symbol_positions, warnings, instrument_type)
         market_data_sources.update(
             str(frame.attrs.get("market_source"))
             for frame in frames.values()
@@ -475,9 +403,7 @@ def _run_uncached_quality_analysis(
             "warnings": sorted(set(warnings)),
         },
     }
-    QUALITY_ANALYSIS_CACHE.set(cache_key, result)
     return result
 
 
 __all__ = ["run_journal_quality_analysis_service"]
-

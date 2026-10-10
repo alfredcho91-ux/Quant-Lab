@@ -1,4 +1,4 @@
-"""Transport checks for credential endpoints."""
+"""Transport checks for endpoints that receive exchange credentials."""
 
 from __future__ import annotations
 
@@ -11,9 +11,13 @@ from backend.config.settings import get_app_environment
 
 
 def require_secure_credential_transport(request: Request) -> None:
+    """Reject credential writes over plain HTTP outside local development."""
     if get_app_environment() != "production" or _is_secure(request):
         return
-    raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Credentials must be sent over HTTPS")
+    raise HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail="Exchange credentials must be sent over HTTPS",
+    )
 
 
 def _is_secure(request: Request) -> bool:
@@ -21,7 +25,8 @@ def _is_secure(request: Request) -> bool:
         return True
     if os.getenv("TRUST_PROXY_HEADERS", "false").lower() not in {"1", "true", "yes", "on"}:
         return False
-    if request.headers.get("x-forwarded-proto", "").split(",", 1)[0].strip().lower() == "https":
+    forwarded = request.headers.get("x-forwarded-proto", "").split(",", 1)[0].strip().lower()
+    if forwarded == "https":
         return True
     try:
         return json.loads(request.headers.get("cf-visitor", "{}")).get("scheme") == "https"

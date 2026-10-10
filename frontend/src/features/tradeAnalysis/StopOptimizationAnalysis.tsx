@@ -15,12 +15,12 @@ type Props = {
 };
 
 function number(value?: number | null, digits = 2): string {
-  return value == null || !Number.isFinite(value) ? '-' : value.toFixed(digits);
+  return value == null || !Number.isFinite(value) ? '-' : value.toFixed(Math.min(2, digits));
 }
 
 function signed(value?: number | null, digits = 2): string {
   if (value == null || !Number.isFinite(value)) return '-';
-  return `${value >= 0 ? '+' : ''}${value.toFixed(digits)}`;
+  return `${value >= 0 ? '+' : ''}${value.toFixed(Math.min(2, digits))}`;
 }
 
 function regimeLabel(id: string): string {
@@ -174,7 +174,7 @@ export default function StopOptimizationAnalysis({ data, direction, isLoading, i
           {recovery.steepest_drop ? (
             <div className="mt-4 text-sm text-dark-200">회복률 급락 구간 <strong className="font-mono text-amber-300">{number(recovery.steepest_drop.from_pct)}% → {number(recovery.steepest_drop.to_pct)}%</strong></div>
           ) : <div className="mt-4 text-sm text-dark-400">급락 구간을 판단할 표본이 부족합니다.</div>}
-          <details className="mt-3 text-xs">
+          <details className="mt-3 text-xs" open>
             <summary className="cursor-pointer text-primary-300">구간별 회복률 보기</summary>
             <div className="mt-2 grid gap-1 sm:grid-cols-2">
               {usefulRecovery.map((point) => <div key={point.threshold_pct} className="flex justify-between border-b border-dark-800 py-1.5"><span>-{number(point.threshold_pct)}%</span><span className="font-mono">{number(point.recovery_probability_pct, 1)}% <span className="text-dark-600">({point.recovered_count}/{point.reached_count})</span></span></div>)}
@@ -188,15 +188,16 @@ export default function StopOptimizationAnalysis({ data, direction, isLoading, i
         <p className="mt-1 text-[11px] text-dark-500">승리 보존율, PF, 평균 R, Drawdown을 함께 반영 · 굵은 행이 선택값</p>
         <div className="mt-3"><CandidateTable candidates={analysis.fixed_candidates} selected={recommendation?.selected_pct} /></div>
       </details>
+      {data.warnings.length > 0 && <div className="space-y-0.5 border-t border-dark-700 p-4 text-[11px] text-amber-300">{data.warnings.map((warning) => <div key={warning}>{warning}</div>)}</div>}
 
-      <details className="border-b border-dark-700 p-4">
+      <details className="border-b border-dark-700 p-4" open>
         <summary className="cursor-pointer text-xs font-semibold text-white">ATR Stop 후보 비교</summary>
         <p className="mt-1 text-[11px] text-dark-500">진입 직전 완료된 4시간봉 ATR 기준</p>
         <div className="mt-3"><CandidateTable candidates={analysis.atr_candidates} /></div>
       </details>
 
       {regimes.length > 0 && (
-        <details className="p-4">
+        <details className="p-4" open>
           <summary className="cursor-pointer text-xs font-semibold text-white">장세별 추천 범위</summary>
           <div className="mt-3 space-y-2 text-xs">
             {regimes.map((regime) => <div key={regime.id} className="flex flex-wrap justify-between gap-2 border-b border-dark-800 py-2"><span>{regimeLabel(regime.id)}</span><span className="font-mono text-primary-200">{regime.recommendation ? `${number(regime.recommendation.lower_pct)}% ~ ${number(regime.recommendation.upper_pct)}%` : '-'} <span className="text-dark-600">n={regime.trade_count}</span></span></div>)}

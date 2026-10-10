@@ -28,6 +28,20 @@ from backend.utils.transport_security import require_secure_credential_transport
 router = APIRouter(prefix="/api/deepcoin", tags=["deepcoin"])
 
 
+@router.post("/credentials", response_model=DeepcoinStatusEnvelope)
+@handle_api_errors()
+async def api_configure_deepcoin_credentials(payload: DeepcoinCredentialsRequest, request: Request):
+    require_secure_credential_transport(request)
+    return await run_in_threadpool(configure_deepcoin_credentials_service, payload.api_key, payload.secret_key, payload.passphrase)
+
+
+@router.delete("/credentials", response_model=DeepcoinStatusEnvelope)
+@handle_api_errors()
+async def api_delete_deepcoin_credentials(request: Request):
+    require_secure_credential_transport(request)
+    return await run_in_threadpool(delete_deepcoin_credentials_service)
+
+
 @router.get("/status", response_model=DeepcoinStatusEnvelope)
 @handle_api_errors()
 async def api_deepcoin_status():
@@ -40,27 +54,6 @@ async def api_deepcoin_status():
 async def api_deepcoin_open_positions():
     """Return current non-zero positions using server-side credentials only."""
     return await run_in_threadpool(get_deepcoin_open_positions_service)
-
-
-@router.post("/credentials", response_model=DeepcoinStatusEnvelope)
-@handle_api_errors()
-async def api_configure_deepcoin_credentials(payload: DeepcoinCredentialsRequest, request: Request):
-    """Verify and save local read-only credentials without returning any secret."""
-    require_secure_credential_transport(request)
-    return await run_in_threadpool(
-        configure_deepcoin_credentials_service,
-        payload.api_key,
-        payload.secret_key,
-        payload.passphrase,
-    )
-
-
-@router.delete("/credentials", response_model=DeepcoinStatusEnvelope)
-@handle_api_errors()
-async def api_delete_deepcoin_credentials(request: Request):
-    """Remove locally persisted Deepcoin credentials."""
-    require_secure_credential_transport(request)
-    return await run_in_threadpool(delete_deepcoin_credentials_service)
 
 
 @router.get("/trade-markers", response_model=DeepcoinTradeMarkersEnvelope)

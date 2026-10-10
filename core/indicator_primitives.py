@@ -217,24 +217,14 @@ def compute_vwap_standard_deviation(
     length: int = 14,
     timestamp_column: str = "open_dt",
 ) -> Optional[dict[str, object]]:
-    """Return an anchored HLC3 VWAP, deviation bands, and current sigma position.
-
-    The VWAP is volume-weighted from the selected calendar anchor's first bar.
-    The standard deviation uses the latest ``length`` completed bars' HLC3
-    values, weighted by volume when volume is available. Keeping these inputs
-    explicit makes the calculation identical for daily, weekly, and monthly
-    anchored VWAP data.
-    """
+    """Return anchored HLC3 VWAP, bands, and current sigma position."""
     if anchor not in {"day", "week", "month"} or length <= 0:
-        raise ValueError("A supported calendar anchor and a positive length are required")
-    required = {"high", "low", "close", "volume"}
-    if df.empty or not required.issubset(df.columns):
+        raise ValueError("VWAP anchor must be day, week, or month and length must be positive")
+    if df.empty or not {"high", "low", "close", "volume"}.issubset(df.columns):
         return None
-
     vwap = compute_vwap_anchored(df, anchor=anchor, timestamp_column=timestamp_column)
     if vwap is None:
         return None
-
     timestamps = pd.to_datetime(
         df[timestamp_column] if timestamp_column in df.columns else df.index,
         errors="coerce",
@@ -242,14 +232,12 @@ def compute_vwap_standard_deviation(
     )
     reference = timestamps.iloc[-1] if isinstance(timestamps, pd.Series) else timestamps[-1]
     if anchor == "day":
-        anchor_start = reference.normalize()
+        start = reference.normalize()
     elif anchor == "week":
-        anchor_start = reference.normalize() - pd.Timedelta(days=reference.weekday())
+        start = reference.normalize() - pd.Timedelta(days=reference.weekday())
     else:
-        anchor_start = reference.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-    # Deviation must never include a prior anchor period. Early in an anchor
-    # period the available bars can be fewer than the configured 14-bar window.
-    period = df.loc[timestamps >= anchor_start]
+        start = reference.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    period = df.loc[timestamps >= start]
     typical = (period["high"] + period["low"] + period["close"]) / 3.0
     sample = pd.DataFrame({"typical": typical, "volume": period["volume"]}).tail(length)
     sample = sample.replace([np.inf, -np.inf], np.nan).dropna()

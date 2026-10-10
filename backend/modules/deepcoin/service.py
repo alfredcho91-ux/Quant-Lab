@@ -14,6 +14,7 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple
 from urllib.parse import urlencode
 
 import requests
+from backend.config.sample_policy import require_exchange_access
 
 from backend.config.settings import (
     DeepcoinCredentials,
@@ -23,6 +24,8 @@ from backend.config.settings import (
 from backend.modules.journal.repository import (
     add_entries_if_new_external_ids,
     existing_external_ids,
+    list_entries,
+    update_indicator_snapshots_by_external_id,
     update_imported_entries_by_external_id,
 )
 from backend.modules.deepcoin.snapshot import (
@@ -34,13 +37,37 @@ from backend.modules.deepcoin.snapshot import (
     indicator_snapshot_for_event as _indicator_snapshot_for_fill,
     snapshot_candle_count as _snapshot_candle_count,
 )
-from backend.modules.deepcoin.credentials import (
-    credential_storage_source,
-    delete_local_deepcoin_credentials,
-    save_local_deepcoin_credentials,
-)
-from backend.utils.log_redaction import register_sensitive_values
 from backend.utils.error_handler import BusinessLogicError, DataLoadError
+from backend.modules.deepcoin.credentials import save_local_deepcoin_credentials, delete_local_deepcoin_credentials
+from backend.modules.exchanges.credentials import CredentialStorageError
+from backend.utils.log_redaction import register_sensitive_values
+
+
+def configure_deepcoin_credentials_service(api_key: str, secret_key: str, passphrase: str) -> Dict[str, Any]:
+    """Keep the existing Deepcoin endpoint on the shared credential authority."""
+    require_exchange_access()
+    credentials = DeepcoinCredentials(api_key.strip(), secret_key.strip(), passphrase.strip())
+    register_sensitive_values(credentials.api_key, credentials.secret_key, credentials.passphrase)
+    try:
+        DeepcoinClient(credentials).get_fills(inst_type="SWAP", lookback_days=1)
+    except (DataLoadError, ValueError) as exc:
+        raise BusinessLogicError("Deepcoin connection could not be verified. Check the API key, passphrase, IP allowlist, and read permission.", error_code="DEEPCOIN_CONNECTION_FAILED") from exc
+    try:
+        save_local_deepcoin_credentials(credentials.api_key, credentials.secret_key, credentials.passphrase)
+    except (CredentialStorageError, OSError, ValueError) as exc:
+        raise BusinessLogicError("Deepcoin credentials could not be saved locally.", error_code="DEEPCOIN_CREDENTIAL_SAVE_FAILED") from exc
+    return get_deepcoin_status_service()
+
+
+def delete_deepcoin_credentials_service() -> Dict[str, Any]:
+    require_exchange_access()
+    try:
+        deleted = delete_local_deepcoin_credentials()
+    except (CredentialStorageError, OSError, ValueError) as exc:
+        raise BusinessLogicError("Deepcoin credentials could not be deleted locally.", error_code="DEEPCOIN_CREDENTIAL_DELETE_FAILED") from exc
+    result = get_deepcoin_status_service()
+    result["data"]["deleted"] = deleted
+    return result
 
 DEEPCOIN_FILLS_PATH = "/deepcoin/trade/fills"
 DEEPCOIN_POSITIONS_PATH = "/deepcoin/account/positions"
@@ -67,6 +94,7 @@ class DeepcoinClient:
     """Minimal Deepcoin private REST client used only for account-history reads."""
 
     def __init__(self, credentials: DeepcoinCredentials, base_url: Optional[str] = None):
+        require_exchange_access()
         self._credentials = credentials
         self._base_url = (base_url or get_deepcoin_api_base_url()).rstrip("/")
         self.truncated = False
@@ -350,7 +378,9 @@ def _timestamp_to_iso(timestamp_ms: int) -> str:
     return datetime.fromtimestamp(timestamp_ms / 1000, tz=timezone.utc).isoformat().replace("+00:00", "Z")
 
 
-def _iso_to_timestamp_ms(value: str) -> Optional[int]:
+def _iso_to_timestamp_ms(value: Any) -> Optional[int]:
+    if not isinstance(value, str) or not value.strip():
+        return None
     try:
         parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
     except (TypeError, ValueError):
@@ -624,57 +654,99 @@ def _snapshot_event_for_position(position: _PreparedFill) -> _PreparedFill:
     )
 
 
+def _snapshot_needs_refresh(snapshot: Any) -> bool:
+    """Return whether a saved snapshot predates the complete RVOL20 format."""
+    if not isinstance(snapshot, dict) or snapshot.get("version") != SNAPSHOT_VERSION:
+        return True
+    timeframes = snapshot.get("timeframes")
+    if not isinstance(timeframes, dict):
+        return True
+    return any(
+        not isinstance(timeframes.get(interval), dict)
+        or timeframes[interval].get("status") != "complete"
+        or "rvol20" not in timeframes[interval]
+        for interval in ("1h", "2h", "4h", "1d")
+    )
+
+
+def _stale_closed_position_snapshot_events(lookback_days: int) -> List[_PreparedFill]:
+    """Return stale closed positions that can be rebuilt from their entry time.
+
+    The exchange history endpoint can omit old closed positions. A missing
+    entry time is never replaced by exit time because that would introduce
+    look-ahead bias into the entry analysis.
+    """
+    cutoff_ms = int((datetime.now(timezone.utc) - timedelta(days=lookback_days)).timestamp() * 1000)
+    events: List[_PreparedFill] = []
+    for entry in list_entries():
+        if entry.get("source") != "deepcoin_position" or not _snapshot_needs_refresh(entry.get("indicator_snapshot")):
+            continue
+        entry_time = _iso_to_timestamp_ms(entry.get("entry_datetime"))
+        external_id = str(entry.get("external_id") or "").strip()
+        coin = _base_coin(entry.get("symbol"))
+        if entry_time is None or entry_time < cutoff_ms or not external_id or coin is None:
+            continue
+        events.append(
+            _PreparedFill(
+                raw={},
+                external_id=external_id,
+                timestamp_ms=entry_time,
+                coin=coin,
+                event_type="position_entry",
+            )
+        )
+    return events
+
+
 def get_deepcoin_status_service() -> Dict[str, Any]:
-    configured = get_deepcoin_credentials() is not None
-    storage = credential_storage_source() if configured else "not_configured"
     return {
         "success": True,
         "data": {
-            "configured": configured,
+            "configured": get_deepcoin_credentials() is not None,
             "mode": "read_only",
-            "credential_storage": storage,
         },
     }
 
 
-def configure_deepcoin_credentials_service(api_key: str, secret_key: str, passphrase: str) -> Dict[str, Any]:
-    """Verify read access before persisting credentials in protected local storage."""
-    credentials = DeepcoinCredentials(
-        api_key=api_key.strip(),
-        secret_key=secret_key.strip(),
-        passphrase=passphrase.strip(),
-    )
-    register_sensitive_values(credentials.api_key, credentials.secret_key, credentials.passphrase)
-    try:
-        DeepcoinClient(credentials).get_fills(inst_type="SWAP", lookback_days=1)
-    except (DataLoadError, ValueError) as exc:
+def get_deepcoin_open_positions_service() -> Dict[str, Any]:
+    """Return normalized live positions without persisting account state."""
+    credentials = get_deepcoin_credentials()
+    if credentials is None:
         raise BusinessLogicError(
-            "Deepcoin connection could not be verified. Check the API key, passphrase, IP allowlist, and read permission.",
-            error_code="DEEPCOIN_CONNECTION_FAILED",
-        ) from exc
+            "Deepcoin API credentials are not configured",
+            error_code="DEEPCOIN_NOT_CONFIGURED",
+        )
 
-    try:
-        save_local_deepcoin_credentials(credentials.api_key, credentials.secret_key, credentials.passphrase)
-    except (OSError, ValueError) as exc:
-        raise BusinessLogicError(
-            "Deepcoin credentials could not be saved locally.",
-            error_code="DEEPCOIN_CREDENTIAL_SAVE_FAILED",
-        ) from exc
-    return get_deepcoin_status_service()
-
-
-def delete_deepcoin_credentials_service() -> Dict[str, Any]:
-    """Remove the local read-only Deepcoin credential set."""
-    try:
-        deleted = delete_local_deepcoin_credentials()
-    except (OSError, ValueError) as exc:
-        raise BusinessLogicError(
-            "Deepcoin credentials could not be deleted locally.",
-            error_code="DEEPCOIN_CREDENTIAL_DELETE_FAILED",
-        ) from exc
-    status = get_deepcoin_status_service()
-    status["data"]["deleted"] = deleted
-    return status
+    positions = []
+    for raw in DeepcoinClient(credentials).get_open_positions():
+        coin = _base_coin(raw.get("instId"))
+        side = str(raw.get("posSide") or "").lower()
+        size = _to_float(raw.get("pos"))
+        if coin is None or side not in {"long", "short"} or size is None or size <= 0:
+            continue
+        raw_times = [
+            value for value in (
+                _timestamp_ms(raw.get("uTime")),
+                _timestamp_ms(raw.get("cTime")),
+            )
+            if value is not None
+        ]
+        # Older API variants swap cTime/uTime semantics; their chronological order is stable.
+        opened_ms = min(raw_times) if raw_times else None
+        updated_ms = max(raw_times) if raw_times else None
+        positions.append({
+            "position_id": str(raw.get("posId") or ""),
+            "symbol": f"{coin}/USDT",
+            "direction": "Long" if side == "long" else "Short",
+            "size": size,
+            "average_price": _to_json_number(raw.get("avgPx")),
+            "last_price": _to_json_number(raw.get("lastPx")),
+            "unrealized_pnl": _to_json_number(raw.get("unrealizedProfit")),
+            "leverage": _to_json_number(raw.get("lever")),
+            "opened_at": _timestamp_to_iso(opened_ms) if opened_ms else None,
+            "updated_at": _timestamp_to_iso(updated_ms) if updated_ms else None,
+        })
+    return {"success": True, "data": positions}
 
 
 def get_deepcoin_trade_markers_service(
@@ -841,6 +913,12 @@ def sync_deepcoin_fills_service(inst_type: str, lookback_days: int) -> Dict[str,
     ])
     positions_skipped = len(existing_positions) - positions_updated
 
+    # Deepcoin can omit older closed positions from its history response. Keep
+    # execution data untouched and refresh only stale entry snapshots locally.
+    stale_position_events = _stale_closed_position_snapshot_events(lookback_days)
+    stale_snapshots = _build_indicator_snapshots(stale_position_events) if stale_position_events else {}
+    positions_snapshots_refreshed = update_indicator_snapshots_by_external_id(stale_snapshots)
+
     new_events = [*new_fills, *new_positions]
     imported = 0
     positions_imported = 0
@@ -855,6 +933,7 @@ def sync_deepcoin_fills_service(inst_type: str, lookback_days: int) -> Dict[str,
             {
                 "version": SNAPSHOT_VERSION,
                 "market_source": "Binance USDT-M Futures",
+                "market_source_fallback": False,
                 "reference": fallback_reference,
                 "event_type": snapshot_event.event_type,
                 "event_time": _timestamp_to_iso(snapshot_event.timestamp_ms),
@@ -907,6 +986,10 @@ def sync_deepcoin_fills_service(inst_type: str, lookback_days: int) -> Dict[str,
         )
     if partial_snapshots:
         warnings.append("Some imported records were saved with partial indicator snapshots.")
+    if positions_snapshots_refreshed:
+        warnings.append(
+            f"Refreshed indicator snapshots for {positions_snapshots_refreshed} existing closed positions."
+        )
     return {
         "success": True,
         "data": {
@@ -921,6 +1004,7 @@ def sync_deepcoin_fills_service(inst_type: str, lookback_days: int) -> Dict[str,
             "positions_fetched": len(raw_positions),
             "positions_imported": positions_imported,
             "positions_updated": positions_updated,
+            "positions_snapshots_refreshed": positions_snapshots_refreshed,
             "fills_updated": fills_updated,
             "positions_skipped": positions_skipped,
             "positions_ignored": positions_ignored,
@@ -929,58 +1013,10 @@ def sync_deepcoin_fills_service(inst_type: str, lookback_days: int) -> Dict[str,
     }
 
 
-def get_deepcoin_open_positions_service() -> Dict[str, Any]:
-    """Return normalized live positions without persisting account state."""
-    credentials = get_deepcoin_credentials()
-    if credentials is None:
-        raise BusinessLogicError(
-            "Deepcoin API credentials are not configured",
-            error_code="DEEPCOIN_NOT_CONFIGURED",
-        )
-
-    positions = []
-    for raw in DeepcoinClient(credentials).get_open_positions():
-        coin = _base_coin(raw.get("instId"))
-        side = str(raw.get("posSide") or "").lower()
-        size = _to_float(raw.get("pos"))
-        if coin is None or side not in {"long", "short"} or size is None or size <= 0:
-            continue
-        raw_times = [
-            value for value in (
-                _timestamp_ms(raw.get("uTime")),
-                _timestamp_ms(raw.get("cTime")),
-            )
-            if value is not None
-        ]
-        # Deepcoin responses have been observed with uTime/cTime semantics reversed
-        # across API versions. Chronological order is stable even when labels are not.
-        opened_ms = min(raw_times) if raw_times else None
-        updated_ms = max(raw_times) if raw_times else None
-        stable_position_id = str(raw.get("posId") or "").strip()
-        display_position_id = stable_position_id or f"deepcoin:{coin}/USDT:{side}"
-        positions.append({
-            "position_id": display_position_id,
-            "lifecycle_id": stable_position_id or None,
-            "lifecycle_available": bool(stable_position_id),
-            "symbol": f"{coin}/USDT",
-            "direction": "Long" if side == "long" else "Short",
-            "size": size,
-            "average_price": _to_json_number(raw.get("avgPx")),
-            "last_price": _to_json_number(raw.get("lastPx")),
-            "unrealized_pnl": _to_json_number(raw.get("unrealizedProfit")),
-            "leverage": _to_json_number(raw.get("lever")),
-            "opened_at": _timestamp_to_iso(opened_ms) if opened_ms else None,
-            "updated_at": _timestamp_to_iso(updated_ms) if updated_ms else None,
-        })
-    return {"success": True, "data": positions}
-
-
 __all__ = [
     "DeepcoinClient",
-    "get_deepcoin_status_service",
     "get_deepcoin_open_positions_service",
-    "configure_deepcoin_credentials_service",
-    "delete_deepcoin_credentials_service",
+    "get_deepcoin_status_service",
     "get_deepcoin_trade_markers_service",
     "sync_deepcoin_fills_service",
 ]

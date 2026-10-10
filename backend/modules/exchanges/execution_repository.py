@@ -1,0 +1,329 @@
+"""Compact persistence for raw exchange executions used by chart review."""
+
+from __future__ import annotations
+
+import json
+import math
+import sqlite3
+from pathlib import Path
+from typing import Any, Dict, Iterable, List, Optional, Set
+
+from backend.config.settings import JOURNAL_DB_PATH
+from backend.utils.sqlite_connection import ClosingConnection
+
+TABLE_NAME = "exchange_executions"
+COLUMNS = [
+    "external_id", "datetime", "symbol", "direction", "size", "entry_price",
+    "source", "exchange", "order_id", "notes", "fee", "fee_currency", "indicator_snapshot", "created_at",
+    "actual_side", "position_side", "contract_size", "inst_type", "fee_complete",
+    "account_scope",
+]
+
+
+def _connect(db_path: Optional[Path] = None) -> sqlite3.Connection:
+    path = db_path or JOURNAL_DB_PATH
+    path.parent.mkdir(parents=True, exist_ok=True)
+    connection = sqlite3.connect(str(path), factory=ClosingConnection)
+    try:
+        connection.row_factory = sqlite3.Row
+        connection.execute("PRAGMA journal_mode=WAL")
+        connection.execute("PRAGMA synchronous=NORMAL")
+    except BaseException:
+        connection.close()
+        raise
+    return connection
+
+
+def _ensure_schema(connection: sqlite3.Connection) -> None:
+    """Atomically bootstrap executions and migrate only proven-safe sources.
+
+    A caller's transaction is never committed here. A savepoint also restores
+    the entire migration unit if an insert/delete/trigger fails midway through.
+    """
+    owns_transaction = not connection.in_transaction
+    if owns_transaction:
+        connection.execute("BEGIN IMMEDIATE")
+    connection.execute("SAVEPOINT execution_bootstrap")
+    try:
+        _create_schema(connection)
+        # Reserve the writer before reading identities even in a caller-owned
+        # deferred transaction. No existing execution is modified.
+        connection.execute(f"UPDATE {TABLE_NAME} SET external_id = external_id WHERE 0")
+        _migrate_legacy_rows(connection)
+    except Exception:
+        connection.execute("ROLLBACK TO execution_bootstrap")
+        connection.execute("RELEASE execution_bootstrap")
+        if owns_transaction:
+            connection.rollback()
+        raise
+    connection.execute("RELEASE execution_bootstrap")
+    if owns_transaction:
+        try:
+            connection.commit()
+        except Exception:
+            connection.rollback()
+            raise
+
+
+def _create_schema(connection: sqlite3.Connection) -> None:
+    connection.execute(f"""
+        CREATE TABLE IF NOT EXISTS {TABLE_NAME} (
+            external_id TEXT PRIMARY KEY,
+            datetime TEXT NOT NULL,
+            symbol TEXT NOT NULL,
+            direction TEXT NOT NULL,
+            size REAL,
+            entry_price REAL NOT NULL,
+            source TEXT NOT NULL,
+            exchange TEXT NOT NULL,
+            order_id TEXT,
+            notes TEXT,
+            fee REAL,
+            fee_currency TEXT,
+            indicator_snapshot TEXT,
+            created_at TEXT,
+            actual_side TEXT,
+            position_side TEXT,
+            contract_size REAL,
+            inst_type TEXT,
+            fee_complete INTEGER,
+            account_scope TEXT
+        )
+    """)
+    existing_columns = {
+        str(row["name"])
+        for row in connection.execute(f"PRAGMA table_info({TABLE_NAME})").fetchall()
+    }
+    for column, definition in (
+        ("notes", "TEXT"), ("actual_side", "TEXT"), ("position_side", "TEXT"),
+        ("contract_size", "REAL"), ("inst_type", "TEXT"), ("fee_complete", "INTEGER"),
+        ("account_scope", "TEXT"),
+    ):
+        if column not in existing_columns:
+            connection.execute(f"ALTER TABLE {TABLE_NAME} ADD COLUMN {column} {definition}")
+    connection.execute(
+        f"CREATE INDEX IF NOT EXISTS {TABLE_NAME}_lookup ON {TABLE_NAME} (exchange, symbol, datetime)"
+    )
+
+
+def _migrate_legacy_rows(connection: sqlite3.Connection) -> Dict[int, str]:
+    """Return per-source outcomes; FAILED propagates and rolls back bootstrap.
+
+    Never infer success from an ignored insert. Non-representable facts or
+    Journal-dependent entities stay attached to the original Journal identity.
+    No status is persisted and no provenance is manufactured.
+    """
+    journal_exists = connection.execute(
+        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'journal_entries'"
+    ).fetchone()
+    if journal_exists is None:
+        return {}
+    sources = ("binance_fill", "bybit_fill", "okx_fill")
+    placeholders = ", ".join("?" for _ in sources)
+    tables = {row[0] for row in connection.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+    outcomes = {}
+    rows = connection.execute(
+        f"SELECT * FROM journal_entries WHERE source IN ({placeholders}) ORDER BY id", sources,
+    ).fetchall()
+    for row in rows:
+        source = dict(row)
+        identifier = source["id"]
+        payload = {column: source.get(column) for column in COLUMNS}
+        payload["fee_complete"] = source.get("fee_complete", 1)
+        if not _legacy_execution_is_representable(source, payload):
+            outcomes[identifier] = "NOT_MIGRATABLE"
+            continue
+        if _legacy_has_dependents(connection, tables, source):
+            outcomes[identifier] = "NOT_MIGRATABLE"
+            continue
+        existing = connection.execute(
+            f"SELECT {', '.join(COLUMNS)} FROM {TABLE_NAME} WHERE external_id=?",
+            (payload["external_id"],),
+        ).fetchone()
+        values = tuple(payload[column] for column in COLUMNS)
+        if existing is not None and tuple(existing) != values:
+            outcomes[identifier] = "CONFLICT"
+            continue
+        if existing is None:
+            connection.execute(
+                f"INSERT INTO {TABLE_NAME} ({', '.join(COLUMNS)}) VALUES ({', '.join('?' for _ in COLUMNS)})",
+                values,
+            )
+        # Verify after insertion too: a trigger must not silently suppress or
+        # rewrite the destination and allow removal of the only source copy.
+        destination = connection.execute(
+            f"SELECT {', '.join(COLUMNS)} FROM {TABLE_NAME} WHERE external_id=?",
+            (payload["external_id"],),
+        ).fetchone()
+        if destination is None or tuple(destination) != values:
+            raise RuntimeError("Legacy execution migration verification failed")
+        connection.execute("DELETE FROM journal_entries WHERE id=?", (identifier,))
+        if connection.execute("SELECT 1 FROM journal_entries WHERE id=?", (identifier,)).fetchone():
+            raise RuntimeError("Legacy execution source removal failed")
+        outcomes[identifier] = "MIGRATED" if existing is None else "ALREADY_EQUIVALENT"
+    return outcomes
+
+
+def _legacy_execution_is_representable(source: Dict[str, Any], payload: Dict[str, Any]) -> bool:
+    for field in ("external_id", "datetime", "symbol", "direction", "source", "exchange"):
+        if not isinstance(payload[field], str) or not payload[field].strip():
+            return False
+    price = payload["entry_price"]
+    if not isinstance(price, (int, float)) or not math.isfinite(price):
+        return False
+    # Preserve every non-representable column, not just today's user-owned
+    # allowlist. False/zero are recorded evidence, not missing values.
+    for column, value in source.items():
+        if column == "id" or column in COLUMNS or value is None or value == "":
+            continue
+        if column in {"setup_tags", "mistake_tags", "indicators"}:
+            try:
+                if json.loads(value) == []:
+                    continue
+            except (TypeError, ValueError):
+                pass
+        return False
+    return True
+
+
+def _legacy_has_dependents(connection: sqlite3.Connection, tables: Set[str], source: Dict[str, Any]) -> bool:
+    # These are the current Journal identity consumers. Experiments refer to
+    # Strategy/Version identities, never Journal identities. Do not reassign
+    # either relationship to an execution or infer a Strategy from tags.
+    if "journal_strategy_assignments" in tables and connection.execute(
+        "SELECT 1 FROM journal_strategy_assignments WHERE journal_entry_id=?", (source["id"],),
+    ).fetchone():
+        return True
+    if "trading_plan_links" in tables and connection.execute(
+        "SELECT 1 FROM trading_plan_links WHERE journal_entry_id=? OR journal_external_id=?",
+        (source["id"], source["external_id"]),
+    ).fetchone():
+        return True
+    return False
+
+
+def add_executions_if_new(rows: Iterable[Dict[str, Any]], *, db_path: Optional[Path] = None) -> Set[str]:
+    payloads = {str(row["external_id"]): _normalize_row(row) for row in rows if row.get("external_id")}
+    if not payloads:
+        return set()
+    with _connect(db_path) as connection:
+        _ensure_schema(connection)
+        existing = _existing_ids(connection, payloads)
+        placeholders = ", ".join("?" for _ in COLUMNS)
+        connection.executemany(
+            f"INSERT OR IGNORE INTO {TABLE_NAME} ({', '.join(COLUMNS)}) VALUES ({placeholders})",
+            [tuple(payloads[key][column] for column in COLUMNS) for key in sorted(set(payloads) - existing)],
+        )
+        for key in sorted(existing):
+            snapshot = payloads[key].get("indicator_snapshot")
+            connection.execute(
+                f"""UPDATE {TABLE_NAME}
+                SET indicator_snapshot = COALESCE(?, indicator_snapshot),
+                    account_scope = COALESCE(account_scope, ?)
+                WHERE external_id = ?""",
+                (snapshot, payloads[key].get("account_scope"), key),
+            )
+        connection.commit()
+        return set(payloads) - existing
+
+
+def list_executions(
+    *,
+    exchange: Optional[str] = None,
+    symbol: Optional[str] = None,
+    symbols: Optional[Iterable[str]] = None,
+    start_time: Optional[str] = None,
+    end_time: Optional[str] = None,
+    account_scope: Optional[str] = None,
+    db_path: Optional[Path] = None,
+) -> List[Dict[str, Any]]:
+    conditions, values = [], []
+    for column, value in (("exchange", exchange), ("symbol", symbol), ("account_scope", account_scope)):
+        if value:
+            conditions.append(f"{column} = ?")
+            values.append(value)
+    normalized_symbols = sorted({str(value) for value in (symbols or []) if value})
+    if normalized_symbols:
+        placeholders = ", ".join("?" for _ in normalized_symbols)
+        conditions.append(f"symbol IN ({placeholders})")
+        values.extend(normalized_symbols)
+    if start_time:
+        conditions.append("datetime >= ?")
+        values.append(start_time)
+    if end_time:
+        conditions.append("datetime <= ?")
+        values.append(end_time)
+    where = f"WHERE {' AND '.join(conditions)}" if conditions else ""
+    with _connect(db_path) as connection:
+        _ensure_schema(connection)
+        rows = connection.execute(
+            f"SELECT {', '.join(COLUMNS)} FROM {TABLE_NAME} {where} ORDER BY datetime ASC",
+            values,
+        ).fetchall()
+    return [_row_to_dict(row) for row in rows]
+
+
+def adopt_legacy_account_scope(
+    exchange: str,
+    account_scope: str,
+    *,
+    db_path: Optional[Path] = None,
+) -> int:
+    """Assign legacy unscoped executions only when the exchange has no conflicting account scope."""
+    if not exchange or not account_scope:
+        return 0
+    with _connect(db_path) as connection:
+        _ensure_schema(connection)
+        existing_scopes = {
+            str(row["account_scope"])
+            for row in connection.execute(
+                f"""SELECT DISTINCT account_scope FROM {TABLE_NAME}
+                WHERE exchange = ? AND account_scope IS NOT NULL AND account_scope != ''""",
+                (exchange,),
+            ).fetchall()
+        }
+        if existing_scopes and existing_scopes != {account_scope}:
+            return 0
+        cursor = connection.execute(
+            f"""UPDATE {TABLE_NAME} SET account_scope = ?
+            WHERE exchange = ? AND (account_scope IS NULL OR account_scope = '')""",
+            (account_scope, exchange),
+        )
+        connection.commit()
+        return int(cursor.rowcount)
+
+
+def _existing_ids(connection: sqlite3.Connection, external_ids: Iterable[str]) -> Set[str]:
+    identifiers = sorted(set(external_ids))
+    found: Set[str] = set()
+    for offset in range(0, len(identifiers), 900):
+        batch = identifiers[offset:offset + 900]
+        placeholders = ", ".join("?" for _ in batch)
+        rows = connection.execute(
+            f"SELECT external_id FROM {TABLE_NAME} WHERE external_id IN ({placeholders})", batch
+        ).fetchall()
+        found.update(str(row["external_id"]) for row in rows)
+    return found
+
+
+def _normalize_row(row: Dict[str, Any]) -> Dict[str, Any]:
+    payload = {column: row.get(column) for column in COLUMNS}
+    snapshot = payload.get("indicator_snapshot")
+    if isinstance(snapshot, dict):
+        payload["indicator_snapshot"] = json.dumps(snapshot, separators=(",", ":"))
+    payload["fee_complete"] = int(bool(payload.get("fee_complete", True)))
+    return payload
+
+
+def _row_to_dict(row: sqlite3.Row) -> Dict[str, Any]:
+    result = dict(row)
+    raw_snapshot = result.get("indicator_snapshot")
+    if raw_snapshot:
+        try:
+            result["indicator_snapshot"] = json.loads(raw_snapshot)
+        except (TypeError, json.JSONDecodeError):
+            result["indicator_snapshot"] = None
+    return result
+
+
+__all__ = ["add_executions_if_new", "adopt_legacy_account_scope", "list_executions"]

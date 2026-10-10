@@ -14,7 +14,7 @@ function formatPct(value?: number | null): string {
 
 function formatPValue(value?: number | null): string {
   if (typeof value !== 'number' || Number.isNaN(value)) return 'N/A';
-  if (value >= 0.001) return value.toFixed(3);
+  if (value >= 0.01) return value.toFixed(2);
   return value.toExponential(2);
 }
 

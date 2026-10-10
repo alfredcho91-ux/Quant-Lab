@@ -10,7 +10,9 @@ import {
   indicatorComparisons,
   performanceSummary,
   returnRangeIdFor,
+  strongestReliableCondition,
 } from './tradeAnalysis';
+import { wilsonInterval } from './statisticalConfidence';
 
 function snapshot(rsi: number, macdHistogram: number): TradeIndicatorSnapshot {
   return {
@@ -113,11 +115,67 @@ describe('trade analysis', () => {
     expect(rsi?.lossAverage).toBe(70);
     expect(lowRsi?.winFrequency).toBe(100);
     expect(lowRsi?.lossFrequency).toBe(0);
-    expect(lowRsi?.winMatched).toBe(1);
-    expect(lowRsi?.lossMatched).toBe(0);
-    expect(lowRsi?.lift).toBeNull();
+    expect(lowRsi?.conditionCount).toBe(1);
+    expect(lowRsi?.conditionalWinRate).toBe(100);
+    expect(lowRsi?.occurrenceRatio).toBeNull();
     expect(filterTradesByCondition(trades, '4h', 'rsi_low').map((trade) => trade.entry.id)).toEqual([2]);
-    expect(filterTradesByIndicatorMetric(trades, '4h', 'macd_hist').map((trade) => trade.entry.id)).toEqual([2, 4]);
+  });
+
+  it('uses only reliable, meaningful occurrence gaps for the automatic condition conclusion', () => {
+    const base = {
+      id: 'condition',
+      label: 'Condition',
+      winFrequency: 40,
+      lossFrequency: 20,
+      difference: 20,
+      winCount: 30,
+      lossCount: 30,
+      winMatched: 12,
+      lossMatched: 6,
+      conditionCount: 18,
+      conditionalWinRate: 66.666,
+      occurrenceRatio: 2,
+    };
+    expect(strongestReliableCondition([base])?.id).toBe('condition');
+    expect(strongestReliableCondition([{ ...base, winCount: 8, lossCount: 8 }])).toBeNull();
+    expect(strongestReliableCondition([{ ...base, difference: 4, occurrenceRatio: 1.1 }])).toBeNull();
+  });
+
+  it('calculates Wilson intervals only from valid exact counts', () => {
+    const interval = wilsonInterval(34, 50);
+    expect(interval?.low).toBeCloseTo(54.19, 1);
+    expect(interval?.high).toBeCloseTo(79.24, 1);
+    expect(wilsonInterval(1, 0)).toBeNull();
+    expect(wilsonInterval(6, 5)).toBeNull();
+  });
+
+  it('omits condition comparisons when either outcome group is empty', () => {
+    const winsOnly = buildAnalyzedTrades(fixtures()).filter((trade) => (trade.entry.realized_pnl || 0) > 0);
+
+    expect(conditionComparisons(winsOnly, '4h')).toEqual([]);
+  });
+
+  it('keeps zero-match condition statistics finite', () => {
+    const comparisons = conditionComparisons(buildAnalyzedTrades(fixtures()), '4h');
+    const highStochRsi = comparisons.find((item) => item.id === 'stoch_rsi_high');
+
+    expect(highStochRsi?.conditionCount).toBe(0);
+    expect(highStochRsi?.conditionalWinRate).toBeNull();
+    expect(highStochRsi?.occurrenceRatio).toBeNull();
+    expect(Number.isFinite(highStochRsi?.winFrequency || 0)).toBe(true);
+    expect(Number.isFinite(highStochRsi?.lossFrequency || 0)).toBe(true);
+  });
+
+  it('keeps evidence drawers aligned with win/loss comparison samples', () => {
+    const trades = buildAnalyzedTrades(fixtures());
+    const breakEven = {
+      ...trades[0],
+      entry: { ...trades[0].entry, id: 99, realized_pnl: 0 },
+    };
+    const withBreakEven = [...trades, breakEven];
+
+    expect(filterTradesByIndicatorMetric(withBreakEven, '4h', 'rsi').map((trade) => trade.entry.id)).toEqual([2, 4]);
+    expect(filterTradesByCondition(withBreakEven, '4h', 'rsi_low').map((trade) => trade.entry.id)).toEqual([2]);
   });
 
   it('classifies profit and loss return magnitudes at exact boundaries', () => {

@@ -1,9 +1,9 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import type { ComponentProps } from 'react';
-import { QueryClient, QueryObserver } from '@tanstack/react-query';
+import { QueryClient, QueryClientProvider, QueryObserver } from '@tanstack/react-query';
 import { describe, expect, it, vi } from 'vitest';
 
-import type { JournalEntry, PlanEvaluation, PlanLabData, TradingPlan } from '../types';
+import type { ExchangeOpenPosition, JournalEntry, PlanEvaluation, PlanLabData, TradingPlan } from '../types';
 import {
   calculateTargetRiskReward,
   calculateTargetRiskRewardFromDraft,
@@ -14,9 +14,10 @@ import {
   shouldLoadPlanLabAnalysis,
   type PlanDraft,
 } from '../features/planLab/pastTradePlan';
-import { PlanDetailsDrawer } from '../features/planLab/PlanTradeDetailDrawer';
-import { PlanForm } from './PlanLabPage';
+import { PlanDetailsDrawer, TradeAnalysisSummary } from '../features/planLab/PlanTradeDetailDrawer';
+import { entryRvol20 } from '../features/journal/tradeReportSnapshot';
 import { planCoverageItems } from '../features/planLab/planCoverage';
+import { PlanForm } from './PlanLabPage';
 
 const draft: PlanDraft = {
   exchange: 'binance',
@@ -129,6 +130,39 @@ function renderPlanForm(overrides: Partial<ComponentProps<typeof PlanForm>> = {}
 }
 
 describe('Past Trade Plan Input reliability', () => {
+  it('uses the same canonical entry RVOL20 snapshot in Plan Lab and ignores the exit snapshot', () => {
+    const position: JournalEntry = {
+      ...trade(1, '2026-01-01T10:00:00Z'),
+      source: 'deepcoin_position',
+      exchange: 'Deepcoin',
+      indicator_snapshot: { event_type: 'position_close', timeframes: { '4h': { status: 'complete', rvol20: 9.99 } } },
+    };
+    const entryFill: JournalEntry = {
+      id: 2,
+      datetime: '2026-01-01T10:00:00Z',
+      symbol: 'BTC/USDT',
+      direction: 'Long',
+      size: 1,
+      source: 'deepcoin',
+      exchange: 'Deepcoin',
+      notes: 'Deepcoin SWAP fill: buy',
+      indicator_snapshot: { event_type: 'fill', timeframes: { '4h': { status: 'complete', rvol20: 1.82 } } },
+    };
+
+    expect(entryRvol20(position, [position, entryFill])).toBe(1.82);
+    expect(entryRvol20(position, [position])).toBeNull();
+    expect(entryRvol20({
+      ...position,
+      indicator_snapshot: { event_type: 'position_entry', timeframes: { '4h': { status: 'complete', rvol20: 1.5 } } },
+    }, [])).toBe(1.5);
+    const html = renderToStaticMarkup(<QueryClientProvider client={new QueryClient()}>
+      <TradeAnalysisSummary entry={position} entries={[position, entryFill]} isKo />
+    </QueryClientProvider>);
+    expect(html).toContain('1.82x');
+    expect(html).not.toContain('9.99x');
+    expect(html).toContain('진입 직전 완료봉 거래량 ÷ 그 이전 20개 완료봉 평균');
+  });
+
   it('calculates a live LONG target R:R for a TP1-only plan', () => {
     const result = calculateTargetRiskReward({ direction: 'Long', entry: 100, stopLoss: 98, tp1: 104 });
     expect(result).toMatchObject({ mode: 'TP1_ONLY', riskDistance: 2, riskPct: 2, tp1R: 2, tp2R: null, splitTargetR: null, valid: true });
@@ -143,8 +177,8 @@ describe('Past Trade Plan Input reliability', () => {
 
   it('uses retrospective actual entry only as a preview reference, never as a plan entry', () => {
     const result = calculateTargetRiskRewardFromDraft(draft, 100);
-    expect(result).toMatchObject({ valid: true, tp1R: 2, mode: 'TP1_ONLY' });
     const payload = revisionPayload(draft, true);
+    expect(result).toMatchObject({ valid: true, tp1R: 2, mode: 'TP1_ONLY' });
     expect(payload?.entry_price).toBeNull();
     expect(payload).not.toHaveProperty('targetRR');
     expect(payload).not.toHaveProperty('targetRiskReward');
@@ -153,6 +187,20 @@ describe('Past Trade Plan Input reliability', () => {
     expect(html).toContain('목표 손익비');
     expect(html).toContain('실제 진입가를 기준으로 현재 입력한 SL/TP 가격 구조');
     expect(html).toContain('공식 계획 결과(Plan R)는 실제 가격 경로로 별도 계산');
+  });
+
+  it('uses a verified open position only as an in-trade R:R reference', () => {
+    const openPosition: ExchangeOpenPosition = {
+      exchange: 'deepcoin', position_id: 'live-1', symbol: 'BTC/USDT', direction: 'Long',
+      size: 1, average_price: 100, last_price: 101, unrealized_pnl: 1, opened_at: '2026-01-01T10:00:00Z',
+    };
+    const html = renderPlanForm({ trade: undefined, openPosition });
+
+    expect(revisionPayload(draft, true)).toMatchObject({ entry_price: null, entry_min: null, entry_max: null });
+    expect(html).toContain('진행중 거래 계획 입력');
+    expect(html).toContain('실제 진입 후 기록하는 계획입니다');
+    expect(html).toContain('실제 진입가는 목표 손익비 기준으로만 사용');
+    expect(html).not.toContain('Plan Entry');
   });
 
   it('keeps unsupported split post-exit coverage separate from the official analysis n', () => {
@@ -295,6 +343,38 @@ describe('Past Trade Plan Input reliability', () => {
     expect(html).toContain('평가 가능한 가격 경로가 없습니다');
   });
 
+  it.each([
+    [false, 'Not calculated — price-path data required for the plan result is unavailable.'],
+    [true, '계산되지 않음 — 계획 결과에 필요한 가격 경로 데이터가 없습니다.'],
+  ])('places the known unavailable reason beside the dash without changing actual result, locale %s', (isKo, reason) => {
+    const html = renderToStaticMarkup(<PlanDetailsDrawer
+      plan={plan('VERIFIED_PRETRADE', 1)}
+      entry={trade(1, '2026-01-01T10:00:00Z')}
+      evaluation={splitEvaluation({
+        evaluation_status: 'NOT_EVALUABLE',
+        plan_execution_mode: 'SINGLE_TP',
+        planned_result_r: null,
+        planned_result_pnl: null,
+        execution_delta_r: null,
+        plan_legs: [],
+        geometry: { valid: true, status: 'VALID' },
+      })}
+      entries={[]}
+      analysisRequested
+      analysisLoading={false}
+      isKo={isKo}
+      onClose={() => undefined}
+      onRevise={() => undefined}
+      onLoadAnalysis={() => undefined}
+    />);
+
+    expect(html).toContain('+1.50R');
+    expect(html).toContain(reason);
+    expect(html).not.toContain('Calculated with the legacy rule');
+    expect(html).not.toContain('기존 계획 방식으로 계산했습니다');
+    expect(html).not.toContain('+0.00R');
+  });
+
   it('explains TP1-to-stop and TP1-to-horizon from backend leg outcomes', () => {
     const stored = plan('VERIFIED_PRETRADE', 1);
     stored.latest_revision.take_profit_2 = 108;
@@ -375,6 +455,22 @@ describe('Past Trade Plan Input reliability', () => {
     const failed = renderPlanForm({ saved: false, error: '저장 실패' });
     expect(failed).toContain('저장 실패');
     expect(failed).not.toContain('회고 계획이 저장되었습니다');
+  });
+
+  it('shows the server lifecycle race rejection instead of an in-trade success state', () => {
+    const message = 'The position is no longer open. Synchronize closed trades, then record it as retrospective.';
+    const html = renderPlanForm({
+      trade: undefined,
+      openPosition: {
+        exchange: 'deepcoin', position_id: 'live-1', symbol: 'BTC/USDT', direction: 'Long',
+        size: 1, average_price: 100, last_price: 101, unrealized_pnl: 1,
+      },
+      saved: false,
+      error: message,
+    });
+
+    expect(html).toContain(message);
+    expect(html).not.toContain('회고 계획이 저장되었습니다');
   });
 
   it('hides hindsight result fields before retrospective save', () => {

@@ -15,6 +15,8 @@ export interface Labels {
   menu_trade_analysis: string;
   menu_risk_lab: string;
   menu_plan_lab: string;
+  menu_trade_explorer: string;
+  menu_playbook: string;
   menu_streak_analysis: string;
   menu_trend_judgment: string;
   menu_trend_chart: string;
@@ -69,8 +71,10 @@ export interface Labels {
 }
 
 const labels_ko: Labels = {
+  menu_trade_explorer: '거래 탐색',
+  menu_playbook: '플레이북',
   sidebar_title: '💎 퀀트 마스터',
-  sidebar_caption: '8 Strategies • RSI Single Knobs • Chart on Top',
+  sidebar_caption: '추세·백테스트·저널 복기를 한곳에서',
   coin_select: '코인 선택',
   menu_title: '메뉴',
   menu_backtest: '🚀 백테스트',
@@ -143,8 +147,10 @@ const labels_ko: Labels = {
 };
 
 const labels_en: Labels = {
+  menu_trade_explorer: 'Trade Explorer',
+  menu_playbook: 'Playbook',
   sidebar_title: '💎 Quant Master',
-  sidebar_caption: '8 Strategies • RSI Single Knobs • Chart on Top',
+  sidebar_caption: 'Trend, backtest, and journal review',
   coin_select: 'Select Coin',
   menu_title: 'Menu',
   menu_backtest: '🚀 Backtest',

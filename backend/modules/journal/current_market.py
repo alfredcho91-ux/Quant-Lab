@@ -8,10 +8,10 @@ from typing import Any, Dict, Optional
 
 import pandas as pd
 
-from backend.config.settings import PROJECT_ROOT
 from backend.modules.deepcoin.snapshot import (
     SNAPSHOT_INTERVALS,
     SNAPSHOT_VERSION,
+    anchored_vwap_snapshots_for_event,
     indicator_snapshot_for_event,
 )
 from backend.modules.journal.quality_market import (
@@ -27,7 +27,7 @@ from backend.utils.validators import validate_coin_symbol
 
 CURRENT_MARKET_CACHE = DataCache(
     ttl_minutes=65,
-    cache_dir=str(PROJECT_ROOT / ".cache" / "journal_current_market"),
+    persistent=False,  # Hourly UI context, never restored as a derived fact.
 )
 CURRENT_FRAME_CANDLES = {
     "1h": 245,
@@ -36,7 +36,6 @@ CURRENT_FRAME_CANDLES = {
     "1d": 245,
     "1w": 205,
     "1M": 125,
-    "1w": 205,
 }
 
 
@@ -64,7 +63,6 @@ def _current_hour_key(coin: str, as_of_ms: int) -> str:
 def build_current_market_snapshot(coin: str, as_of_ms: int) -> Dict[str, Any]:
     """Build indicators and trend states using candles completed before ``as_of_ms``."""
     normalized_coin = validate_coin_symbol(coin)
-    symbol = f"{normalized_coin}USDT"
     event = _CurrentMarketEvent(
         external_id=f"current:{normalized_coin}:{as_of_ms}",
         timestamp_ms=as_of_ms,
@@ -142,6 +140,7 @@ def build_current_market_snapshot(coin: str, as_of_ms: int) -> Dict[str, Any]:
                 "event_type": "current_market",
                 "event_time": _timestamp_to_iso(as_of_ms),
                 "timeframes": indicator_timeframes,
+                "anchored_vwaps": anchored_vwap_snapshots_for_event(frames, event),
             },
             "trend_states": trend_states,
             "market_regime": classify_market_regime(trend_states, previous_4h_direction),

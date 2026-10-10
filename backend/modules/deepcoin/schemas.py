@@ -12,6 +12,12 @@ class DeepcoinStatusData(BaseModel):
     deleted: Optional[bool] = None
 
 
+class DeepcoinCredentialsRequest(BaseModel):
+    api_key: str = Field(min_length=1, max_length=512)
+    secret_key: str = Field(min_length=1, max_length=512)
+    passphrase: str = Field(min_length=1, max_length=512)
+
+
 class DeepcoinStatusEnvelope(BaseModel):
     success: bool
     data: DeepcoinStatusData
@@ -20,12 +26,6 @@ class DeepcoinStatusEnvelope(BaseModel):
 class DeepcoinSyncRequest(BaseModel):
     inst_type: Literal["SWAP", "SPOT"] = "SWAP"
     lookback_days: int = Field(default=7, ge=1, le=90)
-
-
-class DeepcoinCredentialsRequest(BaseModel):
-    api_key: str = Field(min_length=1, max_length=512)
-    secret_key: str = Field(min_length=1, max_length=512)
-    passphrase: str = Field(min_length=1, max_length=512)
 
 
 class DeepcoinSyncData(BaseModel):
@@ -40,6 +40,7 @@ class DeepcoinSyncData(BaseModel):
     positions_fetched: int = 0
     positions_imported: int = 0
     positions_updated: int = 0
+    positions_snapshots_refreshed: int = 0
     fills_updated: int = 0
     positions_skipped: int = 0
     positions_ignored: int = 0
@@ -53,8 +54,6 @@ class DeepcoinSyncEnvelope(BaseModel):
 
 class DeepcoinOpenPosition(BaseModel):
     position_id: str
-    lifecycle_id: Optional[str] = None
-    lifecycle_available: bool = True
     symbol: str
     direction: Literal["Long", "Short"]
     size: float
@@ -92,7 +91,6 @@ class DeepcoinTradeMarkersEnvelope(BaseModel):
 
 __all__ = [
     "DeepcoinStatusData",
-    "DeepcoinCredentialsRequest",
     "DeepcoinStatusEnvelope",
     "DeepcoinOpenPosition",
     "DeepcoinOpenPositionsEnvelope",

@@ -3,19 +3,21 @@ from __future__ import annotations
 import base64
 import os
 
-from backend.modules.deepcoin import credentials, secure_credentials, service
+from backend.modules.deepcoin import credentials, service
+from backend.modules.exchanges import encrypted_store, legacy_env
 
 
 def test_local_credentials_are_written_atomically_with_restricted_mode(monkeypatch, tmp_path):
     env_file = tmp_path / ".env"
     env_file.write_text("DEEPCOIN_API_BASE_URL=https://example.test\nOTHER=value\n", encoding="utf-8")
-    monkeypatch.setattr(credentials, "ENV_FILE", env_file)
+    monkeypatch.setattr(legacy_env, "ENV_FILE", env_file)
+    monkeypatch.setattr(legacy_env, "owns_local_credential_env", lambda: True)
     monkeypatch.delenv("DEEPCOIN_API_KEY", raising=False)
     monkeypatch.delenv("DEEPCOIN_SECRET_KEY", raising=False)
     monkeypatch.delenv("DEEPCOIN_PASSPHRASE", raising=False)
     monkeypatch.setenv("CREDENTIAL_STORAGE", "encrypted_db")
     monkeypatch.setenv("CREDENTIAL_MASTER_KEY", base64.urlsafe_b64encode(b"x" * 32).decode("ascii"))
-    monkeypatch.setattr(secure_credentials, "JOURNAL_DB_PATH", tmp_path / "journal.db")
+    monkeypatch.setattr(encrypted_store, "JOURNAL_DB_PATH", tmp_path / "journal.db")
 
     credentials.save_local_deepcoin_credentials("api key", "secret-key", "pass phrase")
 
@@ -26,7 +28,9 @@ def test_local_credentials_are_written_atomically_with_restricted_mode(monkeypat
     assert "OTHER=value" in saved
     assert credentials.has_local_deepcoin_credentials() is True
     assert credentials.credential_storage_source() == "encrypted_db"
-    assert os.stat(env_file).st_mode & 0o777 == 0o600
+    assert b"secret-key" not in (tmp_path / "journal.db").read_bytes()
+    if os.name != "nt":
+        assert os.stat(env_file).st_mode & 0o777 == 0o600
 
 
 def test_configure_credentials_verifies_before_saving(monkeypatch):

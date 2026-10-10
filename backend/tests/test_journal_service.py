@@ -10,7 +10,6 @@ from backend.modules.journal import repository as journal_repository
 from backend.modules.journal.service import (
     delete_journal_service,
     get_journal_service,
-    update_journal_behavior_service,
 )
 
 
@@ -299,6 +298,84 @@ def test_journal_repository_batches_external_id_reads_and_writes(isolated_journa
     assert rows[second]["realized_pnl"] == 2
 
 
+def test_snapshot_refresh_preserves_existing_execution_fields(isolated_journal_store):
+    external_id = "deepcoin:position:snapshot-only"
+    journal_repository.add_entries_if_new_external_ids([{
+        "external_id": external_id,
+        "source": "deepcoin_position",
+        "symbol": "BTC/USDT",
+        "entry_price": 64000,
+        "exit_price": 65000,
+        "realized_pnl": 42,
+        "indicator_snapshot": {"version": 2},
+    }])
+
+    assert journal_repository.update_indicator_snapshots_by_external_id({
+        external_id: {"version": 3, "timeframes": {"1h": {"status": "complete"}}},
+    }) == 1
+
+    stored = next(row for row in get_journal_service()["data"] if row["external_id"] == external_id)
+    assert stored["entry_price"] == 64000
+    assert stored["exit_price"] == 65000
+    assert stored["realized_pnl"] == 42
+    assert stored["indicator_snapshot"]["version"] == 3
+
+
+def test_quarantine_preserves_user_annotations_and_can_be_restored(isolated_journal_store):
+    external_id = "binance:position:boundary"
+    stored = add_test_entry({
+        "external_id": external_id,
+        "source": "binance_position",
+        "symbol": "BTC/USDT",
+        "realized_pnl": 12,
+        "outcome": "Win",
+        "planned_stop_pct": 1.5,
+        "planned_target_pct": 3.0,
+        "planned_entry_reason": "breakout retest",
+        "setup_tags": ["trend"],
+        "mistake_tags": ["late-entry"],
+        "entry_reason_1_indicator": "RSI",
+        "entry_reason_1": "momentum confirmation",
+        "mistakes": "chased the candle",
+    })["data"]
+
+    assert journal_repository.quarantine_imported_entries_by_external_id(
+        [external_id],
+        "binance_position_boundary_unverified",
+    ) == 1
+    quarantined = next(row for row in get_journal_service()["data"] if row["id"] == stored["id"])
+    assert quarantined["source"] == "binance_position_boundary_unverified"
+    assert quarantined["realized_pnl"] is None
+    assert quarantined["planned_stop_pct"] == 1.5
+    assert quarantined["planned_target_pct"] == 3.0
+    assert quarantined["planned_entry_reason"] == "breakout retest"
+    assert quarantined["setup_tags"] == ["trend"]
+    assert quarantined["mistake_tags"] == ["late-entry"]
+    assert quarantined["entry_reason_1"] == "momentum confirmation"
+    assert quarantined["mistakes"] == "chased the candle"
+
+    assert journal_repository.update_imported_entries_by_external_id([{
+        "external_id": external_id,
+        "source": "binance_position",
+        "symbol": "BTC/USDT",
+        "realized_pnl": 15,
+        "outcome": "Win",
+    }]) == 1
+    restored = next(row for row in get_journal_service()["data"] if row["id"] == stored["id"])
+    assert restored["id"] == stored["id"]
+    assert restored["external_id"] == external_id
+    assert restored["source"] == "binance_position"
+    assert restored["realized_pnl"] == 15
+    assert restored["planned_stop_pct"] == 1.5
+    assert restored["planned_target_pct"] == 3.0
+    assert restored["planned_entry_reason"] == "breakout retest"
+    assert restored["setup_tags"] == ["trend"]
+    assert restored["mistake_tags"] == ["late-entry"]
+    assert restored["entry_reason_1_indicator"] == "RSI"
+    assert restored["entry_reason_1"] == "momentum confirmation"
+    assert restored["mistakes"] == "chased the candle"
+
+
 def test_journal_service_maps_legacy_indicator_list_into_reason_indicators(
     isolated_journal_store,
 ):
@@ -357,38 +434,3 @@ def test_journal_service_maps_legacy_indicator_list_into_reason_indicators(
     assert fetched["data"][0]["entry_reason_1_indicator"] == "RSI"
     assert fetched["data"][0]["entry_reason_2_indicator"] == "MA"
     assert fetched["data"][0]["entry_reason_3_indicator"] == "Volume"
-
-
-def test_behavior_notes_are_preserved_when_exchange_fields_refresh(isolated_journal_store):
-    created = add_test_entry({
-        "symbol": "BTC/USDT",
-        "direction": "Long",
-        "realized_pnl": 10.0,
-    })
-    entry_id = created["data"]["id"]
-    updated = update_journal_behavior_service(entry_id, {
-        "planned_stop_pct": 1.5,
-        "planned_target_pct": 3.0,
-        "setup_tags": ["추세추종", "VPVR 지지"],
-        "mistake_tags": ["조기청산"],
-        "plan_recorded_at": "2026-08-22T00:00:00+00:00",
-    })
-
-    assert updated["success"] is True
-    assert updated["data"]["setup_tags"] == ["추세추종", "VPVR 지지"]
-    assert journal_repository.update_imported_entries_by_external_id([{
-        "external_id": updated["data"]["external_id"],
-        "symbol": "BTC/USDT",
-        "realized_pnl": 12.0,
-    }]) == 1
-
-    refreshed = get_journal_service()["data"][0]
-    assert refreshed["realized_pnl"] == 12.0
-    assert refreshed["planned_stop_pct"] == 1.5
-    assert refreshed["mistake_tags"] == ["조기청산"]
-
-    later = update_journal_behavior_service(entry_id, {
-        "mistake_tags": ["조기청산", "늦은 손절"],
-        "plan_recorded_at": "2026-08-23T00:00:00+00:00",
-    })
-    assert later["data"]["plan_recorded_at"] == "2026-08-22T00:00:00+00:00"

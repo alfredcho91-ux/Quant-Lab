@@ -10,6 +10,7 @@ import logging
 from pathlib import Path
 from typing import Dict, Any, Optional
 from datetime import datetime, timedelta
+from backend.config.sample_policy import IS_SAMPLE
 
 try:
     from diskcache import Cache
@@ -24,21 +25,22 @@ logger = logging.getLogger(__name__)
 class DataCache:
     """
     TTL 기반 영속 캐시 (diskcache 사용)
-    
+
     서버 재시작 후에도 캐시가 유지되며, 디스크에 저장됩니다.
-    
+
     Attributes:
         ttl_seconds: 캐시 TTL (초 단위)
         _cache: diskcache.Cache 인스턴스
         _hits: 캐시 히트 횟수
         _misses: 캐시 미스 횟수
     """
-    
+
     def __init__(
         self,
         ttl_minutes: int = 5,
         cache_dir: Optional[str] = None,
         ttl_seconds: Optional[int] = None,
+        persistent: bool = True,
     ):
         """
         Args:
@@ -52,6 +54,7 @@ class DataCache:
             self.ttl_seconds = ttl_minutes * 60
 
         self._configured_cache_dir = cache_dir
+        self._persistent = persistent
         self._cache: Any = None
         self._cache_ready = False
         self._use_diskcache = False
@@ -90,7 +93,7 @@ class DataCache:
             return
 
         cache_backend = os.getenv("DATA_CACHE_BACKEND", "disk").strip().lower()
-        prefer_memory = cache_backend in {"memory", "mem", "off", "disabled", "none"}
+        prefer_memory = IS_SAMPLE or not self._persistent or cache_backend in {"memory", "mem", "off", "disabled", "none"}
 
         if DISKCACHE_AVAILABLE and not prefer_memory:
             try:
@@ -128,14 +131,14 @@ class DataCache:
         for key, _ in oldest_keys:
             self._cache.pop(key, None)
             self._timestamps.pop(key, None)
-    
+
     def get(self, key: str) -> Optional[Any]:
         """
         캐시에서 값 가져오기
-        
+
         Args:
             key: 캐시 키
-        
+
         Returns:
             캐시된 값 또는 None (미스 또는 만료)
         """
@@ -162,11 +165,11 @@ class DataCache:
                     del self._timestamps[key]
             self._misses += 1
             return None
-    
+
     def set(self, key: str, value: Any) -> None:
         """
         캐시에 값 저장
-        
+
         Args:
             key: 캐시 키
             value: 저장할 값
@@ -182,7 +185,7 @@ class DataCache:
             self._timestamps[key] = datetime.now()
             self._evict_expired_memory_entries()
             self._evict_memory_overflow()
-    
+
     def clear(self) -> None:
         """캐시 초기화"""
         self._ensure_cache_ready()
@@ -194,11 +197,11 @@ class DataCache:
             self._timestamps.clear()
         self._hits = 0
         self._misses = 0
-    
+
     def stats(self) -> Dict[str, Any]:
         """
         캐시 통계 반환 (히트율 포함)
-        
+
         Returns:
             캐시 통계 딕셔너리
         """
@@ -206,7 +209,7 @@ class DataCache:
 
         total_requests = self._hits + self._misses
         hit_rate = (self._hits / total_requests * 100) if total_requests > 0 else 0.0
-        
+
         if self._use_diskcache:
             # diskcache는 len()과 keys()를 지원
             cached_items = len(self._cache)
@@ -218,7 +221,7 @@ class DataCache:
         else:
             cached_items = len(self._cache)
             keys = list(self._cache.keys())[:10]
-        
+
         return {
             "cached_items": cached_items,
             "keys": keys[:10],  # 처음 10개만 반환 (너무 많을 수 있음)

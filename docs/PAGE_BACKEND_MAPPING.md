@@ -1,11 +1,14 @@
 # 화면-백엔드 매핑
 
-문서 기준일: 2026-08-21. 이 표는 현재 `frontend/src/App.tsx`의 경로와 `backend/main.py`의 라우터 등록을 기준으로 합니다. 사이드바 노출 순서는 매매일지, 매매분석부터 시작하고 AI Lab은 마지막입니다.
+문서 기준일: 2026-10-10. 이 표는 `frontend/src/App.tsx`의 경로와 `backend/main.py`의 라우터 등록을 기준으로 합니다. 사이드바는 저널 기능부터 시작하고 홀딩/재진입을 마지막에 둡니다. [현재 저널 통합 경계](./JOURNAL_SYNC.md)를 함께 확인합니다.
 
 ## 주요 화면
 
 | 화면/경로 | 프런트 주요 코드 | API | 백엔드 계산 경로 |
 | --- | --- | --- | --- |
+| 플레이북 `/playbook` | `pages/PlaybookPage.tsx`, `features/playbook/` | `/api/playbook/strategies`, 전략 버전·규칙 API | `modules/strategies/`, `modules/rule_engine/` |
+| 거래 탐색 `/trade-explorer` | `pages/TradeExplorerPage.tsx` | `/api/journal`, 근거 거래·리포트 API | `modules/journal/` |
+| 안내형 분석·복기·실험 `/trade-analysis` | `features/analytics/`, `features/review/` | `/api/analytics/*`, `/api/review/*`, `/api/experiments/*` | `modules/analytics/`, `modules/review/`, `modules/experiments/` |
 | 매매일지 `/journal` | `pages/JournalPage.tsx`, `features/journal/TradeBehaviorEditor.tsx` | `GET/PATCH/DELETE /api/journal`, `GET/POST/PATCH/DELETE /api/journal/behavior-rules`, `GET /api/deepcoin/status`, `GET /api/deepcoin/trade-markers`, `POST /api/deepcoin/sync` | `modules/journal/`, `modules/deepcoin/`, `core/indicator_pipelines.py`, `core/vpvr.py` |
 | 매매 분석 `/trade-analysis` | `pages/TradeAnalysisPage.tsx`, `features/tradeAnalysis/CurrentMarketSimilarityPanel.tsx`, `TradeQualityAnalysis.tsx`, `TradeBehaviorAnalysis.tsx` | `GET /api/journal`, `GET /api/journal/current-market`, `GET /api/journal/quality-analysis`, `GET/POST /api/journal/behavior-analysis`, `GET /api/journal/stop-loss-analysis` | `modules/journal/current_market.py`, `analysis.py`, `quality_analysis.py`, `behavior_analysis.py`, `quality_market.py`, `stop_loss_analysis.py`, `core/indicator_pipelines.py` |
 | 추세판단 `/trend-judgment` | `pages/TrendJudgmentPage.tsx`, `components/IndicatorProjectionCard.tsx`, `components/VPVRTable.tsx`, `components/MomentumIndicatorPanels.tsx` | `POST /api/trend-indicators`, `GET /api/indicators/projection`, `GET /api/indicators/vpvr/{coin}/{interval}` | `modules/stats/service.py`, `modules/indicators/service.py`, `core/indicators.py`, `core/vpvr.py` |

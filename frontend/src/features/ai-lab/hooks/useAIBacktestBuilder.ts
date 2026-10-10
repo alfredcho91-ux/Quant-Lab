@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { getStrategies, getTimeframes, runBacktest } from '../../../api/client';
-import type { BacktestParams, BacktestResult, Strategy } from '../../../types';
+import type { BacktestParams, BacktestResult, BacktestStrategy as Strategy } from '../../../types';
 import { runAIResearch } from '../../../api/ai_lab';
 import { DEFAULT_MODEL_BY_PROVIDER, type LlmProvider } from '../config';
 import {

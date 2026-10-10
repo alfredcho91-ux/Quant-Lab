@@ -16,7 +16,7 @@ import ParamsPanel from '../components/ParamsPanel';
 import StrategyExplainer from '../components/StrategyExplainer';
 import TradesTable from '../components/TradesTable';
 import DataSourceToggle from '../components/DataSourceToggle';
-import type { BacktestResult, Strategy } from '../types';
+import type { BacktestResult, BacktestStrategy as Strategy } from '../types';
 
 export default function BacktestPage() {
   const language = useLanguage();

@@ -1,13 +1,7 @@
 import { TRADING_STYLE_OPTIONS, type TradingStyle } from './tradingStyle';
 import { useSetTradingStyle, useTradingStyle } from '../../store/useStore';
 
-export default function TradingStyleSelect({
-  isKo,
-  onStyleChange,
-}: {
-  isKo: boolean;
-  onStyleChange?: (style: TradingStyle) => void;
-}) {
+export default function TradingStyleSelect({ isKo, onStyleChange }: { isKo: boolean; onStyleChange?: (style: TradingStyle) => void }) {
   const tradingStyle = useTradingStyle();
   const setTradingStyle = useSetTradingStyle();
 

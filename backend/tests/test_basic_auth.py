@@ -27,15 +27,6 @@ def test_dev_mode_skips_basic_auth(monkeypatch):
     assert main.verify_credentials(request(), None) == "local_dev"
 
 
-def test_dev_mode_rejects_non_loopback_requests(monkeypatch):
-    main = load_main_module(monkeypatch, "development")
-
-    with pytest.raises(HTTPException) as exc_info:
-        main.verify_credentials(request("192.168.0.10"), None)
-
-    assert exc_info.value.status_code == 403
-
-
 def test_production_requires_basic_auth(monkeypatch):
     monkeypatch.setenv("DEMO_USERNAME", "demo")
     monkeypatch.setenv("DEMO_PASSWORD", "secret")

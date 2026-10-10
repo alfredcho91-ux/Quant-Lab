@@ -18,11 +18,19 @@ def timestamp_ms(value: Any) -> Optional[int]:
         return None
     try:
         timestamp = pd.Timestamp(value)
-    except (TypeError, ValueError):
+        # pandas accepts values such as the literal "NaT" but they are not
+        # usable instants. Treat them as absent historical timestamps instead
+        # of letting timestamp()/tz handling leak an exception to callers.
+        if pd.isna(timestamp):
+            return None
+    except (TypeError, ValueError, OverflowError):
         return None
     if timestamp.tzinfo is None:
         timestamp = timestamp.tz_localize("UTC")
-    return int(timestamp.timestamp() * 1000)
+    try:
+        return int(timestamp.timestamp() * 1000)
+    except (TypeError, ValueError, OverflowError):
+        return None
 
 
 def finite_float(value: Any) -> Optional[float]:
@@ -33,11 +41,17 @@ def finite_float(value: Any) -> Optional[float]:
     return result if math.isfinite(result) else None
 
 
-def market_group_key(entry: Dict[str, Any]) -> tuple[str, str]:
+def instrument_type(entry: Dict[str, Any]) -> str:
+    """Recover the synced market type without guessing from a symbol alone."""
+    tags = {tag.strip().lower() for tag in str(entry.get("tags") or "").split(",")}
+    return "SPOT" if "spot" in tags else "SWAP"
+
+
+def market_group_key(entry: Dict[str, Any]) -> tuple[str, str, str]:
     """Keep positions from different exchanges out of the same OHLCV analysis."""
     exchange = str(entry.get("exchange") or "unknown").strip().lower()
     symbol = str(entry.get("symbol") or "").strip().upper()
-    return exchange, symbol
+    return exchange, instrument_type(entry), symbol
 
 
 def path_covers_position(
@@ -46,19 +60,33 @@ def path_covers_position(
     exit_time: int,
     interval_ms: int,
 ) -> bool:
-    """Return whether candle history reaches both boundaries of a position."""
+    """Return whether contiguous candle history covers the position lifetime."""
     if candles is None or candles.empty or entry_time > exit_time:
         return False
     if "open_time" not in candles.columns or "close_time" not in candles.columns:
         return False
-    open_times = pd.to_numeric(candles.get("open_time"), errors="coerce").dropna()
-    close_times = pd.to_numeric(candles.get("close_time"), errors="coerce").dropna()
-    if open_times.empty or close_times.empty:
+    bounds = pd.DataFrame({
+        "open_time": pd.to_numeric(candles["open_time"], errors="coerce"),
+        "close_time": pd.to_numeric(candles["close_time"], errors="coerce"),
+    }).dropna().drop_duplicates(subset=["open_time"]).sort_values("open_time")
+    bounds = bounds.loc[
+        (bounds["close_time"] >= entry_time - 1)
+        & (bounds["open_time"] <= exit_time)
+    ].reset_index(drop=True)
+    if bounds.empty:
         return False
-    return bool(
-        float(open_times.min()) < entry_time + interval_ms
-        and float(close_times.max()) > exit_time - interval_ms
-    )
+    opens = bounds["open_time"].to_numpy(dtype=float)
+    closes = bounds["close_time"].to_numpy(dtype=float)
+    if (
+        opens[0] > entry_time
+        or closes[0] < entry_time - 1
+        or opens[-1] > exit_time
+        or closes[-1] < exit_time - 1
+    ):
+        return False
+    if ((closes < opens) | ((closes - opens + 1) > interval_ms)).any():
+        return False
+    return bool(len(opens) == 1 or (opens[1:] <= closes[:-1] + 1).all())
 
 
 def closed_positions(
@@ -68,7 +96,7 @@ def closed_positions(
 ) -> List[Dict[str, Any]]:
     selected: List[Dict[str, Any]] = []
     for entry in entries:
-        if entry.get("source") != "deepcoin_position":
+        if not str(entry.get("source") or "").endswith("_position"):
             continue
         close_time = timestamp_ms(entry.get("datetime"))
         entry_time = timestamp_ms(entry.get("entry_datetime"))

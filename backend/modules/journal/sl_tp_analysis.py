@@ -3,18 +3,21 @@
 from __future__ import annotations
 
 import math
-import threading
 from collections import defaultdict, deque
 from decimal import Decimal
 from typing import Any, Dict, Iterable, List, Optional, Sequence
 
 import pandas as pd
 
-from backend.config.settings import PROJECT_ROOT
 from backend.modules.journal import repository
-from backend.modules.journal.cache_keys import position_analysis_cache_key
-from backend.modules.journal.trade_selection import closed_positions, finite_float, market_group_key, position_batches, timestamp_ms
-from backend.utils.cache import DataCache
+from backend.modules.journal.trade_selection import (
+    closed_positions,
+    finite_float,
+    market_group_key,
+    path_covers_position,
+    position_batches,
+    timestamp_ms,
+)
 from backend.modules.journal.market_data import load_journal_ohlcv
 
 PATH_INTERVAL = "5m"
@@ -22,22 +25,12 @@ PATH_INTERVAL_MS = 5 * 60 * 1000
 MAX_PATH_CANDLES = 30_000
 TRAIN_RATIO = 0.7
 MAX_GRID_COMBINATIONS = 800
-SL_TP_CACHE_VERSION = 3
 SCORE_WEIGHTS = {
     "expectancy": 0.35,
     "profit_factor": 0.25,
     "average_r": 0.15,
     "drawdown": 0.25,
 }
-SL_TP_PATH_CACHE = DataCache(
-    ttl_minutes=60,
-    cache_dir=str(PROJECT_ROOT / ".cache" / "journal_sl_tp_paths"),
-)
-SL_TP_RESULT_CACHE = DataCache(
-    ttl_minutes=60,
-    cache_dir=str(PROJECT_ROOT / ".cache" / "journal_sl_tp_analysis"),
-)
-SL_TP_LOCK = threading.RLock()
 
 
 def grid_values(minimum: float, maximum: float, step: float) -> List[float]:
@@ -129,27 +122,32 @@ def _compound_performance(returns: Sequence[float]) -> tuple[float, float]:
 
 
 def performance(results: List[Dict[str, Any]]) -> Dict[str, Any]:
-    returns = [float(item["return_pct"]) for item in results]
-    r_values = [float(item["r_multiple"]) for item in results]
+    evaluable = [
+        item for item in results
+        if finite_float(item.get("return_pct")) is not None
+        and finite_float(item.get("r_multiple")) is not None
+    ]
+    returns = [float(item["return_pct"]) for item in evaluable]
+    r_values = [float(item["r_multiple"]) for item in evaluable]
     wins = [value for value in returns if value > 0]
     losses = [value for value in returns if value < 0]
     gross_loss = abs(sum(losses))
     cumulative_return, max_drawdown = _compound_performance(returns)
     return {
-        "trade_count": len(results),
-        "win_rate_pct": len(wins) / len(results) * 100.0 if results else None,
-        "stop_hit_count": sum(bool(item["stop_hit"]) for item in results),
-        "stop_hit_pct": sum(bool(item["stop_hit"]) for item in results) / len(results) * 100.0 if results else None,
-        "tp_hit_count": sum(bool(item["tp_hit"]) for item in results),
-        "tp_hit_pct": sum(bool(item["tp_hit"]) for item in results) / len(results) * 100.0 if results else None,
-        "ambiguous_count": sum(bool(item["ambiguous"]) for item in results),
+        "trade_count": len(evaluable),
+        "win_rate_pct": len(wins) / len(evaluable) * 100.0 if evaluable else None,
+        "stop_hit_count": sum(bool(item["stop_hit"]) for item in evaluable),
+        "stop_hit_pct": sum(bool(item["stop_hit"]) for item in evaluable) / len(evaluable) * 100.0 if evaluable else None,
+        "tp_hit_count": sum(bool(item["tp_hit"]) for item in evaluable),
+        "tp_hit_pct": sum(bool(item["tp_hit"]) for item in evaluable) / len(evaluable) * 100.0 if evaluable else None,
+        "ambiguous_count": sum(bool(item["ambiguous"]) for item in evaluable),
         "average_win_pct": sum(wins) / len(wins) if wins else None,
         "average_loss_pct": sum(losses) / len(losses) if losses else None,
         "expectancy_pct": sum(returns) / len(returns) if returns else None,
         "average_r": sum(r_values) / len(r_values) if r_values else None,
         "profit_factor": sum(wins) / gross_loss if gross_loss > 0 else None,
-        "cumulative_return_pct": cumulative_return if results else None,
-        "max_drawdown_pct": max_drawdown if results else None,
+        "cumulative_return_pct": cumulative_return if evaluable else None,
+        "max_drawdown_pct": max_drawdown if evaluable else None,
     }
 
 
@@ -188,7 +186,8 @@ def _first_barrier_event(item: Dict[str, Any], barrier: str, distance_pct: float
     locations = hits.to_numpy().nonzero()[0]
     if len(locations):
         index = int(locations[0])
-        result: Optional[tuple[int, bool]] = (index, bool(path.iloc[index].get("boundary_uncertain", False)))
+        uncertain = bool(path.iloc[index].get("boundary_uncertain", False))
+        result: Optional[tuple[int, bool]] = (index, uncertain)
     else:
         result = None
     cache[key] = result
@@ -201,7 +200,11 @@ def _simulate_prepared_item(item: Dict[str, Any], sl_pct: float, tp_pct: float) 
     stop_index = stop_event[0] if stop_event else None
     target_index = target_event[0] if target_event else None
     first_index = min(index for index in (stop_index, target_index) if index is not None) if stop_index is not None or target_index is not None else None
-    if any(event is not None and event[0] == first_index and event[1] for event in (stop_event, target_event)):
+    first_is_uncertain = any(
+        event is not None and event[0] == first_index and event[1]
+        for event in (stop_event, target_event)
+    )
+    if first_is_uncertain:
         return {
             "outcome": "not_evaluable",
             "stop_hit": False,
@@ -403,19 +406,8 @@ def _fee_pct(position: Dict[str, Any]) -> Optional[float]:
     return abs(fee) / notional * 100.0
 
 
-def _path_cache_key(start_time: int, end_time: int, positions: List[Dict[str, Any]]) -> str:
-    return position_analysis_cache_key(
-        "journal_sl_tp_paths",
-        SL_TP_CACHE_VERSION,
-        start_time,
-        end_time,
-        positions,
-        ("id", "datetime", "entry_datetime", "symbol", "direction", "entry_price", "exit_price", "fee", "leverage", "invested_amount"),
-    )
-
-
 def _build_path_items(positions: List[Dict[str, Any]]) -> tuple[List[Dict[str, Any]], List[str]]:
-    by_market: Dict[tuple[str, str], List[Dict[str, Any]]] = defaultdict(list)
+    by_market: Dict[tuple[str, str, str], List[Dict[str, Any]]] = defaultdict(list)
     for position in positions:
         symbol = position.get("symbol")
         if symbol:
@@ -423,7 +415,7 @@ def _build_path_items(positions: List[Dict[str, Any]]) -> tuple[List[Dict[str, A
 
     items: List[Dict[str, Any]] = []
     warnings: List[str] = []
-    for (exchange, symbol), symbol_positions in by_market.items():
+    for (exchange, instrument_type, symbol), symbol_positions in by_market.items():
         for batch_index, batch in enumerate(position_batches(symbol_positions), start=1):
             earliest = min(timestamp_ms(item.get("entry_datetime")) or 0 for item in batch)
             latest = max(timestamp_ms(item.get("datetime")) or 0 for item in batch)
@@ -437,6 +429,7 @@ def _build_path_items(positions: List[Dict[str, Any]]) -> tuple[List[Dict[str, A
                 total_candles=requested,
                 end_time=latest,
                 exchange=exchange,
+                instrument_type=instrument_type,
             )
             if candles is None or candles.empty:
                 warnings.append(f"{symbol} batch {batch_index}: SL/TP market data unavailable")
@@ -449,6 +442,9 @@ def _build_path_items(positions: List[Dict[str, Any]]) -> tuple[List[Dict[str, A
                 exit_price = finite_float(position.get("exit_price"))
                 if None in (entry_time, exit_time, entry_price, exit_price) or entry_price <= 0:
                     continue
+                if not path_covers_position(candles, entry_time, exit_time, PATH_INTERVAL_MS):
+                    warnings.append(f"journal {position['id']}: complete {PATH_INTERVAL} path is unavailable")
+                    continue
                 open_times = pd.to_numeric(candles["open_time"], errors="coerce")
                 close_times = pd.to_numeric(candles["close_time"], errors="coerce")
                 path = candles.loc[
@@ -459,9 +455,6 @@ def _build_path_items(positions: List[Dict[str, Any]]) -> tuple[List[Dict[str, A
                     continue
                 path_open = pd.to_numeric(path["open_time"], errors="coerce")
                 path_close_exclusive = pd.to_numeric(path["close_time"], errors="coerce") + 1
-                if path_open.empty or float(path_open.min()) >= entry_time + PATH_INTERVAL_MS or float(pd.to_numeric(path["close_time"], errors="coerce").max()) <= exit_time - PATH_INTERVAL_MS:
-                    warnings.append(f"journal {position['id']}: complete 5m path does not reach both boundaries")
-                    continue
                 path["boundary_uncertain"] = (
                     ((path_open < entry_time) & (entry_time < path_close_exclusive))
                     | ((path_open < exit_time) & (exit_time < path_close_exclusive))
@@ -478,38 +471,6 @@ def _build_path_items(positions: List[Dict[str, Any]]) -> tuple[List[Dict[str, A
                     "path": path,
                 })
     return sorted(items, key=lambda item: (item["entry_time"], item["journal_id"])), sorted(set(warnings))
-
-
-def _load_path_items(start_time: int, end_time: int, positions: List[Dict[str, Any]]) -> tuple[List[Dict[str, Any]], List[str]]:
-    key = _path_cache_key(start_time, end_time, positions)
-    cached = SL_TP_PATH_CACHE.get(key)
-    if cached is not None:
-        return cached
-    with SL_TP_LOCK:
-        cached = SL_TP_PATH_CACHE.get(key)
-        if cached is not None:
-            return cached
-        built = _build_path_items(positions)
-        SL_TP_PATH_CACHE.set(key, built)
-        return built
-
-
-def _result_cache_key(
-    start_time: int,
-    end_time: int,
-    positions: List[Dict[str, Any]],
-    sl_values: List[float],
-    tp_values: List[float],
-) -> str:
-    base = position_analysis_cache_key(
-        "journal_sl_tp_analysis",
-        SL_TP_CACHE_VERSION,
-        start_time,
-        end_time,
-        positions,
-        ("id", "datetime", "entry_datetime", "symbol", "direction", "entry_price", "exit_price", "fee", "leverage", "invested_amount"),
-    )
-    return f"{base}:sl={','.join(map(str, sl_values))}:tp={','.join(map(str, tp_values))}"
 
 
 def run_journal_sl_tp_analysis_service(
@@ -531,49 +492,40 @@ def run_journal_sl_tp_analysis_service(
         raise ValueError(f"SL/TP grid must contain between 1 and {MAX_GRID_COMBINATIONS} combinations")
 
     positions = closed_positions(repository.list_entries(), start_time, end_time)
-    cache_key = _result_cache_key(start_time, end_time, positions, sl_values, tp_values)
-    cached = SL_TP_RESULT_CACHE.get(cache_key)
-    if cached is not None:
-        return cached
-    with SL_TP_LOCK:
-        cached = SL_TP_RESULT_CACHE.get(cache_key)
-        if cached is not None:
-            return cached
-        items, warnings = _load_path_items(start_time, end_time, positions)
-        result = {
-            "success": True,
-            "data": {
-                "interval": PATH_INTERVAL,
-                "sl_values": sl_values,
-                "tp_values": tp_values,
-                "methodology": {
-                    "simulation_window": "entry_to_actual_exit",
-                    "same_candle_policy": "conservative_stop_and_ambiguous",
-                    "return_basis": "directional_price_return_after_recorded_fee_proxy",
-                    "funding_included": False,
-                    "slippage_included": False,
-                    "train_ratio": TRAIN_RATIO,
-                    "score_weights": SCORE_WEIGHTS,
-                    "max_grid_combinations": MAX_GRID_COMBINATIONS,
-                },
-                "direction_breakdown": {
-                    direction: _analysis_bundle(
-                        [item for item in items if item["direction"] == direction],
-                        sl_values,
-                        tp_values,
-                    )
-                    for direction in ("Long", "Short")
-                },
-                "coverage": {
-                    "closed_positions_considered": len(positions),
-                    "analyzed_positions": len(items),
-                    "fee_proxy_positions": sum(bool(item["fee_available"]) for item in items),
-                },
-                "warnings": warnings,
+    items, warnings = _build_path_items(positions)
+    result = {
+        "success": True,
+        "data": {
+            "interval": PATH_INTERVAL,
+            "sl_values": sl_values,
+            "tp_values": tp_values,
+            "methodology": {
+                "simulation_window": "entry_to_actual_exit",
+                "same_candle_policy": "conservative_stop_and_ambiguous",
+                "return_basis": "directional_price_return_after_recorded_fee_proxy",
+                "funding_included": False,
+                "slippage_included": False,
+                "train_ratio": TRAIN_RATIO,
+                "score_weights": SCORE_WEIGHTS,
+                "max_grid_combinations": MAX_GRID_COMBINATIONS,
             },
-        }
-        SL_TP_RESULT_CACHE.set(cache_key, result)
-        return result
+            "direction_breakdown": {
+                direction: _analysis_bundle(
+                    [item for item in items if item["direction"] == direction],
+                    sl_values,
+                    tp_values,
+                )
+                for direction in ("Long", "Short")
+            },
+            "coverage": {
+                "closed_positions_considered": len(positions),
+                "analyzed_positions": len(items),
+                "fee_proxy_positions": sum(bool(item["fee_available"]) for item in items),
+            },
+            "warnings": warnings,
+        },
+    }
+    return result
 
 
 def load_trade_path_items(
@@ -582,7 +534,7 @@ def load_trade_path_items(
     positions: List[Dict[str, Any]],
 ) -> tuple[List[Dict[str, Any]], List[str]]:
     """Public reuse point for analyses that need the canonical completed 5m path."""
-    return _load_path_items(start_time, end_time, positions)
+    return _build_path_items(positions)
 
 
 __all__ = ["load_trade_path_items", "run_journal_sl_tp_analysis_service", "simulate_trade_path"]
