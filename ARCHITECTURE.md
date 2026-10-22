@@ -20,7 +20,9 @@ flowchart LR
 
 의존성의 기본 방향은 `frontend -> backend/modules -> backend/strategy 또는 core -> backend/utils`입니다. `core/`는 HTTP, 파일 I/O, 네트워크 접근을 하지 않습니다. 라우터도 전략 로직을 직접 호출하지 않고 도메인 서비스를 거칩니다.
 
-현재 배포 버전: `v1.0.0`
+현재 배포 버전: `v1.1.0`
+
+꼬리 통계와 변동성 페이지는 기존 OHLC API 및 완료 봉 필터를 재사용해 프런트엔드에서 기술 통계를 계산합니다. 새로운 백엔드 엔진·API·의존성을 추가하지 않습니다. ATR은 기존 core Wilder 계산과 일치하는 기준을 검증하며, 상세 정의와 데이터 한계는 [Wick Statistics](docs/WICK_STATISTICS.md) 및 [Volatility Statistics](docs/VOLATILITY_STATISTICS.md)를 참고하세요.
 
 ## 디렉터리 책임
 

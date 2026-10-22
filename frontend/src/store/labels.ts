@@ -20,6 +20,7 @@ export interface Labels {
   menu_streak_analysis: string;
   menu_trend_judgment: string;
   menu_trend_chart: string;
+  menu_volatility_statistics: string;
   menu_ai_backtest_lab: string;
   menu_ai_backtest_builder: string;
   menu_weekly_pattern: string;
@@ -89,6 +90,7 @@ const labels_ko: Labels = {
   menu_streak_analysis: '🏹 연속 봉 분석',
   menu_trend_judgment: '📊 추세판단',
   menu_trend_chart: '추세분석 차트',
+  menu_volatility_statistics: '변동성·꼬리 통계',
   menu_ai_backtest_lab: '🤖 AI 백테스트 랩',
   menu_ai_backtest_builder: '🛠️ AI 전략 빌더',
   menu_weekly_pattern: '📅 주간 패턴 분석',
@@ -165,6 +167,7 @@ const labels_en: Labels = {
   menu_streak_analysis: '🏹 Candle Streak',
   menu_trend_judgment: '📊 Trend Judgment',
   menu_trend_chart: 'Trend Analysis Chart',
+  menu_volatility_statistics: 'Volatility & Wick Statistics',
   menu_ai_backtest_lab: '🤖 AI Backtest Lab',
   menu_ai_backtest_builder: '🛠️ AI Strategy Builder',
   menu_weekly_pattern: '📅 Weekly Pattern',

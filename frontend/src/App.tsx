@@ -9,6 +9,7 @@ import { isSampleWorkspace } from './features/onboarding/workspaceSession';
 const AIStrategyLabPage = lazy(() => import('./pages/AIStrategyLabPage'));
 const TrendJudgmentPage = lazy(() => import('./pages/TrendJudgmentPage'));
 const TrendChartPage = lazy(() => import('./pages/TrendChartPage'));
+const VolatilityStatisticsPage = lazy(() => import('./pages/VolatilityStatisticsPage'));
 const BacktestPage = lazy(() => import('./pages/BacktestPage'));
 const BBMidPage = lazy(() => import('./pages/BBMidPage'));
 const StreakAnalysisPage = lazy(() => import('./pages/StreakAnalysisPage'));
@@ -29,6 +30,7 @@ function AppRoutes() {
     '/backtest': <BacktestPage />,
     '/trend-judgment': <TrendJudgmentPage />,
     '/trend-chart': <TrendChartPage />,
+    '/volatility-statistics': <VolatilityStatisticsPage />,
     '/bb-mid': <BBMidPage />,
     '/streak-analysis': <StreakAnalysisPage />,
     '/compound-calculator': <TradingCompoundCalculatorPage />,

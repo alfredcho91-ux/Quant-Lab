@@ -2,10 +2,12 @@ import { useEffect, useState } from 'react';
 import { RefreshCw, RotateCcw, ZoomIn, ZoomOut } from 'lucide-react';
 import ErrorNotice from '../components/ErrorNotice';
 import { TrendPriceChart } from '../components/TrendPriceChart';
+import { WickStatisticsSettings } from '../components/WickStatisticsSettings';
+import { WickDistribution } from '../components/WickDistribution';
 import { useHourlyRefresh } from '../hooks/useHourlyRefresh';
 import { useTrendPriceChart } from '../hooks/useTrendPriceChart';
 import { usePageCommon } from '../hooks/usePageCommon';
-import { useSelectedCoin, useSelectedInterval } from '../store/useStore';
+import { useSelectedCoin, useSelectedInterval, useStore } from '../store/useStore';
 import type { Coin } from '../types';
 
 function getChartHeight(): number {
@@ -15,6 +17,7 @@ function getChartHeight(): number {
 export default function TrendChartPage() {
   const selectedCoin = useSelectedCoin();
   const selectedInterval = useSelectedInterval();
+  const wickStatistics = useStore(state => state.wickStatistics);
   const { isKo } = usePageCommon();
   const safeCoin = (selectedCoin || 'BTC') as Coin;
   const [priceZoom, setPriceZoom] = useState(1);
@@ -106,6 +109,7 @@ export default function TrendChartPage() {
         </div>
       </header>
 
+      <WickStatisticsSettings isKo={isKo} />
       {isTrendChartLoading ? (
         <div className="flex items-center justify-center rounded-lg border border-dark-700 bg-dark-800/30 text-sm text-dark-400" style={{ height: chartHeight }}>
           {isKo ? '차트 데이터를 불러오는 중...' : 'Loading chart data...'}
@@ -123,16 +127,20 @@ export default function TrendChartPage() {
           </div>
         </div>
       ) : (
-        <TrendPriceChart
-          data={trendChartData}
-          vpvr={vpvrData}
-          vwaps={selectedProjection}
-          priceLevels={chartPriceLevels}
-          verticalZoom={priceZoom}
-          isKo={isKo}
-          height={chartHeight}
-          baseHalfRangePercent={0.08}
-        />
+        <>
+          <TrendPriceChart
+            data={trendChartData}
+            vpvr={vpvrData}
+            vwaps={selectedProjection}
+            priceLevels={chartPriceLevels}
+            verticalZoom={priceZoom}
+            isKo={isKo}
+            height={chartHeight}
+            baseHalfRangePercent={0.08}
+            wickSettings={wickStatistics}
+          />
+          <WickDistribution data={trendChartData} isKo={isKo} />
+        </>
       )}
     </div>
   );

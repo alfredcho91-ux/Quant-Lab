@@ -111,7 +111,7 @@ def verify_credentials(
 app = FastAPI(
     title="Quant Master API",
     description="Backend API for crypto trading analysis platform",
-    version="1.0.0",
+    version="1.1.0",
     default_response_class=ORJSONResponse,  # orjson 사용으로 JSON 직렬화 성능 향상
     dependencies=[Depends(verify_credentials)],
     lifespan=lifespan,

@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   CandlestickSeries,
   ColorType,
   CrosshairMode,
   LineStyle,
+  LineSeries,
   createChart,
   type CandlestickData,
   type UTCTimestamp,
@@ -11,6 +12,10 @@ import {
 
 import type { IndicatorProjection, OHLCV, VPVRData } from '../types';
 import { CHART_BOTTOM_AXIS, VPVRProfile } from './VPVRProfile';
+import type { WickStatisticsSettings } from '../types/indicators';
+import { computeWickStatistics } from '../utils/wickStatistics';
+import { WICK_SERIES, wickLineData } from '../utils/wickStatisticsPresentation';
+import { formatNum } from '../utils/format';
 
 export interface TrendPriceLevel {
   interval: string;
@@ -29,6 +34,7 @@ interface TrendPriceChartProps {
   height?: number;
   baseHalfRange?: number;
   baseHalfRangePercent?: number;
+  wickSettings?: WickStatisticsSettings;
 }
 
 interface ReferenceLine {
@@ -117,8 +123,14 @@ export function TrendPriceChart({
   height = 500,
   baseHalfRange,
   baseHalfRangePercent,
+  wickSettings,
 }: TrendPriceChartProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const [pricePaneHeight, setPricePaneHeight] = useState(height - CHART_BOTTOM_AXIS);
+  const wickPeriod = wickSettings?.period;
+  const wickUnit = wickSettings?.unit;
+  const wickValues = useMemo(() => wickPeriod === undefined ? null
+    : computeWickStatistics(data, wickPeriod, wickUnit), [data, wickPeriod, wickUnit]);
 
   const { priceAxisMin, priceAxisMax } = useMemo(() => {
     const values = [
@@ -237,6 +249,7 @@ export function TrendPriceChart({
         background: { type: ColorType.Solid, color: '#111827' },
         textColor: '#94a3b8',
         attributionLogo: true,
+        panes: { enableResize: false, separatorColor: '#334155' },
       },
       grid: {
         vertLines: { color: 'rgba(51, 65, 85, 0.35)' },
@@ -279,6 +292,23 @@ export function TrendPriceChart({
     }));
     series.setData(candleData);
 
+    if (wickSettings && wickValues) {
+      WICK_SERIES.forEach(definition => {
+        const wickSeries = chart.addSeries(LineSeries, {
+          title: definition.label,
+          color: definition.color,
+          lineWidth: 2,
+          visible: wickSettings.visible[definition.key],
+          priceLineVisible: false,
+          lastValueVisible: false,
+          priceFormat: { type: wickSettings.unit === 'percent' ? 'percent' : 'price', precision: 2, minMove: 0.01 },
+        }, 1);
+        wickSeries.setData(wickLineData(data, wickValues[definition.key]));
+      });
+      chart.panes()[1].setHeight(Math.min(180, height * 0.35));
+      chart.panes()[1].priceScale('right').applyOptions({ scaleMargins: { top: 0.22, bottom: 0.1 } });
+    }
+
     referenceLines.forEach((line) => {
       series.createPriceLine({
         price: line.price,
@@ -304,6 +334,26 @@ export function TrendPriceChart({
     legend.className = 'absolute left-2 top-1 z-20 text-[10px] font-mono text-dark-300';
     overlay.appendChild(legend);
 
+    const wickLegend = document.createElement('div');
+    wickLegend.className = 'absolute left-2 right-2 z-20 flex flex-wrap gap-x-3 gap-y-1 text-[10px] font-mono text-dark-300';
+    if (wickSettings) overlay.appendChild(wickLegend);
+    const wickTimeIndices = new Map(candleData.map((bar, index) => [bar.time, index]));
+    const setWickLegend = (index: number) => {
+      if (!wickSettings || !wickValues) return;
+      wickLegend.replaceChildren();
+      const title = document.createElement('span');
+      title.textContent = `Wick Statistics (${wickSettings.period})${wickSettings.unit === 'percent' ? ' %' : ''}`;
+      wickLegend.appendChild(title);
+      WICK_SERIES.filter(item => wickSettings.visible[item.key]).forEach(item => {
+        const label = document.createElement('span');
+        label.style.color = item.color;
+        label.title = isKo ? item.ko : item.en;
+        label.textContent = `${item.label} ${formatNum(wickValues[item.key][index])}${wickSettings.unit === 'percent' && wickValues[item.key][index] != null ? '%' : ''}`;
+        wickLegend.appendChild(label);
+      });
+    };
+    setWickLegend(data.length - 1);
+
     const labelElements = referenceLines.map((line) => {
       const element = document.createElement('span');
       element.textContent = `${line.label} ${formatPrice(line.price)}`;
@@ -324,10 +374,15 @@ export function TrendPriceChart({
     setLegend(candleData[candleData.length - 1]);
 
     const updateOverlay = () => {
+      const paneHeight = chart.panes()[0].getHeight();
+      if (wickSettings) {
+        setPricePaneHeight(paneHeight);
+        wickLegend.style.top = `${paneHeight + 6}px`;
+      }
       const visibleLabels: Array<{ element: HTMLSpanElement; line: ReferenceLine; y: number }> = [];
       labelElements.forEach(({ element, line }) => {
         const y = series.priceToCoordinate(line.price);
-        element.style.display = y == null || y < 0 || y > height - CHART_BOTTOM_AXIS ? 'none' : 'block';
+        element.style.display = y == null || y < 0 || y > paneHeight ? 'none' : 'block';
         if (y != null) {
           element.style.top = `${y}px`;
           element.style.left = `${Math.min(line.labelPosition, 78)}%`;
@@ -369,24 +424,27 @@ export function TrendPriceChart({
     chart.subscribeCrosshairMove((param) => {
       const bar = param.seriesData.get(series) as CandlestickData<UTCTimestamp> | undefined;
       setLegend(bar ?? candleData[candleData.length - 1]);
+      setWickLegend(param.time == null ? data.length - 1 : (wickTimeIndices.get(param.time as UTCTimestamp) ?? -1));
       updateOverlay();
     });
     chart.timeScale().subscribeVisibleLogicalRangeChange(updateOverlay);
     chart.timeScale().fitContent();
-    requestAnimationFrame(updateOverlay);
+    let overlayFrame = requestAnimationFrame(updateOverlay);
 
     const resizeObserver = new ResizeObserver(([entry]) => {
       chart.resize(Math.floor(entry.contentRect.width), height);
-      requestAnimationFrame(updateOverlay);
+      cancelAnimationFrame(overlayFrame);
+      overlayFrame = requestAnimationFrame(updateOverlay);
     });
     resizeObserver.observe(container);
 
     return () => {
       resizeObserver.disconnect();
+      cancelAnimationFrame(overlayFrame);
       overlay.remove();
       chart.remove();
     };
-  }, [data, height, priceAxisMax, priceAxisMin, referenceLines, vpvr]);
+  }, [data, height, isKo, priceAxisMax, priceAxisMin, referenceLines, vpvr, wickSettings, wickValues]);
 
   if (data.length === 0) {
     return (
@@ -405,7 +463,7 @@ export function TrendPriceChart({
         {vpvr && (
           <VPVRProfile
             vpvr={vpvr}
-            height={height}
+            height={wickSettings ? pricePaneHeight + CHART_BOTTOM_AXIS : height}
             isKo={isKo}
             priceAxisMin={priceAxisMin}
             priceAxisMax={priceAxisMax}

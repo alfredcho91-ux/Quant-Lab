@@ -9,6 +9,8 @@ import {
   type MarketInterval,
 } from '../constants/market';
 import { isTradingStyle, type TradingStyle } from '../features/preferences/tradingStyle';
+import type { WickStatisticsSettings } from '../types/indicators';
+import { normalizeWickSettings } from '../utils/wickStatistics';
 
 export type Interval = MarketInterval;
 export type BackgroundTheme = 'default' | 'white' | 'black';
@@ -24,6 +26,8 @@ interface AppState {
   tradingStyle: TradingStyle;
   currentPage: MenuPage;
   sidebarCollapsed: boolean;
+  wickStatistics: WickStatisticsSettings;
+  updateWickStatistics: (settings: Partial<WickStatisticsSettings>) => void;
   
   // Backtest Parameters
   backtestParams: BacktestParams;
@@ -80,6 +84,8 @@ export const useStore = create<AppState>()(
       tradingStyle: 'auto',
       currentPage: 'backtest',
       sidebarCollapsed: false,
+      wickStatistics: normalizeWickSettings(null),
+      updateWickStatistics: (settings) => set(state => ({ wickStatistics: normalizeWickSettings({ ...state.wickStatistics, ...settings }) })),
       backtestParams: defaultBacktestParams,
       
       // Actions
@@ -126,6 +132,7 @@ export const useStore = create<AppState>()(
         selectedCoin: state.selectedCoin,
         selectedInterval: state.selectedInterval,
         tradingStyle: state.tradingStyle,
+        wickStatistics: state.wickStatistics,
         backtestParams: state.backtestParams,
       }),
       merge: (persistedState, currentState) => {
@@ -154,6 +161,7 @@ export const useStore = create<AppState>()(
           ...currentState,
           ...incoming,
           tradingStyle,
+          wickStatistics: normalizeWickSettings(incoming.wickStatistics),
           backtestParams: normalizedParams,
         };
       },

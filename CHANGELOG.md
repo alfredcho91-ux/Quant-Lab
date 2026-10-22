@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.1.0] - 2026-10-22
+
+- Added AUW/MUW/ALW/MLW Wick Statistics in the existing trend chart's native auxiliary pane, with configurable period, price/percent units, independent toggles and persisted settings.
+- Added per-candle upper/lower wick distributions in lower-inclusive, upper-exclusive 0.1 percentage-point bins, with counts, shares, zero-wick inclusion and excluded-sample disclosure.
+- Added the bilingual `/volatility-statistics` page for core-compatible Wilder ATR, Median True Range and population upper/lower wick standard deviations. Calculation period and completed history count (1–9,999) are independently configurable.
+- Preserved completed-candle/no-look-ahead behavior, null warm-up/invalid windows, exact calculation precision and two-decimal labels. Added calculation, query-authority, chart and settings regression tests.
+- Source release only, consistent with previous Quant-Lab releases; no Windows installer or packaged executable is included.
+
 ## [2026-08-21] Navigation And Product Scope Cleanup
 
 - Removed the unused Combo Filter Test end to end: sidebar item, page, frontend client/types, `/api/combo-filter` endpoint, schemas, strategy module, and indicator helper.

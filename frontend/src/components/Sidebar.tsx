@@ -53,6 +53,7 @@ const menuItems = [
   // 주요 분석 페이지
   { path: '/trend-judgment', icon: Activity, labelKey: 'menu_trend_judgment' as const },
   { path: '/trend-chart', icon: CandlestickChart, labelKey: 'menu_trend_chart' as const },
+  { path: '/volatility-statistics', icon: BarChart3, labelKey: 'menu_volatility_statistics' as const },
   { path: '/streak-analysis', icon: Flame, labelKey: 'menu_streak_analysis' as const },
   // 기타 분석 페이지
   { path: '/compound-calculator', icon: Calculator, labelKey: 'menu_compound_calculator' as const },

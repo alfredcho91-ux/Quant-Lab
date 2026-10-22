@@ -1,3 +1,10 @@
+export type WickStatistic = 'auw' | 'muw' | 'alw' | 'mlw';
+export interface WickStatisticsSettings {
+  period: number;
+  unit: 'price' | 'percent';
+  visible: Record<WickStatistic, boolean>;
+}
+
 export type AnchoredVwapZone =
   | 'center'
   | 'upper_expansion'
