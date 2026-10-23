@@ -13,6 +13,7 @@ class FrontendStaticFiles(StaticFiles):
             "journal", "trade-analysis", "risk-lab", "plan-lab",
             "trade-explorer", "hold-reentry", "playbook",
             "trend-judgment", "trend-chart", "streak-analysis", "compound-calculator",
+            "volatility-statistics", "stop-loss-lab",
             "ai-backtest-lab", "ai-backtest-builder", "backtest", "bb-mid",
         }:
             path = "index.html"

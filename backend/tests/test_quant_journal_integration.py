@@ -72,7 +72,7 @@ def test_sample_boundary_blocks_quant_research_and_private_presets(monkeypatch):
     client = TestClient(main.app)
     for method, path in [('get', '/api/presets'), ('get', '/api/strategies'),
                          ('post', '/api/backtest'), ('post', '/api/ai/research'),
-                         ('post', '/api/streak-analysis')]:
+                           ('post', '/api/streak-analysis'), ('post', '/api/stop-loss-lab/analyze')]:
         response = getattr(client, method)(path)
         assert response.status_code == 403
         assert response.json()['error_code'] == 'SAMPLE_OFFLINE'

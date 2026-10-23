@@ -70,6 +70,7 @@ def test_static_html_and_api_precedence(client):
 @pytest.mark.parametrize("path", [
     "/journal", "/trade-analysis", "/risk-lab", "/plan-lab",
     "/trade-explorer", "/hold-reentry", "/playbook",
+    "/volatility-statistics", "/stop-loss-lab",
 ])
 def test_frontend_screen_direct_entry_and_reload(client, path):
     for url in (path, path + "?coin=BTC", path + "/"):

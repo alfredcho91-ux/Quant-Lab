@@ -20,9 +20,9 @@ flowchart LR
 
 의존성의 기본 방향은 `frontend -> backend/modules -> backend/strategy 또는 core -> backend/utils`입니다. `core/`는 HTTP, 파일 I/O, 네트워크 접근을 하지 않습니다. 라우터도 전략 로직을 직접 호출하지 않고 도메인 서비스를 거칩니다.
 
-현재 배포 버전: `v1.1.0`
+현재 배포 버전: `v1.2.0`
 
-꼬리 통계와 변동성 페이지는 기존 OHLC API 및 완료 봉 필터를 재사용해 프런트엔드에서 기술 통계를 계산합니다. 새로운 백엔드 엔진·API·의존성을 추가하지 않습니다. ATR은 기존 core Wilder 계산과 일치하는 기준을 검증하며, 상세 정의와 데이터 한계는 [Wick Statistics](docs/WICK_STATISTICS.md) 및 [Volatility Statistics](docs/VOLATILITY_STATISTICS.md)를 참고하세요.
+차트 꼬리 지표와 기존 봉별 통계 표는 기존 OHLC API 및 완료 봉 필터를 재사용해 프런트엔드에서 계산합니다. v1.2.0 손절 실험실은 `backend/modules/stop_loss_lab`의 통계·체결 계산과 `POST /api/stop-loss-lab/analyze`를 사용하며, 공개 시세 파이프라인·core Wilder ATR·확정 스윙·기존 성과 집계를 재사용합니다. 새 의존성이나 데이터베이스 마이그레이션은 없습니다. 계산·체결·표본 외 경계는 [Stop-Loss Lab](docs/STOP_LOSS_LAB.md), 기존 지표 정의는 [Wick Statistics](docs/WICK_STATISTICS.md) 및 [Volatility Statistics](docs/VOLATILITY_STATISTICS.md)를 참고하세요.
 
 ## 디렉터리 책임
 

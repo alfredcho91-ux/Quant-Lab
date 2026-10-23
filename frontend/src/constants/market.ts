@@ -22,4 +22,11 @@ export const MARKET_INTERVALS = [
 
 export type MarketInterval = (typeof MARKET_INTERVALS)[number];
 
+export const MARKET_INTERVAL_LABELS_KO: Partial<Record<MarketInterval, string>> = {
+  '4h': '4시간봉',
+  '1d': '날봉',
+  '1w': '주봉',
+  '1M': '달봉',
+};
+
 export const DEFAULT_MARKET_INTERVAL: MarketInterval = '4h';

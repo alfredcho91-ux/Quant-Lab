@@ -40,7 +40,7 @@ import { getMarketPrices, getFearGreedIndex } from '../api/client';
 import type { Language } from '../types';
 import type { BackgroundTheme, Interval } from '../store/useStore';
 import { useMediaQuery } from '../hooks/useMediaQuery';
-import { MARKET_COINS, MARKET_INTERVALS } from '../constants/market';
+import { MARKET_COINS, MARKET_INTERVALS, MARKET_INTERVAL_LABELS_KO } from '../constants/market';
 import { isSampleWorkspace } from '../features/onboarding/workspaceSession';
 
 const menuItems = [
@@ -197,7 +197,7 @@ export default function Sidebar() {
               title={labels.interval}
             >
               {MARKET_INTERVALS.map((tf) => (
-                <option key={tf} value={tf}>{tf}</option>
+                <option key={tf} value={tf}>{language === 'ko' ? MARKET_INTERVAL_LABELS_KO[tf] ?? tf : tf}</option>
               ))}
             </select>
           </div>
@@ -227,7 +227,7 @@ export default function Sidebar() {
               className="w-full bg-dark-800 border border-dark-600 rounded-lg px-3 py-2 text-sm mt-2"
             >
               {MARKET_INTERVALS.map((tf) => (
-                <option key={tf} value={tf}>{tf}</option>
+                <option key={tf} value={tf}>{language === 'ko' ? MARKET_INTERVAL_LABELS_KO[tf] ?? tf : tf}</option>
               ))}
             </select>
           </>

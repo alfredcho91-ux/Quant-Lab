@@ -40,6 +40,17 @@
 
 ## 지표와 추세
 
+### 손절 실험실
+
+`POST /api/stop-loss-lab/analyze` — `LabRequest`의 UTC 날짜·기준/실행 봉·
+진입/손절/익절 격자·수수료·슬리피지·위험 설정으로 공개 Binance USDT-M
+Futures OHLC를 분석합니다(이 경로는 Spot/CSV가 아님). 성공은
+`{success: true, data: {config, data, distributions, breakouts, candidates,
+split_time, selected_id, walk_forward}}`; 잘못된 입력·부족한 데이터는 422.
+샘플 워크스페이스에서는 403. 개인 계좌/저널 접근이나 주문 전송 없음.
+스키마는 `backend/modules/stop_loss_lab/schemas.py`, 계산·체결·표본 외 경계는
+[Stop-Loss Lab](docs/STOP_LOSS_LAB.md)을 참조합니다.
+
 | Method | Endpoint | 주요 입력 | 설명 |
 | --- | --- | --- | --- |
 | POST | `/api/trend-indicators` | `coin`, `interval`, `use_csv` | 직전 확정봉 기준 추세·모멘텀 지표와 최근 시계열 |

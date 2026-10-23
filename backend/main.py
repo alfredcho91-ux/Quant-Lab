@@ -29,6 +29,7 @@ from backend.modules.streak.router import router as streak_router
 from backend.modules.market.router import router as market_router
 from backend.modules.backtest.router import router as backtest_router
 from backend.modules.stats.router import router as stats_router
+from backend.modules.stop_loss_lab.router import router as stop_loss_lab_router
 from backend.modules.preset.router import router as preset_router
 from backend.modules.support_resistance.router import router as support_resistance_router
 from backend.modules.strategy_info.router import router as strategy_router
@@ -111,7 +112,7 @@ def verify_credentials(
 app = FastAPI(
     title="Quant Master API",
     description="Backend API for crypto trading analysis platform",
-    version="1.1.0",
+    version="1.2.0",
     default_response_class=ORJSONResponse,  # orjson 사용으로 JSON 직렬화 성능 향상
     dependencies=[Depends(verify_credentials)],
     lifespan=lifespan,
@@ -230,6 +231,7 @@ app.include_router(streak_router)  # /api/streak-analysis
 app.include_router(market_router)  # /api/market/*
 app.include_router(backtest_router)  # /api/backtest*
 app.include_router(stats_router)  # /api/bb-mid, /api/hybrid-*
+app.include_router(stop_loss_lab_router)
 app.include_router(preset_router)  # /api/presets
 app.include_router(support_resistance_router)  # /api/support-resistance
 app.include_router(strategy_router)  # /api/strategy-info

@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { CandlestickChart, LineChart, ScatterChart } from 'echarts/charts';
+import { BarChart, CandlestickChart, LineChart, ScatterChart } from 'echarts/charts';
 import {
   DataZoomComponent,
   GridComponent,
@@ -14,6 +14,7 @@ import type { EChartsCoreOption, EChartsType } from 'echarts/core';
 import { CanvasRenderer } from 'echarts/renderers';
 
 use([
+  BarChart,
   CandlestickChart,
   LineChart,
   ScatterChart,

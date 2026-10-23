@@ -1,8 +1,7 @@
-import { useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import type { EChartsCoreOption } from 'echarts/core';
 import { getOHLCV } from '../api/market';
-import EChart from '../components/EChart';
+import { MARKET_INTERVAL_LABELS_KO } from '../constants/market';
 import ErrorNotice from '../components/ErrorNotice';
 import { useLanguage, useSelectedCoin, useSelectedInterval } from '../store/useStore';
 import { getCompletedCandles } from '../utils/ohlcv';
@@ -12,11 +11,14 @@ import { computeVolatilityStatistics, type VolatilityMetric, type VolatilityUnit
 
 // The existing API accepts at most 10,000 rows, including the forming last bar.
 const MAX_COMPLETED_BARS = 9_999;
-const SERIES: Array<{ key: VolatilityMetric; ko: string; en: string; color: string }> = [
-  { key: 'atr', ko: 'ATR · 평균 진폭', en: 'ATR · Average True Range', color: '#38bdf8' },
-  { key: 'mtr', ko: 'MTR · 중앙값 진폭', en: 'MTR · Median True Range', color: '#a78bfa' },
-  { key: 'upperStd', ko: '윗꼬리 표준편차', en: 'Upper wick standard deviation', color: '#fbbf24' },
-  { key: 'lowerStd', ko: '아랫꼬리 표준편차', en: 'Lower wick standard deviation', color: '#34d399' },
+const PAGE_SIZE = 50;
+const METRICS: Array<{ key: VolatilityMetric; ko: string; en: string; color: string }> = [
+  { key: 'rangeMean', ko: '봉 변동성 평균', en: 'Candle volatility mean', color: '#38bdf8' },
+  { key: 'rangeMedian', ko: '봉 변동성 중위값', en: 'Candle volatility median', color: '#38bdf8' },
+  { key: 'auw', ko: '윗꼬리 평균', en: 'Upper wick mean', color: '#fbbf24' },
+  { key: 'muw', ko: '윗꼬리 중위값', en: 'Upper wick median', color: '#fbbf24' },
+  { key: 'alw', ko: '아랫꼬리 평균', en: 'Lower wick mean', color: '#34d399' },
+  { key: 'mlw', ko: '아랫꼬리 중위값', en: 'Lower wick median', color: '#34d399' },
 ];
 
 export default function VolatilityStatisticsPage() {
@@ -27,6 +29,8 @@ export default function VolatilityStatisticsPage() {
   const [draftPeriod, setDraftPeriod] = useState('14');
   const [draftCount, setDraftCount] = useState('500');
   const [draftUnit, setDraftUnit] = useState<VolatilityUnit>('percent');
+  const [page, setPage] = useState(1);
+  useEffect(() => setPage(1), [coin, interval]);
   const period = Number(draftPeriod);
   const count = Number(draftCount);
   const valid = Number.isSafeInteger(period) && period > 0 && Number.isSafeInteger(count) && count > 0 && count <= MAX_COMPLETED_BARS;
@@ -41,52 +45,26 @@ export default function VolatilityStatisticsPage() {
   const candles = useMemo(() => query.data?.candles ?? [], [query.data]);
   const values = useMemo(() => computeVolatilityStatistics(candles, settings.period, settings.unit), [candles, settings.period, settings.unit]);
   const suffix = settings.unit === 'percent' ? '%' : '';
-  const names = useMemo(() => SERIES.map(series => isKo ? series.ko : series.en), [isKo]);
-  const option = useMemo<EChartsCoreOption>(() => {
-    const categories = candles.map(row => row.open_dt);
-    return {
-      animation: false,
-      legend: { top: 8, data: names, textStyle: { color: '#cbd5e1' } },
-      tooltip: {
-        trigger: 'axis', renderMode: 'richText', axisPointer: { type: 'cross' },
-        // Candlestick aggregates are arrays; ECharts formats their individual
-        // numeric OHLC dimensions separately. Do not label the array as missing.
-        valueFormatter: (value: unknown) => typeof value === 'number' ? formatNum(value) : value == null ? '—' : '',
-      },
-      axisPointer: { link: [{ xAxisIndex: 'all' }], label: { precision: 2 } },
-      grid: [{ left: 72, right: 28, top: 64, height: '36%' }, { left: 72, right: 28, top: '55%', bottom: 76 }],
-      xAxis: [0, 1].map(index => ({
-        type: 'category', gridIndex: index, data: categories, boundaryGap: true,
-        axisLabel: { show: index === 1, color: '#94a3b8', hideOverlap: true },
-        axisLine: { lineStyle: { color: '#334155' } },
-      })),
-      yAxis: [0, 1].map(index => ({
-        type: 'value', gridIndex: index, scale: index === 0, ...(index === 1 ? { min: 0, name: suffix ? '% / %p' : (isKo ? '가격 단위' : 'Price units') } : {}),
-        nameTextStyle: { color: '#94a3b8' }, axisLabel: { color: '#94a3b8', formatter: (value: number) => formatNum(value) },
-        splitLine: { lineStyle: { color: '#334155' } },
-      })),
-      dataZoom: [{ type: 'inside', xAxisIndex: [0, 1] }, { type: 'slider', xAxisIndex: [0, 1], bottom: 12, height: 24 }],
-      series: [
-        { name: isKo ? '가격' : 'Price', type: 'candlestick', data: candles.map(row => [row.open, row.close, row.low, row.high]),
-          itemStyle: { color: '#26a69a', color0: '#ef5350', borderColor: '#26a69a', borderColor0: '#ef5350' } },
-        ...SERIES.map((series, index) => ({
-          name: names[index], type: 'line', xAxisIndex: 1, yAxisIndex: 1, data: values[series.key],
-          showSymbol: false, connectNulls: false, itemStyle: { color: series.color }, lineStyle: { color: series.color, width: 2 },
-        })),
-      ],
-    };
-  }, [candles, values, names, isKo, suffix]);
+  const names = METRICS.map(metric => isKo ? metric.ko : metric.en);
+  const pageCount = Math.max(1, Math.ceil(candles.length / PAGE_SIZE));
+  const currentPage = Math.min(page, pageCount);
+  const offset = (currentPage - 1) * PAGE_SIZE;
+  const rowIndices = Array.from({ length: Math.min(PAGE_SIZE, candles.length - offset) }, (_, index) => candles.length - 1 - offset - index);
 
   function apply(event: FormEvent) {
     event.preventDefault();
-    if (valid) setSettings({ period, count, unit: draftUnit });
+    if (valid) {
+      setSettings({ period, count, unit: draftUnit });
+      setPage(1);
+    }
   }
 
   return (
     <div className="min-w-0 space-y-5">
       <header>
         <h1 className="text-2xl font-bold text-white">{isKo ? '변동성·꼬리 통계' : 'Volatility & Wick Statistics'}</h1>
-        <p className="mt-1 text-sm text-dark-300">{coin} · {interval} · {isKo ? 'ATR / MTR / 윗꼬리·아랫꼬리 표준편차' : 'ATR / MTR / Upper and lower wick standard deviation'}</p>
+        <p className="mt-1 text-sm text-dark-300">{coin} · {isKo ? MARKET_INTERVAL_LABELS_KO[interval] ?? interval : interval} · {isKo ? '봉 변동성·윗꼬리·아랫꼬리의 평균과 중위값' : 'Means and medians of candle volatility, upper wicks and lower wicks'}</p>
+        <p className="mt-1 text-xs text-dark-400">{isKo ? '봉 변동성은 갭을 포함한 TR 기준 · 평균은 최근 N봉 산술평균(일반 ATR의 Wilder 평활과 다름)' : 'Candle volatility uses gap-inclusive TR · means are arithmetic averages of N bars, not Wilder-smoothed ATR'}</p>
       </header>
       <form onSubmit={apply} className="card flex flex-wrap items-end gap-4 p-4">
         <label className="text-sm text-dark-300">{isKo ? '계산 기간 N' : 'Calculation period N'}
@@ -112,28 +90,60 @@ export default function VolatilityStatisticsPage() {
           : candles.length === 0 ? <p role="status" className="card p-5">{isKo ? '사용 가능한 완료 봉이 없습니다.' : 'No completed candles available.'}</p>
             : <>
               {candles.length < settings.period && <p role="status" className="text-amber-300">{isKo ? '계산 기간보다 완료 봉이 부족하여 통계는 —로 표시합니다.' : 'There are fewer completed candles than N; statistics are shown as —.'}</p>}
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                {SERIES.map((series, index) => <section key={series.key} aria-label={names[index]} className="card p-4">
-                  <h2 className="text-sm" style={{ color: series.color }}>{names[index]}</h2>
-                  <p className="mt-2 font-mono text-2xl text-white">{formatNum(values[series.key][candles.length - 1])}{values[series.key][candles.length - 1] != null ? (suffix && (series.key === 'upperStd' || series.key === 'lowerStd') ? '%p' : suffix) : ''}</p>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-flow-col xl:grid-cols-3 xl:grid-rows-2">
+                {METRICS.map((metric, index) => <section key={metric.key} aria-label={names[index]} className="card p-4">
+                  <h2 className="text-sm" style={{ color: metric.color }}>{names[index]}</h2>
+                  <p className="mt-2 font-mono text-2xl text-white">{formatNum(values[metric.key][candles.length - 1])}{values[metric.key][candles.length - 1] != null ? suffix : ''}</p>
                 </section>)}
               </div>
               <p className="text-xs text-dark-400">{isKo ? '최근 완료 봉 시작 시각' : 'Latest completed candle open time'}: {candles[candles.length - 1]?.open_dt}</p>
-              <section aria-label={isKo ? '변동성 시계열 차트' : 'Volatility time-series chart'} className="card min-w-0 overflow-hidden p-2">
-                <EChart option={option} height={680} />
-                <p className="px-3 pb-2 text-xs text-dark-400">{isKo ? '범례를 눌러 지표 표시를 전환하고, 하단 슬라이더로 두 패널의 조회 구간을 함께 조절합니다.' : 'Toggle series using the legend; the bottom slider adjusts both panels together.'}</p>
+              <section className="card min-w-0 p-4">
+                <h2 className="font-semibold text-white">{isKo ? '봉별 통계 테이블' : 'Per-candle statistics'}</h2>
+                <p className="mt-1 text-xs text-dark-400">{isKo ? '최신 완료 봉부터 표시 · 페이지당 50봉 · 각 행은 해당 시점의 N기간 통계입니다. 표본 부족·비정상 값은 —로 표시합니다.' : 'Newest completed candles first · 50 rows per page · each row shows its N-period statistics. Insufficient or invalid values are shown as —.'}</p>
+                <div className="mt-3 max-h-[600px] overflow-auto rounded border border-dark-700">
+                  <table aria-label={isKo ? '봉별 변동성·꼬리 통계' : 'Per-candle volatility statistics'} className="w-full whitespace-nowrap text-right text-sm">
+                    <thead className="sticky top-0 bg-dark-800 text-xs text-dark-300">
+                      <tr>
+                        <th scope="col" rowSpan={2} className="px-3 py-3 text-left">{isKo ? '봉 시작 시각' : 'Candle open time'}</th>
+                        <th scope="col" rowSpan={2} className="px-3 py-3">{isKo ? '종가' : 'Close'}</th>
+                        {[0, 2, 4].map(index => <th key={index} scope="colgroup" colSpan={2} className="px-3 pt-3 text-center" style={{ color: METRICS[index].color }}>
+                          {index === 0 ? (isKo ? '봉 변동성(TR)' : 'Candle volatility (TR)') : index === 2 ? (isKo ? '윗꼬리' : 'Upper wick') : (isKo ? '아랫꼬리' : 'Lower wick')}{suffix ? ` (${suffix})` : ''}
+                        </th>)}
+                      </tr>
+                      <tr>
+                        {METRICS.map((metric, index) => <th key={metric.key} scope="col" aria-label={`${names[index]}${suffix ? ` (${suffix})` : ''}`} className="px-3 pb-3 pt-2" style={{ color: metric.color }}>
+                          {index % 2 === 0 ? (isKo ? '평균' : 'Mean') : (isKo ? '중위값' : 'Median')}
+                        </th>)}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {rowIndices.map(index => <tr key={candles[index].open_time} className="border-t border-dark-700/50 hover:bg-dark-700/30">
+                        <th scope="row" className="px-3 py-2 text-left font-normal text-dark-300">{candles[index].open_dt}</th>
+                        <td className="px-3 py-2 font-mono text-dark-200">{formatNum(candles[index].close)}</td>
+                        {METRICS.map(metric => <td key={metric.key} className="px-3 py-2 font-mono text-dark-200">{formatNum(values[metric.key][index])}</td>)}
+                      </tr>)}
+                    </tbody>
+                  </table>
+                </div>
+                <nav aria-label={isKo ? '봉별 통계 페이지' : 'Candle statistics pagination'} className="mt-3 flex flex-wrap items-center justify-between gap-3 text-xs text-dark-300">
+                  <p aria-live="polite">{isKo ? `${offset + 1}–${offset + rowIndices.length} / ${candles.length}봉 · ${currentPage} / ${pageCount}페이지` : `${offset + 1}–${offset + rowIndices.length} of ${candles.length} candles · Page ${currentPage} of ${pageCount}`}</p>
+                  <div className="flex gap-2">
+                    <button type="button" disabled={currentPage === 1} onClick={() => setPage(currentPage - 1)} className="btn-secondary disabled:opacity-50">{isKo ? '이전 페이지' : 'Previous page'}</button>
+                    <button type="button" disabled={currentPage === pageCount} onClick={() => setPage(currentPage + 1)} className="btn-secondary disabled:opacity-50">{isKo ? '다음 페이지' : 'Next page'}</button>
+                  </div>
+                </nav>
               </section>
             </>}
       <details className="card p-4 text-sm text-dark-300">
         <summary className="cursor-pointer font-semibold">{isKo ? '계산 기준과 해석 주의사항' : 'Calculation definitions and limitations'}</summary>
         <div className="mt-3 space-y-2 text-xs leading-relaxed">
           <p>TR = max(High − Low, |High − Previous Close|, |Low − Previous Close|)</p>
-          <p>{isKo ? 'ATR: 기존 핵심 엔진과 같은 Wilder 평활(α=1/N). 첫 TR은 High−Low이며 첫 TR부터 평활하고 N개 이후 표시합니다. 데이터 시작점·불러온 봉 수가 달라지면 초기값 영향으로 ATR이 달라질 수 있습니다.' : 'ATR: Wilder smoothing (α=1/N), matching the core engine. The first TR is High−Low; smoothing starts at that TR and is displayed after N observations. Changing the loaded history changes initialization and can affect ATR.'}</p>
-          <p>{isKo ? 'MTR: 최근 N개 TR의 중앙값. 짝수 N은 가운데 두 값의 평균입니다.' : 'MTR: median of the last N true ranges; even windows average the central pair.'}</p>
-          <p>{isKo ? '윗꼬리 = High−max(Open, Close), 아랫꼬리 = min(Open, Close)−Low. 표준편차 = √(Σ(x−평균)²/N), 모집단 기준(ddof=0). 길이 0도 포함합니다.' : 'Upper wick = High−max(Open, Close); lower wick = min(Open, Close)−Low. Population standard deviation = √(Σ(x−mean)²/N), ddof=0. Zero wicks are included.'}</p>
-          <p>{isKo ? '% 모드: ATR·MTR은 가격 단위 통계를 해당 시점 종가로 나눠 ×100. 꼬리는 각 봉 종가 대비 %로 먼저 변환한 뒤 표준편차를 계산합니다. 꼬리 표준편차의 단위는 %p입니다.' : '% mode: ATR/MTR are divided by the current candle close ×100 after aggregation. Wick lengths are normalized by each candle close before calculating standard deviation; wick standard deviation is in percentage points.'}</p>
-          <p>{isKo ? '완료 봉만 사용하며 미래 봉은 참조하지 않습니다. 부족한 표본·비정상 OHLC는 —. 비정상 봉 이후 TR은 이전 종가를 확인할 수 없어 한 봉 더 미정이며 ATR은 유효 TR N개로 다시 준비합니다. API가 반환한 봉 수가 요청보다 적을 수 있습니다. 가격 차트는 원본 응답을 표시하며 통계 유효성과는 별개입니다.' : 'Completed candles only, with no future data. Insufficient/invalid OHLC produces —. An invalid candle also makes the next TR unavailable; ATR restarts with N valid TR observations. The API may return fewer bars than requested. Price candles display the original response independently of statistic validity.'}</p>
-          <p>{isKo ? '표준편차는 꼬리 길이의 산포이며 방향 예측·손익 보장이 아닙니다. 계산은 반올림하지 않고 화면만 소수점 두 자리로 표시합니다.' : 'Standard deviation describes dispersion, not direction or guaranteed returns. Calculations are unrounded; display uses two decimals.'}</p>
+          <p>{isKo ? '봉 변동성은 갭을 포함한 TR입니다(봉 자체의 High−Low와 다를 수 있음). 첫 봉은 이전 종가가 없어 High−Low를 사용합니다. 평균은 최근 N개 값의 산술평균으로, 일반 ATR의 Wilder 평활을 사용하지 않습니다.' : 'Candle volatility uses gap-inclusive TR, which can differ from High−Low. The first loaded bar uses High−Low because its previous close is unavailable. Means are arithmetic averages of N observations, not Wilder-smoothed ATR.'}</p>
+          <p>{isKo ? '중위값은 최근 N개 값을 정렬한 중앙값입니다. 짝수 N은 가운데 두 값의 평균입니다. 여섯 항목 모두 같은 N개 완료 봉 기준입니다.' : 'Medians use the central value of the sorted N observations, averaging the central pair for even N. All six metrics use the same N completed bars.'}</p>
+          <p>{isKo ? '윗꼬리 = High−max(Open, Close), 아랫꼬리 = min(Open, Close)−Low. 각 꼬리의 평균과 중위값을 따로 계산하며 길이 0도 포함합니다.' : 'Upper wick = High−max(Open, Close); lower wick = min(Open, Close)−Low. Each side has its own mean and median; zero wicks are included.'}</p>
+          <p>{isKo ? '% 모드: 각 봉의 TR과 꼬리 길이를 해당 봉 종가로 나눠 ×100한 뒤 평균·중위값을 계산합니다. 여섯 항목의 단위는 모두 %입니다.' : '% mode: divide each candle\'s TR and wick lengths by its own close ×100 before calculating means/medians. All six metrics are percentages.'}</p>
+          <p>{isKo ? '완료 봉만 사용하며 미래 봉은 참조하지 않습니다. 부족한 표본·비정상 OHLC는 —. 비정상 봉 다음 TR도 이전 종가를 확인할 수 없어 미정입니다. API가 반환한 봉 수가 요청보다 적을 수 있습니다. 페이지를 이동해도 계산 표본은 바뀌지 않습니다.' : 'Completed candles only, with no future data. Insufficient/invalid OHLC produces —. The TR after an invalid bar is also unavailable because its previous close cannot be validated. The API may return fewer bars than requested. Pagination does not change the calculation population.'}</p>
+          <p>{isKo ? '평균·중위값은 과거 크기의 요약이며 방향 예측·손익 보장이 아닙니다. 계산은 반올림하지 않고 화면만 소수점 두 자리로 표시합니다.' : 'Means/medians describe historical sizes, not direction or guaranteed returns. Calculations are unrounded; display uses two decimals.'}</p>
         </div>
       </details>
     </div>

@@ -4,7 +4,17 @@
 
 Quant Lab's sidebar contains **변동성·꼬리 통계 / Volatility & Wick Statistics**, after Trend Analysis Chart. Direct route: `/volatility-statistics`. Existing sample-workspace restrictions remain unchanged.
 
-The page shows latest completed-candle ATR, MTR, upper-wick standard deviation and lower-wick standard deviation, plus a price/indicator chart. Both panels share category times, crosshair links and inside/slider zoom using the existing EChart component. The native legend toggles each statistic.
+Korean timeframe labels in the shared selector and this page header are `4h → 4시간봉`, `1d → 날봉`, `1w → 주봉`, `1M → 달봉`. Option values, store/query keys and API requests retain their original codes; English labels and other timeframe choices are unchanged. This is a label change, not a multi-timeframe comparison or calculation change.
+
+The page shows **six arithmetic-mean/median statistics**, not standard deviations or Wilder ATR:
+
+- Candle volatility (gap-inclusive True Range): mean and median.
+- Upper wick length: mean (AUW) and median (MUW).
+- Lower wick length: mean (ALW) and median (MLW).
+
+The **numeric table has no graphs**. Its eight columns are candle open time, close and the six statistics, grouped into volatility/upper/lower mean–median pairs. Rows are newest first with 50 per page. All six metrics use price units or %, explicitly labeled in the group headers. Warm-up and invalid values remain —, while valid zeros show 0.00. Six summary cards retain the latest values.
+
+All statistics are calculated on the full loaded chronological history before selecting/reversing table rows. Pagination changes only the visible rows, never the calculation population or network request. Applying settings or switching coin/timeframe returns to the first page. The table has a sticky header and its own overflow area so larger datasets do not require rendering all 9,999 rows at once. This page no longer imports EChart or builds chart options; other chart pages are unchanged.
 
 The user can independently set:
 
@@ -17,23 +27,25 @@ Apply settings commits validated form inputs. Editing an input does not trigger 
 ## Calculation contract
 
 - TR = max(H−L, |H−previous close|, |L−previous close|). The first loaded TR uses H−L.
-- ATR matches `core/indicator_primitives.py::compute_atr_wilder` on valid input: first TR seed, recursive `(1−1/N) × previous ATR + TR/N`, hidden until N TR observations. This preserves the existing core's RMA initialization, rather than substituting a simple rolling mean or an SMA seed. ATR initialization depends on loaded history.
-- MTR means **Median True Range**: median of trailing N TRs, averaging the central pair for even N.
-- Upper wick = H−max(O,C); lower wick = min(O,C)−L. Both reuse the existing Wick Statistics validation/calculation helper.
-- Wick standard deviation is population deviation: `sqrt(sum((x−mean)^2)/N)`, ddof=0. Zero wicks remain valid samples. Scale before calculating variance to avoid overflow.
-- Percent ATR/MTR = price-unit statistic/current candle close ×100, matching the core ATR percent convention. Percent wick deviation normalizes each individual wick by its own close ×100 **before** computing deviation; its unit is percentage points (%p).
-- Positive finite numeric OHLC and consistent high/body/low geometry are required. Invalid rows are not imputed or skipped. A wick window remains unavailable until the invalid row leaves it. Invalid current/previous OHLC makes TR unavailable; ATR resets and requires N consecutive valid TRs to become visible again. Non-finite normalization is unavailable, not infinity.
+- The UI explicitly identifies TR as gap-inclusive, which can differ from a candle's own H−L range.
+- Each mean = sum of the trailing N observations / N, using equal weights. This page no longer computes or labels Wilder-smoothed ATR; the existing backend ATR and other chart pages are unchanged.
+- Each median = the central sorted observation in the same trailing N-bar window, averaging the central pair for even N. There are separate medians for TR, upper wicks and lower wicks.
+- Upper wick = H−max(O,C); lower wick = min(O,C)−L. All four wick statistics directly reuse `computeWickStatistics`; their accepted formulas/validation are unchanged.
+- Zero TRs/wicks are valid observations. Means scale nonnegative observations before summing to avoid overflow; calculations and medians are never rounded before display.
+- Percent mode computes `(length / that candle's close) × 100` for **each candle's** TR/upper/lower length **before** the mean/median. It does not divide an already-aggregated statistic by the final close. All six metrics are percentages, not standard-deviation percentage points.
+- Positive finite numeric OHLC and consistent high/body/low geometry are required. Invalid rows are not imputed or skipped. A wick window remains unavailable until the invalid row leaves it. Invalid current/previous OHLC makes TR unavailable, so its trailing windows also remain unavailable until all N TRs are valid. Non-finite normalization is unavailable, not infinity.
 - Only chronological completed bars are consumed. No future values, centered windows, signal execution or trading strategy is added. Calculations retain precision; labels use the existing two-decimal formatter.
 
-Price candles display the original validated HTTP response, independently of whether a statistic's window is valid. This descriptive page does not change backend ATR, backtesting, trade sizing, accepted security boundaries, or the existing Wick Statistics/distribution page.
+The close column shows the corresponding raw candle close independently of whether a statistic's window is valid. This descriptive page does not change backend ATR, backtesting, trade sizing, accepted security boundaries, or the existing Wick Statistics/distribution page.
 
 ## Verification
 
-- 73 focused calculation/page/previous Wick tests passed; full frontend: **567 passed**, 54 files.
+- Six-statistic follow-up: the full frontend, including calculation, table and timeframe-label tests, passed **574 tests**, 54 files.
 - TypeScript noEmit, ESLint and production build passed. Only the existing stale Browserslist database warning was reported by the build.
-- Tests cover gaps, explicit core ATR reference values, odd/even median, zero wicks, population deviation, both unit conventions, invalid-data recovery, overflow, warm-up, arbitrary N, immutability/prefix invariance, forming-candle exclusion, API count bounds, explicit apply, one-request/no-refetch recalculation, empty/error states, late previous-selection responses, bilingual route/navigation and synchronized chart option contracts.
-- Browser verification uses a disposable synthetic HTTP server without application databases, profiles or credentials. Korean desktop cards/chart and applying N=20/count=50/price units were visually checked; the shared zoom/crosshair and bottom slider rendered correctly. English labels and switching from 4h to 1h preserved the applied N/count and replaced the candle timestamps. Mobile was not checked (the product is desktop-first).
-- These frontend feature-stage checks did not rerun the full backend suite or include a real exchange, Windows installer or remote CI. Publication is tracked separately by the v1.1.0 release.
+- Tests distinguish arithmetic means from the previously used Wilder ATR and means from medians on outliers. They verify all four wick results match the existing Wick Statistics contract, per-candle normalization before aggregation, gaps, even medians, zero lengths, invalid-data recovery, overflow and prefix invariance. Table regressions verify all six values/headers, newest-first candle alignment, two-decimal values, warm-up nulls vs valid zeros, forming-candle exclusion, pagination without extra requests or page-subset calculation, reset on settings/coin changes and bilingual labels. No canvas is rendered on this page.
+- Timeframe-label regression verifies all four Korean names in the expanded/collapsed sidebar and page header, unchanged API interval values and the original English labels.
+- Browser verification used a disposable synthetic HTTP server without application databases, profiles or credentials. The Korean desktop screen showed all six mean/median cards and the eight-column table (time, close, three mean/median pairs) for 200 completed candles. The earlier table follow-up also verified moving from page 1 (1–50) to page 2 (51–100). English labels were covered by component tests; mobile was not checked (the product is desktop-first).
+- The page-specific calculation now returns six means/medians; its unused RMA/standard-deviation paths were removed. The backend and shared Wick Statistics/distribution helpers are unchanged, so the backend suite was not rerun. No real exchange, Windows installer or remote CI was tested for this change. This follow-up is local and is not included in the previously published v1.1.0 release; no new commit, push or release was made.
 
 ## Files
 
@@ -44,4 +56,4 @@ Price candles display the original validated HTTP response, independently of whe
 - `frontend/src/utils/wickStatistics.ts`: expose the already-used candle-wick helper; no formula change
 - This document
 
-Earlier uncommitted Wick Statistics work and the user's pre-existing untracked Windows launcher are preserved.
+The existing Wick Statistics feature and the user's pre-existing untracked Windows launcher are unchanged by the table-only follow-up.
