@@ -3,10 +3,10 @@ from datetime import datetime, timezone
 import pandas as pd
 import pytest
 
-from backend.modules.stop_loss_lab.schemas import LabRequest, Distance
+from backend.modules.stop_loss_lab.schemas import LabRequest, StatisticsRequest, Distance
 from backend.modules.stop_loss_lab.statistics import DAY, prepare, snapshot, distributions
 from backend.modules.stop_loss_lab.simulation import execute, metrics, make_sessions, simulate, optimize, distance, partition, breakout_distribution
-from backend.modules.stop_loss_lab.service import analyze
+from backend.modules.stop_loss_lab.service import analyze, candle_statistics
 
 
 HOUR = 3600000
@@ -203,6 +203,22 @@ def test_service_uses_bounded_historical_public_source_and_content_fingerprint()
     assert result == analyze(config(), now=datetime(2025, 2, 1, tzinfo=timezone.utc), fetch=fetch)
 
 
+def test_candle_statistics_is_daily_only_and_does_not_run_the_simulator():
+    reference, _ = fixture()
+    calls = []
+    def fetch(symbol, interval, **kwargs):
+        calls.append((symbol, interval, kwargs))
+        return reference.copy()
+    request = StatisticsRequest(start="2025-01-01", end="2025-01-20", lookback=3)
+    result = candle_statistics(request, now=datetime(2025, 2, 1, tzinfo=timezone.utc), fetch=fetch)
+    assert len(calls) == 1
+    assert calls[0][0:2] == ("BTCUSDT", "1d")
+    assert result["data"]["candle_count"] == 20
+    assert result["distributions"]["all"]["candle_count"] == 20
+    assert result["distributions"]["weekend"]["candle_count"] == 6
+    assert len(result["data"]["fingerprint_sha256"]) == 64
+
+
 def test_router_validates_before_fetch_and_offloads(monkeypatch):
     from fastapi import FastAPI
     from fastapi.testclient import TestClient
@@ -211,11 +227,15 @@ def test_router_validates_before_fetch_and_offloads(monkeypatch):
     app.include_router(module.router)
     calls = []
     monkeypatch.setattr(module, "analyze", lambda request: calls.append(request.coin) or {"ok": True})
+    monkeypatch.setattr(module, "candle_statistics", lambda request: calls.append(f"stats:{request.coin}") or {"statistics": True})
     with TestClient(app) as client:
         assert client.post("/api/stop-loss-lab/analyze", json={"start": "bad"}).status_code == 422
         assert not calls
         response = client.post("/api/stop-loss-lab/analyze", json=config().model_dump(mode="json"))
         assert response.json() == {"success": True, "data": {"ok": True}}
+        statistics = client.post("/api/stop-loss-lab/statistics", json={"coin": "ETH", "start": "2025-01-01", "end": "2025-01-20", "lookback": 14})
+        assert statistics.json() == {"success": True, "data": {"statistics": True}}
+        assert calls[-1] == "stats:ETH"
         monkeypatch.setattr(module, "analyze", lambda request: (_ for _ in ()).throw(ValueError("No market data")))
         assert client.post("/api/stop-loss-lab/analyze", json=config().model_dump(mode="json")).status_code == 422
 

@@ -6,7 +6,9 @@ orders, causal findings, guaranteed returns or an automated trading system.
 ## Architecture audit and integration
 
 - `/volatility-statistics` now opens Stop-Loss Lab; `/stop-loss-lab` is an alias.
-  The existing six-column-statistics table is preserved under **Candle statistics**.
+  The default **Candle statistics** flow is separate from **Strategy experiment**.
+  The existing six-column-statistics table remains available in a collapsed
+  advanced section.
   Existing chart indicator registrations and wick calculations are unchanged.
 - Public data: existing `fetch_binance_klines`, bounded backwards pagination,
   explicit historical `end_time`, existing 30-second raw-data cache. Binance
@@ -25,6 +27,8 @@ orders, causal findings, guaranteed returns or an automated trading system.
   calibration are shared across stop/target combinations. `router.py` offloads
   calculation to FastAPI's threadpool. `POST /api/stop-loss-lab/analyze` uses the
   existing application authentication/local-request and offline sample boundary.
+- `POST /api/stop-loss-lab/statistics` fetches daily candles only and returns full
+  and UTC-weekend observed distributions without entering the optimizer.
 - UI uses existing React Query mutations, public API client, language store,
   number formatting, card/table styles and EChart. Only BarChart is added to the
   existing renderer registry. Heatmap is an accessible clickable table.
@@ -39,9 +43,11 @@ Inclusive UTC date range ≤366 days; execution bars ≤30,000; combinations ≤
 bars × combinations × maximum entries ≤3,000,000. Up to ten explicit numeric
 values per axis, entered comma-separated. No new dependency or persistent cache.
 
-Response contains submitted `config`, source, effective `as_of`, counts, execution
-coverage and SHA-256 of canonical OHLC inputs, daily/weekly distributions and
-breakouts, candidate metrics/trades, chronological split, training-selected cell,
+The independent statistics response contains submitted filters, source, effective
+coverage/fingerprint and `all`/`weekend` daily distributions. The analysis response
+contains submitted `config`, source, effective `as_of`, counts, execution
+coverage and SHA-256 of canonical OHLC inputs, daily/weekly distributions, a
+separate UTC Saturday/Sunday daily-candle distribution, and breakouts, candidate metrics/trades, chronological split, training-selected cell,
 neighborhoods, year/regime groups and expanding walk-forward folds. To reproduce
 later, the same canonical input data is necessary; a fingerprint is not a stored
 market-data snapshot. Historical exchange corrections can change results.
@@ -70,6 +76,10 @@ arithmetic TR mean and **close** normalization and labels that difference.
 
 Explorer summaries describe completed reference candles in the selected dates;
 N controls ATR/MTR and pre-entry rolling calibration, not the date-range count.
+Weekend statistics include only completed daily candles whose Binance open time
+falls on Saturday or Sunday in UTC. Wick/TR observations come from those candles.
+ATR/MTR retain contiguous daily history for indicator validity, then only weekend
+observations are included in the weekend table; weekdays are never counted there.
 ATR/MTR expansion ≥1.25, contraction ≤0.8; otherwise normal. Prior N-close change
 >2% = bull, <−2% = bear, else sideways. These are explicit research buckets,
 not an inferred or forward-looking regime model.

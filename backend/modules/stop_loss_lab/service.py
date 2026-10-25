@@ -3,8 +3,45 @@ from datetime import datetime, timedelta, timezone
 import hashlib
 
 from backend.utils.data_service import fetch_binance_klines
-from .statistics import INTERVAL_MS, prepare, distributions
+from .statistics import INTERVAL_MS, prepare, distributions, weekend_distribution
 from .simulation import breakout_distribution, optimize
+
+
+def candle_statistics(request, *, now=None, fetch=fetch_binance_klines):
+    """Return observed daily-candle distributions without running a simulation."""
+    now = now or datetime.now(timezone.utc)
+    start = int(datetime.combine(request.start, datetime.min.time(), timezone.utc).timestamp()*1000)
+    requested_end = int(datetime.combine(request.end+timedelta(days=1), datetime.min.time(), timezone.utc).timestamp()*1000)
+    as_of = min(requested_end, int(now.timestamp()*1000))
+    duration = INTERVAL_MS["1d"]
+    end = as_of//duration*duration
+    warmup = request.lookback+8
+    earliest = start//duration*duration-warmup*duration
+    last_open = (requested_end-1)//duration*duration
+    count = (last_open-earliest)//duration+1
+    raw = fetch(f"{request.coin}USDT", "1d", total_candles=count, end_time=requested_end-1)
+    daily = prepare(raw, "1d", as_of, request.lookback)
+    window = daily.loc[(daily.open_time >= start) & (daily.end_time <= end)]
+    if window.empty:
+        raise ValueError("No completed daily candles in the requested date range")
+    fingerprint = hashlib.sha256(
+        daily[["open_time", "open", "high", "low", "close"]].to_csv(index=False).encode()
+    ).hexdigest()
+    return {
+        "config": request.model_dump(mode="json"),
+        "data": {
+            "source": "Binance USDT-M Futures public klines",
+            "as_of": end,
+            "fingerprint_sha256": fingerprint,
+            "candle_count": len(window),
+            "first": int(window.iloc[0].open_time),
+            "last": int(window.iloc[-1].end_time),
+        },
+        "distributions": {
+            "all": distributions({"1d": daily}, start, end)["1d"],
+            "weekend": weekend_distribution(daily, start, end),
+        },
+    }
 
 
 def analyze(request, *, now=None, fetch=fetch_binance_klines):
@@ -41,5 +78,6 @@ def analyze(request, *, now=None, fetch=fetch_binance_klines):
                 "counts": {key: len(frame) for key, frame in frames.items()},
                 "execution_first": int(execution.iloc[0].open_time), "execution_last": int(execution.iloc[-1].end_time)},
             "distributions": distributions({key: frames[key] for key in ("1d", "1w")}, start, end),
+            "weekend_distribution": weekend_distribution(frames["1d"], start, end),
             "breakouts": {key: breakout_distribution(frames[key], execution, key, start, end) for key in ("1d", "1w")},
             **result}

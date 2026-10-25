@@ -3,7 +3,7 @@ import pandas as pd
 import pytest
 
 from core.indicator_primitives import compute_atr_wilder
-from backend.modules.stop_loss_lab.statistics import DAY, describe, prepare, snapshot
+from backend.modules.stop_loss_lab.statistics import DAY, describe, prepare, snapshot, weekend_distribution
 from backend.modules.stop_loss_lab.schemas import LabRequest
 
 
@@ -64,3 +64,16 @@ def test_bounded_validation_rejects_bad_grids_and_dates():
 def test_grid_neighbors_use_numerical_order():
     request = LabRequest(start="2025-01-01", end="2025-01-10", stop_values=[1, .3, .5])
     assert request.stop_values == [.3, .5, 1]
+
+
+def test_weekend_distribution_uses_only_utc_saturday_and_sunday_daily_candles():
+    daily = prepare(candles(12), "1d", 12 * DAY, 3)
+    result = weekend_distribution(daily, 0, 12 * DAY)
+
+    # Unix epoch day zero is Thursday, so indices 2/3 and 9/10 are Sat/Sun.
+    assert result["timezone"] == "UTC"
+    assert result["weekdays"] == ["Saturday", "Sunday"]
+    assert result["candle_count"] == 4
+    assert result["day_counts"] == {"Saturday": 2, "Sunday": 2}
+    assert result["metrics"]["upper"]["percent_open"]["count"] == 4
+    assert result["metrics"]["upper"]["percent_open"]["mean"] == pytest.approx(1.75)

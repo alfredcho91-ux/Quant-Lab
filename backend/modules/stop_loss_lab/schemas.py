@@ -11,6 +11,24 @@ class Distance(BaseModel):
     percentile: float = Field(default=95, ge=50, le=99)
 
 
+class StatisticsRequest(BaseModel):
+    """A bounded, daily-candle-only request that never runs the simulator."""
+
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
+    coin: Literal["BTC", "ETH", "SOL"] = "BTC"
+    start: date
+    end: date
+    lookback: int = Field(default=14, ge=1, le=365)
+
+    @model_validator(mode="after")
+    def relationships(self):
+        if self.end < self.start or (self.end - self.start).days > 365:
+            raise ValueError("Choose an inclusive UTC date range of at most 366 days")
+        if self.end > datetime.now(timezone.utc).date():
+            raise ValueError("Future dates are not supported")
+        return self
+
+
 class LabRequest(BaseModel):
     model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
     coin: Literal["BTC", "ETH", "SOL"] = "BTC"

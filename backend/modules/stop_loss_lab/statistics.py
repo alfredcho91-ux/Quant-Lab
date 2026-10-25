@@ -99,16 +99,36 @@ def snapshot(history, lookback, interval):
             "volatility_regime": "expanding" if ratio and ratio >= 1.25 else "contracting" if ratio and ratio <= 0.8 else "normal"}
 
 
+def _distribution(window):
+    metrics = {}
+    for key in ("upper", "lower", "tr", "atr", "mtr"):
+        metrics[key] = {"price": describe(window[key]), "percent_open": describe(window[key] / window.open * 100, histogram=True)}
+    metrics["atr_mtr_ratio"] = describe(window.atr / window.mtr.replace(0, np.nan))
+    return {"candle_count": len(window), "metrics": metrics}
+
+
 def distributions(frames, start, end):
-    output = {}
-    for interval, frame in frames.items():
-        window = frame.loc[(frame.open_time >= start) & (frame.end_time <= end)]
-        metrics = {}
-        for key in ("upper", "lower", "tr", "atr", "mtr"):
-            metrics[key] = {"price": describe(window[key]), "percent_open": describe(window[key] / window.open * 100, histogram=True)}
-        metrics["atr_mtr_ratio"] = describe(window.atr / window.mtr.replace(0, np.nan))
-        output[interval] = {"candle_count": len(window), "metrics": metrics}
-    return output
+    return {
+        interval: _distribution(frame.loc[(frame.open_time >= start) & (frame.end_time <= end)])
+        for interval, frame in frames.items()
+    }
+
+
+def weekend_distribution(daily, start, end):
+    """Describe completed UTC Saturday/Sunday daily candles only."""
+    window = daily.loc[(daily.open_time >= start) & (daily.end_time <= end)].copy()
+    weekdays = pd.to_datetime(window.open_time, unit="ms", utc=True).dt.dayofweek
+    weekend = window.loc[weekdays >= 5]
+    result = _distribution(weekend)
+    result.update({
+        "timezone": "UTC",
+        "weekdays": ["Saturday", "Sunday"],
+        "day_counts": {
+            "Saturday": int((weekdays == 5).sum()),
+            "Sunday": int((weekdays == 6).sum()),
+        },
+    })
+    return result
 
 
 def historical_breakouts(history, side, lookback):

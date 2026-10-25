@@ -19,6 +19,21 @@ export interface Distribution {
 }
 export type Metrics = Record<string, number | boolean | number[] | null>;
 export type CandleMetric = 'upper' | 'lower' | 'tr' | 'atr' | 'mtr';
+export type CandleDistribution = {
+  candle_count: number;
+  metrics: Record<CandleMetric, { price: Distribution; percent_open: Distribution }> & { atr_mtr_ratio: Distribution };
+};
+export type WeekendDistribution = CandleDistribution & {
+  timezone: 'UTC'; weekdays: ['Saturday', 'Sunday']; day_counts: { Saturday: number; Sunday: number };
+};
+export interface CandleStatisticsConfig {
+  coin: string; start: string; end: string; lookback: number;
+}
+export interface CandleStatisticsResult {
+  config: CandleStatisticsConfig;
+  data: { source: string; as_of: number; fingerprint_sha256: string; candle_count: number; first: number; last: number };
+  distributions: { all: CandleDistribution; weekend: WeekendDistribution };
+}
 export interface LabTrade {
   side: string; entry_time: number; exit_time: number; reference_time: number;
   entry_price: number; exit_price: number; stop_price: number; target_price: number; quantity: number;
@@ -38,7 +53,8 @@ export interface LabCandidate {
 export interface LabResult {
   config: LabConfig;
   data: { source: string; as_of: number; fingerprint_sha256: string; counts: Record<string, number>; execution_first: number; execution_last: number };
-  distributions: Record<string, { candle_count: number; metrics: Record<CandleMetric, { price: Distribution; percent_open: Distribution }> & { atr_mtr_ratio: Distribution } }>;
+  distributions: Record<string, CandleDistribution>;
+  weekend_distribution: WeekendDistribution;
   breakouts: Record<string, Record<string, { depth_pct: Distribution; returns_confirmed: number; order_or_coverage_unknown: number; return_rate_lower_pct: number | null; return_minutes_upper_bound: Distribution }>>;
   split_time: number; selected_id: number | null; candidates: LabCandidate[];
   walk_forward: { train_end: number; test_end: number; candidate_id: number | null; test: Metrics | null }[];
@@ -49,5 +65,13 @@ export async function analyzeStopLossLab(config: LabConfig): Promise<LabResult> 
     return unwrapApiResponse(await api.post<ApiResponse<LabResult>>('/stop-loss-lab/analyze', config), 'Unable to run Stop-Loss Lab.');
   } catch (error) {
     throw toApiClientError(error, 'Unable to run Stop-Loss Lab.');
+  }
+}
+
+export async function getStopLossCandleStatistics(config: CandleStatisticsConfig): Promise<CandleStatisticsResult> {
+  try {
+    return unwrapApiResponse(await api.post<ApiResponse<CandleStatisticsResult>>('/stop-loss-lab/statistics', config), 'Unable to load candle statistics.');
+  } catch (error) {
+    throw toApiClientError(error, 'Unable to load candle statistics.');
   }
 }

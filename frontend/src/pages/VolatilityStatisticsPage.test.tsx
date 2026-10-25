@@ -40,11 +40,11 @@ describe('Volatility statistics page', () => {
     window.history.replaceState(null, '', '/volatility-statistics');
     setup(<App />);
     expect(await screen.findByRole('heading', { name: 'Stop-Loss Lab' })).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: 'Candle statistics' }));
-    expect(screen.getByRole('heading', { name: 'Volatility & Wick Statistics' })).toBeTruthy();
+    fireEvent.click(screen.getByText('Legacy candle statistics (advanced)'));
+    expect(await screen.findByRole('heading', { name: 'Volatility & Wick Statistics' })).toBeTruthy();
     await act(async () => { useStore.getState().setLanguage('ko'); });
     expect(screen.getByRole('heading', { name: '변동성·꼬리 통계' })).toBeTruthy();
-    expect(screen.getByRole('button', { name: '손절 실험실', pressed: false })).toBeTruthy();
+    expect(screen.getByRole('button', { name: '봉 통계', pressed: true })).toBeTruthy();
   });
 
   it('uses one OHLC request, excludes the forming candle, and displays real sample count', async () => {
@@ -64,7 +64,7 @@ describe('Volatility statistics page', () => {
     useStore.setState({ language: 'ko' });
     window.history.replaceState(null, '', '/volatility-statistics');
     setup(<App />);
-    fireEvent.click(await screen.findByRole('button', { name: '기존 봉별 통계' }));
+    fireEvent.click(await screen.findByText('기존 봉별 통계 (상세)'));
     await screen.findByRole('table', { name: '봉별 변동성·꼬리 통계' });
     const labels = [['4h', '4시간봉'], ['1d', '날봉'], ['1w', '주봉'], ['1M', '달봉']] as const;
     for (const [code, label] of labels) {
