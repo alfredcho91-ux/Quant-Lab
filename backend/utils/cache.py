@@ -69,11 +69,21 @@ class DataCache:
         self._misses = 0
 
     def _resolve_cache_dir(self) -> str:
+        from backend.config.settings import IS_FROZEN, PROJECT_ROOT, SOURCE_ROOT
+
         if self._configured_cache_dir is not None:
+            if IS_FROZEN:
+                # Bundled modules retain source-relative cache paths. Keep the
+                # same namespace in the writable user profile, not _internal.
+                try:
+                    relative = Path(self._configured_cache_dir).resolve().relative_to((SOURCE_ROOT / ".cache").resolve())
+                except ValueError:
+                    pass  # An explicitly configured external path stays owned by its caller.
+                else:
+                    return str(PROJECT_ROOT / ".cache" / relative)
             return self._configured_cache_dir
 
-        project_root = Path(__file__).parent.parent.parent
-        return str(project_root / ".cache" / "data")
+        return str(PROJECT_ROOT / ".cache" / "data")
 
     def _initialize_memory_cache(self) -> None:
         if not isinstance(self._cache, dict):

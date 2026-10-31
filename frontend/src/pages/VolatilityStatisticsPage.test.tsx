@@ -60,6 +60,14 @@ describe('Volatility statistics page', () => {
     expect(within(screen.getByRole('region', { name: 'Lower wick median' })).getByText('1.00%')).toBeTruthy();
   });
 
+  it.each(['ko', 'en'] as const)('uses the plain-language range label in the legacy table in %s', async language => {
+    useStore.setState({ language });
+    setup();
+    const table = await screen.findByRole('table', { name: language === 'ko' ? '봉별 변동성·꼬리 통계' : 'Per-candle volatility statistics' });
+    expect(within(table).getByRole('columnheader', { name: language === 'ko' ? '봉 변동폭 (%)' : 'Candle range (%)' })).toBeTruthy();
+    expect(screen.queryByText(/\b(?:TR|ATR|MTR)\b/)).toBeNull();
+  });
+
   it('labels four timeframes in Korean without changing query values, including the collapsed sidebar', async () => {
     useStore.setState({ language: 'ko' });
     window.history.replaceState(null, '', '/volatility-statistics');

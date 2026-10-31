@@ -42,10 +42,12 @@
 
 ### 손절 실험실
 
-`POST /api/stop-loss-lab/statistics` — `coin`, 포함 UTC `start`/`end`, ATR/MTR
-`lookback`으로 완료 일봉만 조회합니다. 전략 시뮬레이션은 실행하지 않으며 전체 일봉과
-UTC 토·일 일봉 분포, 실제 범위, 입력 OHLC fingerprint를 반환합니다. 샘플
-워크스페이스에서는 403, 잘못된 날짜나 완료 일봉 부재는 422입니다.
+`POST /api/stop-loss-lab/statistics` — `coin`, `candles`(최근 완료 일봉 수,
+정수 1–10,000, 기본 90), ATR/MTR `lookback`(기본 14)으로 조회합니다.
+날짜 입력 없이 진행 중인 봉과 지표 준비 봉을 표본에서 제외합니다. 전략 시뮬레이션은
+실행하지 않으며 전체 일봉과 그 안의 UTC 토·일 일봉 분포, 실제 확보 봉 수·범위,
+입력 OHLC fingerprint를 반환합니다. 데이터가 부족하면 실제 표본 수를 표시합니다.
+샘플 워크스페이스에서는 403, 잘못된 봉 수나 완료 일봉 부재는 422입니다.
 
 `POST /api/stop-loss-lab/analyze` — `LabRequest`의 UTC 날짜·기준/실행 봉·
 진입/손절/익절 격자·수수료·슬리피지·위험 설정으로 공개 Binance USDT-M

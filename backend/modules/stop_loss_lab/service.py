@@ -10,20 +10,13 @@ from .simulation import breakout_distribution, optimize
 def candle_statistics(request, *, now=None, fetch=fetch_binance_klines):
     """Return observed daily-candle distributions without running a simulation."""
     now = now or datetime.now(timezone.utc)
-    start = int(datetime.combine(request.start, datetime.min.time(), timezone.utc).timestamp()*1000)
-    requested_end = int(datetime.combine(request.end+timedelta(days=1), datetime.min.time(), timezone.utc).timestamp()*1000)
-    as_of = min(requested_end, int(now.timestamp()*1000))
     duration = INTERVAL_MS["1d"]
-    end = as_of//duration*duration
+    end = int(now.timestamp()*1000)//duration*duration
     warmup = request.lookback+8
-    earliest = start//duration*duration-warmup*duration
-    last_open = (requested_end-1)//duration*duration
-    count = (last_open-earliest)//duration+1
-    raw = fetch(f"{request.coin}USDT", "1d", total_candles=count, end_time=requested_end-1)
-    daily = prepare(raw, "1d", as_of, request.lookback)
-    window = daily.loc[(daily.open_time >= start) & (daily.end_time <= end)]
-    if window.empty:
-        raise ValueError("No completed daily candles in the requested date range")
+    raw = fetch(f"{request.coin}USDT", "1d", total_candles=request.candles+warmup, end_time=end-1)
+    daily = prepare(raw, "1d", end, request.lookback)
+    window = daily.tail(request.candles)
+    start = int(window.iloc[0].open_time)
     fingerprint = hashlib.sha256(
         daily[["open_time", "open", "high", "low", "close"]].to_csv(index=False).encode()
     ).hexdigest()

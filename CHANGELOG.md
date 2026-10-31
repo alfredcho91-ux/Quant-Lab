@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.3.0] - 2026-10-31
+
+- Added a Windows portable app using a dedicated WebView2 window instead of a Chrome/browser tab; the bundled Python runtime and prebuilt frontend require no separate Python or Node.js installation.
+- Added single-instance window activation, existing dirty/pending navigation guards on close, and shutdown of the app-owned local server.
+- Added reproducible Windows packaging scripts and a ZIP distribution; user databases, credentials and `.env` files are not bundled. Packaged default caches now use the writable user profile, not the installation directory.
+- Replaced the candle-statistics date range with a recent completed candle count (default 90, supported 1–10,000), excluding forming and indicator warmup candles from the sample. Actual available counts and insufficient history are explicit; weekend statistics remain a subset of the selected candles.
+- Replaced percentile and range abbreviations with plain-language Korean/English labels without changing calculation semantics or strategy API identifiers.
+- Validated 1,313 backend tests (1 skipped), 593 frontend tests, TypeScript, ESLint, production build, architecture guards and actual packaged-app execution on Windows.
+- Windows ZIP is unsigned and requires Microsoft Edge WebView2 Runtime. Existing source-checkout data is preserved; the packaged app uses its own user data directory.
+
 ## [1.1.0] - 2026-10-22
 
 - Added AUW/MUW/ALW/MLW Wick Statistics in the existing trend chart's native auxiliary pane, with configurable period, price/percent units, independent toggles and persisted settings.

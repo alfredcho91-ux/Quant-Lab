@@ -64,7 +64,7 @@ export default function VolatilityStatisticsPage() {
       <header>
         <h1 className="text-2xl font-bold text-white">{isKo ? '변동성·꼬리 통계' : 'Volatility & Wick Statistics'}</h1>
         <p className="mt-1 text-sm text-dark-300">{coin} · {isKo ? MARKET_INTERVAL_LABELS_KO[interval] ?? interval : interval} · {isKo ? '봉 변동성·윗꼬리·아랫꼬리의 평균과 중위값' : 'Means and medians of candle volatility, upper wicks and lower wicks'}</p>
-        <p className="mt-1 text-xs text-dark-400">{isKo ? '봉 변동성은 갭을 포함한 TR 기준 · 평균은 최근 N봉 산술평균(일반 ATR의 Wilder 평활과 다름)' : 'Candle volatility uses gap-inclusive TR · means are arithmetic averages of N bars, not Wilder-smoothed ATR'}</p>
+        <p className="mt-1 text-xs text-dark-400">{isKo ? '봉 변동성은 갭을 포함한 변동폭 기준 · 평균은 최근 N봉 산술평균(Wilder 평활평균과 다름)' : 'Candle volatility uses gap-inclusive candle ranges · means are arithmetic averages of N bars, not Wilder-smoothed averages'}</p>
       </header>
       <form onSubmit={apply} className="card flex flex-wrap items-end gap-4 p-4">
         <label className="text-sm text-dark-300">{isKo ? '계산 기간 N' : 'Calculation period N'}
@@ -107,7 +107,7 @@ export default function VolatilityStatisticsPage() {
                         <th scope="col" rowSpan={2} className="px-3 py-3 text-left">{isKo ? '봉 시작 시각' : 'Candle open time'}</th>
                         <th scope="col" rowSpan={2} className="px-3 py-3">{isKo ? '종가' : 'Close'}</th>
                         {[0, 2, 4].map(index => <th key={index} scope="colgroup" colSpan={2} className="px-3 pt-3 text-center" style={{ color: METRICS[index].color }}>
-                          {index === 0 ? (isKo ? '봉 변동성(TR)' : 'Candle volatility (TR)') : index === 2 ? (isKo ? '윗꼬리' : 'Upper wick') : (isKo ? '아랫꼬리' : 'Lower wick')}{suffix ? ` (${suffix})` : ''}
+                          {index === 0 ? (isKo ? '봉 변동폭' : 'Candle range') : index === 2 ? (isKo ? '윗꼬리' : 'Upper wick') : (isKo ? '아랫꼬리' : 'Lower wick')}{suffix ? ` (${suffix})` : ''}
                         </th>)}
                       </tr>
                       <tr>
@@ -137,12 +137,12 @@ export default function VolatilityStatisticsPage() {
       <details className="card p-4 text-sm text-dark-300">
         <summary className="cursor-pointer font-semibold">{isKo ? '계산 기준과 해석 주의사항' : 'Calculation definitions and limitations'}</summary>
         <div className="mt-3 space-y-2 text-xs leading-relaxed">
-          <p>TR = max(High − Low, |High − Previous Close|, |Low − Previous Close|)</p>
-          <p>{isKo ? '봉 변동성은 갭을 포함한 TR입니다(봉 자체의 High−Low와 다를 수 있음). 첫 봉은 이전 종가가 없어 High−Low를 사용합니다. 평균은 최근 N개 값의 산술평균으로, 일반 ATR의 Wilder 평활을 사용하지 않습니다.' : 'Candle volatility uses gap-inclusive TR, which can differ from High−Low. The first loaded bar uses High−Low because its previous close is unavailable. Means are arithmetic averages of N observations, not Wilder-smoothed ATR.'}</p>
+          <p>{isKo ? '봉 변동폭 = max(고가 − 저가, |고가 − 이전 종가|, |저가 − 이전 종가|)' : 'Candle range = max(High − Low, |High − Previous Close|, |Low − Previous Close|)'}</p>
+          <p>{isKo ? '봉 변동성은 갭을 포함한 변동폭입니다(봉 자체의 고가−저가와 다를 수 있음). 첫 봉은 이전 종가가 없어 고가−저가를 사용합니다. 평균은 최근 N개 값의 산술평균으로, Wilder 평활평균을 사용하지 않습니다.' : 'Candle volatility uses gap-inclusive candle ranges, which can differ from High−Low. The first loaded bar uses High−Low because its previous close is unavailable. Means are arithmetic averages of N observations, not Wilder-smoothed averages.'}</p>
           <p>{isKo ? '중위값은 최근 N개 값을 정렬한 중앙값입니다. 짝수 N은 가운데 두 값의 평균입니다. 여섯 항목 모두 같은 N개 완료 봉 기준입니다.' : 'Medians use the central value of the sorted N observations, averaging the central pair for even N. All six metrics use the same N completed bars.'}</p>
           <p>{isKo ? '윗꼬리 = High−max(Open, Close), 아랫꼬리 = min(Open, Close)−Low. 각 꼬리의 평균과 중위값을 따로 계산하며 길이 0도 포함합니다.' : 'Upper wick = High−max(Open, Close); lower wick = min(Open, Close)−Low. Each side has its own mean and median; zero wicks are included.'}</p>
-          <p>{isKo ? '% 모드: 각 봉의 TR과 꼬리 길이를 해당 봉 종가로 나눠 ×100한 뒤 평균·중위값을 계산합니다. 여섯 항목의 단위는 모두 %입니다.' : '% mode: divide each candle\'s TR and wick lengths by its own close ×100 before calculating means/medians. All six metrics are percentages.'}</p>
-          <p>{isKo ? '완료 봉만 사용하며 미래 봉은 참조하지 않습니다. 부족한 표본·비정상 OHLC는 —. 비정상 봉 다음 TR도 이전 종가를 확인할 수 없어 미정입니다. API가 반환한 봉 수가 요청보다 적을 수 있습니다. 페이지를 이동해도 계산 표본은 바뀌지 않습니다.' : 'Completed candles only, with no future data. Insufficient/invalid OHLC produces —. The TR after an invalid bar is also unavailable because its previous close cannot be validated. The API may return fewer bars than requested. Pagination does not change the calculation population.'}</p>
+          <p>{isKo ? '% 모드: 각 봉의 변동폭과 꼬리 길이를 해당 봉 종가로 나눠 ×100한 뒤 평균·중위값을 계산합니다. 여섯 항목의 단위는 모두 %입니다.' : '% mode: divide each candle\'s range and wick lengths by its own close ×100 before calculating means/medians. All six metrics are percentages.'}</p>
+          <p>{isKo ? '완료 봉만 사용하며 미래 봉은 참조하지 않습니다. 부족한 표본·비정상 OHLC는 —. 비정상 봉 다음 변동폭도 이전 종가를 확인할 수 없어 미정입니다. API가 반환한 봉 수가 요청보다 적을 수 있습니다. 페이지를 이동해도 계산 표본은 바뀌지 않습니다.' : 'Completed candles only, with no future data. Insufficient/invalid OHLC produces —. The range after an invalid bar is also unavailable because its previous close cannot be validated. The API may return fewer bars than requested. Pagination does not change the calculation population.'}</p>
           <p>{isKo ? '평균·중위값은 과거 크기의 요약이며 방향 예측·손익 보장이 아닙니다. 계산은 반올림하지 않고 화면만 소수점 두 자리로 표시합니다.' : 'Means/medians describe historical sizes, not direction or guaranteed returns. Calculations are unrounded; display uses two decimals.'}</p>
         </div>
       </details>

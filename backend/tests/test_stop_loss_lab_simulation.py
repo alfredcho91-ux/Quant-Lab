@@ -209,14 +209,52 @@ def test_candle_statistics_is_daily_only_and_does_not_run_the_simulator():
     def fetch(symbol, interval, **kwargs):
         calls.append((symbol, interval, kwargs))
         return reference.copy()
-    request = StatisticsRequest(start="2025-01-01", end="2025-01-20", lookback=3)
-    result = candle_statistics(request, now=datetime(2025, 2, 1, tzinfo=timezone.utc), fetch=fetch)
+    request = StatisticsRequest(candles=20, lookback=3)
+    result = candle_statistics(request, now=datetime(2025, 1, 21, 12, tzinfo=timezone.utc), fetch=fetch)
     assert len(calls) == 1
     assert calls[0][0:2] == ("BTCUSDT", "1d")
     assert result["data"]["candle_count"] == 20
     assert result["distributions"]["all"]["candle_count"] == 20
     assert result["distributions"]["weekend"]["candle_count"] == 6
     assert len(result["data"]["fingerprint_sha256"]) == 64
+    assert "candidates" not in result
+
+
+@pytest.mark.parametrize("count", [1, 7, 30])
+def test_candle_count_excludes_warmup_and_forming_candles(count):
+    reference, _ = fixture()
+    reference.loc[reference.open_time == START+20*DAY, "high"] = 10000
+    calls = []
+    def fetch(symbol, interval, **kwargs):
+        calls.append(kwargs)
+        return reference.copy()
+    result = candle_statistics(StatisticsRequest(candles=count, lookback=3),
+                               now=datetime(2025, 1, 21, 12, tzinfo=timezone.utc), fetch=fetch)
+    assert calls == [{"total_candles": count+11, "end_time": START+20*DAY-1}]
+    assert result["config"]["candles"] == result["data"]["candle_count"] == count
+    assert result["data"]["first"] == START+(20-count)*DAY
+    assert result["data"]["last"] == START+20*DAY
+    assert result["distributions"]["all"]["metrics"]["tr"]["price"]["count"] == count
+    assert result["distributions"]["all"]["metrics"]["tr"]["price"]["mean"] == 2
+    assert result["distributions"]["all"]["metrics"]["atr"]["price"]["count"] == count
+    assert result["distributions"]["weekend"]["candle_count"] <= count
+
+
+def test_statistics_reports_actual_available_candles_without_inventing_samples():
+    reference, _ = fixture()
+    result = candle_statistics(StatisticsRequest(candles=90),
+                               now=datetime(2025, 1, 22, tzinfo=timezone.utc),
+                               fetch=lambda *args, **kwargs: reference.tail(3))
+    assert result["config"]["candles"] == 90
+    assert result["data"]["candle_count"] == result["distributions"]["all"]["candle_count"] == 3
+    with pytest.raises(ValueError, match="No 1d market data"):
+        candle_statistics(StatisticsRequest(), fetch=lambda *args, **kwargs: None)
+
+
+@pytest.mark.parametrize("count", [0, -1, 10001, 1.5, True, "14", None])
+def test_statistics_rejects_invalid_candle_counts(count):
+    with pytest.raises(ValueError):
+        StatisticsRequest(candles=count)
 
 
 def test_router_validates_before_fetch_and_offloads(monkeypatch):
@@ -233,9 +271,12 @@ def test_router_validates_before_fetch_and_offloads(monkeypatch):
         assert not calls
         response = client.post("/api/stop-loss-lab/analyze", json=config().model_dump(mode="json"))
         assert response.json() == {"success": True, "data": {"ok": True}}
-        statistics = client.post("/api/stop-loss-lab/statistics", json={"coin": "ETH", "start": "2025-01-01", "end": "2025-01-20", "lookback": 14})
+        statistics = client.post("/api/stop-loss-lab/statistics", json={"coin": "ETH", "candles": 20, "lookback": 14})
         assert statistics.json() == {"success": True, "data": {"statistics": True}}
         assert calls[-1] == "stats:ETH"
+        calls_before_invalid = len(calls)
+        assert client.post("/api/stop-loss-lab/statistics", json={"candles": 0}).status_code == 422
+        assert len(calls) == calls_before_invalid
         monkeypatch.setattr(module, "analyze", lambda request: (_ for _ in ()).throw(ValueError("No market data")))
         assert client.post("/api/stop-loss-lab/analyze", json=config().model_dump(mode="json")).status_code == 422
 

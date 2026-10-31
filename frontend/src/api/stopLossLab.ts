@@ -27,7 +27,7 @@ export type WeekendDistribution = CandleDistribution & {
   timezone: 'UTC'; weekdays: ['Saturday', 'Sunday']; day_counts: { Saturday: number; Sunday: number };
 };
 export interface CandleStatisticsConfig {
-  coin: string; start: string; end: string; lookback: number;
+  coin: string; candles: number; lookback: number;
 }
 export interface CandleStatisticsResult {
   config: CandleStatisticsConfig;

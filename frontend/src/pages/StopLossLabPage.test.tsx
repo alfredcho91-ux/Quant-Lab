@@ -32,7 +32,7 @@ function result(config: LabConfig): LabResult {
 }
 function statistics(): CandleStatisticsResult {
   const distribution: LabResult['distributions'][string] = { candle_count: 10, metrics: { upper: { price: d, percent_open: d }, lower: { price: d, percent_open: d }, tr: { price: d, percent_open: d }, atr: { price: d, percent_open: d }, mtr: { price: d, percent_open: d }, atr_mtr_ratio: d } };
-  return { config: { coin: 'BTC', start: '2026-01-01', end: '2026-01-10', lookback: 14 }, data: { source: 'fixture', as_of: Date.UTC(2026, 0, 11), fingerprint_sha256: 'fixture', candle_count: 10, first: Date.UTC(2026, 0, 1), last: Date.UTC(2026, 0, 11) }, distributions: { all: distribution, weekend: { ...distribution, candle_count: 2, timezone: 'UTC', weekdays: ['Saturday', 'Sunday'], day_counts: { Saturday: 1, Sunday: 1 } } } };
+  return { config: { coin: 'BTC', candles: 10, lookback: 14 }, data: { source: 'fixture', as_of: Date.UTC(2026, 0, 11), fingerprint_sha256: 'fixture', candle_count: 10, first: Date.UTC(2026, 0, 1), last: Date.UTC(2026, 0, 11) }, distributions: { all: distribution, weekend: { ...distribution, candle_count: 2, timezone: 'UTC', weekdays: ['Saturday', 'Sunday'], day_counts: { Saturday: 1, Sunday: 1 } } } };
 }
 let client: QueryClient;
 beforeEach(() => {
@@ -64,16 +64,100 @@ describe('Stop-Loss Lab', () => {
 
   it('loads daily statistics independently and switches to the weekend sample without rerunning', async () => {
     setup();
-    fireEvent.change(screen.getByLabelText('Statistics start date UTC'), { target: { value: '2026-01-01' } });
-    fireEvent.change(screen.getByLabelText('Statistics end date UTC'), { target: { value: '2026-01-10' } });
+    expect(screen.queryByLabelText('Statistics start date UTC')).toBeNull();
+    expect(screen.queryByLabelText('Statistics end date UTC')).toBeNull();
+    expect((screen.getByLabelText('Statistics candle count') as HTMLInputElement).value).toBe('90');
+    fireEvent.change(screen.getByLabelText('Statistics candle count'), { target: { value: '10' } });
     fireEvent.click(screen.getByRole('button', { name: 'Load statistics' }));
     expect(await screen.findByRole('region', { name: 'Candle statistics results' })).toBeTruthy();
     expect(analyzeStopLossLab).not.toHaveBeenCalled();
     expect(getStopLossCandleStatistics).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(getStopLossCandleStatistics).mock.calls[0][0]).toEqual({ coin: 'BTC', candles: 10, lookback: 14 });
+    expect(screen.getByText(/Requested 10 recent completed daily candles · available 10/)).toBeTruthy();
     fireEvent.change(screen.getByLabelText('Sample'), { target: { value: 'weekend' } });
     expect(screen.getByRole('heading', { name: 'Weekend candle statistics' })).toBeTruthy();
     expect(screen.getByText((_, node) => node?.textContent === 'Saturday / Sunday: 1 / 1')).toBeTruthy();
     expect(getStopLossCandleStatistics).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(['', '0', '-1', '1.5', '10001'])('does not submit invalid candle count %s', value => {
+    setup();
+    const input = screen.getByLabelText('Statistics candle count') as HTMLInputElement;
+    fireEvent.change(input, { target: { value } });
+    expect((screen.getByRole('button', { name: 'Load statistics' }) as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.submit(input.closest('form')!);
+    expect(getStopLossCandleStatistics).not.toHaveBeenCalled();
+  });
+
+  it.each(['ko', 'en'] as const)('uses plain-language statistic labels without changing values in %s', async language => {
+    useStore.setState({ language });
+    const response = statistics();
+    for (const [key, value] of [['tr', 3], ['atr', 4], ['mtr', 5]] as const) {
+      response.distributions.all.metrics[key].percent_open = { ...d, p50: value };
+    }
+    vi.mocked(getStopLossCandleStatistics).mockResolvedValueOnce(response);
+    setup();
+    const ko = language === 'ko';
+    fireEvent.change(screen.getByLabelText(ko ? '조회 봉 수' : 'Statistics candle count'), { target: { value: '10' } });
+    fireEvent.click(screen.getByRole('button', { name: ko ? '통계 조회' : 'Load statistics' }));
+    const region = await screen.findByRole('region', { name: ko ? '봉 통계 결과' : 'Candle statistics results' });
+    const upper = within(region).getByRole('button', { name: ko ? /^윗꼬리/ : /^Upper wick/ });
+    expect(upper.textContent).toContain(`${ko ? '중위값' : 'Median'} 0.50%`);
+    expect(upper.textContent).toContain(`${ko ? '90% 기준값' : '90% threshold'} 1.20%`);
+    fireEvent.click(within(region).getByText(ko ? '전체 상세 통계 보기' : 'View full statistics'));
+    const table = within(region).getByRole('table');
+    expect(within(table).getByRole('columnheader', { name: ko ? '중위값' : 'Median' })).toBeTruthy();
+    for (const value of [75, 90, 95, 99]) {
+      expect(within(table).getByRole('columnheader', { name: ko ? `${value}% 기준값` : `${value}% threshold` })).toBeTruthy();
+    }
+    expect(region.textContent).not.toMatch(/P(?:50|75|90|95|99)/);
+    for (const [key, label, value] of [
+      ['tr', ko ? '봉 변동폭' : 'Candle range', '3.00'],
+      ['atr', ko ? '평균 변동폭' : 'Average range', '4.00'],
+      ['mtr', ko ? '변동폭 중위값' : 'Median range', '5.00'],
+    ]) {
+      expect((within(region).getByRole('option', { name: label }) as HTMLOptionElement).value).toBe(key);
+      const row = within(table).getByText(label, { exact: true }).closest('tr')!;
+      expect(within(row).getAllByRole('cell')[2].textContent).toBe(value);
+    }
+    expect(region.textContent).not.toMatch(/\b(?:TR|ATR|MTR)\b/);
+    expect(within(region).getByText(ko ? /Wilder 평활평균/ : /Wilder smoothing/)).toBeTruthy();
+  });
+
+  it.each(['ko', 'en'] as const)('keeps strategy method values unchanged under plain-language labels in %s', async language => {
+    useStore.setState({ language });
+    setup();
+    const ko = language === 'ko';
+    fireEvent.click(screen.getByRole('button', { name: ko ? '전략 실험' : 'Strategy experiment' }));
+    const stop = screen.getByLabelText(ko ? '손절 방식' : 'Stop method');
+    const target = screen.getByLabelText(ko ? '익절 방식' : 'Target method');
+    expect((within(stop).getByRole('option', { name: ko ? '평균 변동폭 배수' : 'Average range multiple' }) as HTMLOptionElement).value).toBe('atr');
+    expect((within(target).getByRole('option', { name: ko ? '변동폭 중위값' : 'Median range' }) as HTMLOptionElement).value).toBe('mtr');
+    fireEvent.change(stop, { target: { value: 'atr' } });
+    fireEvent.change(target, { target: { value: 'mtr' } });
+    fireEvent.click(screen.getByRole('button', { name: ko ? '실험 실행' : 'Run experiment' }));
+    await waitFor(() => expect(analyzeStopLossLab).toHaveBeenCalledTimes(1));
+    expect(vi.mocked(analyzeStopLossLab).mock.calls[0][0]).toMatchObject({ stop: { mode: 'atr' }, target_mode: 'mtr' });
+  });
+
+  it('keeps a pending result bound to its submitted count and reports insufficient data', async () => {
+    let resolve!: (value: CandleStatisticsResult) => void;
+    vi.mocked(getStopLossCandleStatistics).mockImplementation(() => new Promise(done => { resolve = done; }));
+    setup();
+    fireEvent.change(screen.getByLabelText('Statistics candle count'), { target: { value: '30' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Load statistics' }));
+    await waitFor(() => expect(getStopLossCandleStatistics).toHaveBeenCalledTimes(1));
+    expect(client.isMutating()).toBe(1);
+    const submitted = vi.mocked(getStopLossCandleStatistics).mock.calls[0][0];
+    fireEvent.change(screen.getByLabelText('Statistics candle count'), { target: { value: '60' } });
+    const response = statistics();
+    response.config = submitted;
+    await act(async () => { resolve(response); });
+    await waitFor(() => expect(client.isMutating()).toBe(0));
+    expect((screen.getByLabelText('Statistics candle count') as HTMLInputElement).value).toBe('60');
+    expect(screen.getByText(/Requested 30 recent completed daily candles · available 10/)).toBeTruthy();
+    expect(screen.getByText(/Fewer candles are available than requested/)).toBeTruthy();
+    expect(screen.getByText(/Results below belong to the previous request/)).toBeTruthy();
   });
 
   it('submits the exact grid and renders distributions, clickable cells and purged evaluation', async () => {

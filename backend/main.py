@@ -112,7 +112,7 @@ def verify_credentials(
 app = FastAPI(
     title="Quant Master API",
     description="Backend API for crypto trading analysis platform",
-    version="1.2.0",
+    version="1.3.0",
     default_response_class=ORJSONResponse,  # orjson 사용으로 JSON 직렬화 성능 향상
     dependencies=[Depends(verify_credentials)],
     lifespan=lifespan,
@@ -160,8 +160,26 @@ def desktop_shutdown(request: Request):
     server = getattr(request.app.state, "desktop_server", None)
     if server is None:
         raise HTTPException(status_code=409, detail="Desktop shutdown is unavailable")
-    server.should_exit = True
+    window = getattr(request.app.state, "desktop_window", None)
+    if window is not None:
+        window.request_close()
+    else:
+        server.should_exit = True
     return {"success": True, "data": {"shutting_down": True}}
+
+
+@app.post("/api/desktop/activate", dependencies=[])
+def desktop_activate(request: Request):
+    if request.client is None or request.client.host not in {"127.0.0.1", "::1", "testclient"}:
+        raise HTTPException(status_code=403, detail="Local requests only")
+    token = getattr(request.app.state, "desktop_activation_token", None)
+    if not token or not secrets.compare_digest(request.headers.get("X-Desktop-Token", ""), token):
+        raise HTTPException(status_code=403, detail="Invalid desktop token")
+    window = getattr(request.app.state, "desktop_window", None)
+    if window is None:
+        raise HTTPException(status_code=409, detail="Desktop window is unavailable")
+    window.activate()
+    return {"success": True, "data": {"activated": True}}
 
 
 @app.exception_handler(RequestValidationError)

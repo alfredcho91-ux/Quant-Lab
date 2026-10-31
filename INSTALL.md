@@ -1,5 +1,11 @@
 # 설치 및 운영 가이드
 
+## Windows 독립 앱
+
+Chrome 탭 없이 실행하려면 패키징한 `Quant Lab.exe`를 사용하세요.
+[Windows 데스크톱 실행·빌드 안내](docs/windows-desktop.md)를 참고하세요.
+아래 명령은 소스 개발 서버를 사용하는 경우입니다.
+
 ## 요구사항
 
 - Python 3.9 이상

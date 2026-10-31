@@ -20,7 +20,9 @@ flowchart LR
 
 의존성의 기본 방향은 `frontend -> backend/modules -> backend/strategy 또는 core -> backend/utils`입니다. `core/`는 HTTP, 파일 I/O, 네트워크 접근을 하지 않습니다. 라우터도 전략 로직을 직접 호출하지 않고 도메인 서비스를 거칩니다.
 
-현재 배포 버전: `v1.2.0`
+현재 배포 버전: `v1.3.0`
+
+v1.3.0 Windows 앱은 `backend/desktop.py`가 루프백 전용 서버와 WebView2 독립 창을 함께 소유합니다. 단일 인스턴스 활성화는 로컬 토큰으로 보호하며, 창 종료는 기존 미저장/저장 중 이동 가드를 사용합니다. 패키지의 DB·설정·기본 시세 캐시는 사용자 앱 데이터 폴더에 저장하고 설치 폴더를 수정하지 않습니다. `packaging/requirements-build.txt`의 빌드·창 의존성은 웹 서버 런타임 요구사항과 분리합니다. [Windows 안내](docs/windows-desktop.md)
 
 차트 꼬리 지표와 기존 봉별 통계 표는 기존 OHLC API 및 완료 봉 필터를 재사용해 프런트엔드에서 계산합니다. v1.2.0 손절 실험실은 `backend/modules/stop_loss_lab`의 통계·체결 계산과 `POST /api/stop-loss-lab/analyze`를 사용하며, 공개 시세 파이프라인·core Wilder ATR·확정 스윙·기존 성과 집계를 재사용합니다. 새 의존성이나 데이터베이스 마이그레이션은 없습니다. 계산·체결·표본 외 경계는 [Stop-Loss Lab](docs/STOP_LOSS_LAB.md), 기존 지표 정의는 [Wick Statistics](docs/WICK_STATISTICS.md) 및 [Volatility Statistics](docs/VOLATILITY_STATISTICS.md)를 참고하세요.
 

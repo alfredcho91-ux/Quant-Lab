@@ -8,13 +8,15 @@
 
 개인용 암호화폐 기술 분석 및 전략 검증 도구입니다. React/TypeScript SPA와 FastAPI/Python API를 분리하고, 공통 지표 계산은 `core/`에 둡니다. 현재 지원 코인은 BTC, ETH, SOL이며, 기본 진입 화면은 4시간봉 중심의 `추세판단`입니다. 사이드바는 매매일지·매매분석과 저널 관련 기능을 앞에 두고 홀딩/재진입 계산기를 마지막에 배치합니다.
 
-현재 배포 버전: `v1.2.0`
+현재 배포 버전: `v1.3.0`
+
+Windows에서는 [독립 앱 ZIP](https://github.com/alfredcho91-ux/Quant-Lab/releases/latest/download/Quant-Lab-Windows.zip)을 전체 압축 해제한 뒤 `Quant Lab/Quant Lab.exe`를 실행하세요. Chrome 탭이나 별도 Python·Node.js 실행이 필요하지 않습니다. `_internal` 폴더도 함께 유지해야 합니다. WebView2 Runtime이 필요하며, 현재 배포본은 코드 서명되지 않은 포터블 앱입니다. [실행·빌드 및 데이터 위치 안내](docs/windows-desktop.md)
 
 ## 현재 범위
 
 - 추세판단과 전용 차트: Lightweight Charts 기반 캔들·크로스헤어·줌/스크롤, 다중 지표, VWAP, RSI 가격대, VPVR
 - 꼬리 통계: 전용 차트의 AUW/MUW/ALW/MLW, 기간·가격/% 단위·표시 설정 저장, 완료 봉의 0.1%p 단위 윗꼬리·아랫꼬리 분포
-- 손절 실험실(`/volatility-statistics`, `/stop-loss-lab`): 일/주봉 꼬리·Wilder ATR·MTR 분포, 과거 정보만 사용하는 진입·손절·익절 격자 실험, 하위 봉 체결·비용·계좌 위험, 히트맵·표본 외/순차 검증. 기존 6개 봉별 통계 표는 별도 탭으로 유지. [계산·체결 가정과 제약](docs/STOP_LOSS_LAB.md)
+- 손절 실험실(`/volatility-statistics`, `/stop-loss-lab`): 날짜 대신 최근 완료 일봉 수(기본 90개, 1–10,000개)로 꼬리·봉 변동폭·평균 변동폭·변동폭 중위값을 조회합니다. 중위값·90% 기준값 등 읽기 쉬운 표기와 전체/주말 표본을 지원하며, 전략 실험은 별도 탭에서 과거 정보만 사용해 검증합니다. 기존 6개 봉별 통계 표는 상세 펼침 영역에 유지합니다. [계산·체결 가정과 제약](docs/STOP_LOSS_LAB.md)
 - 가격 참고: 1h/2h/4h/1d RSI 30·70 역산 가격, 일간·주간·월간 VWAP, 시간대별 기준선 라벨
 - 분석 및 검증: 연속봉 통계, 기본 백테스트, 복리 계산기, 홀딩 vs 재진입 손익 비교
 - 기록 및 연구: 매매일지, Deepcoin 읽기 전용 체결 동기화, AI 백테스트/리서치 워크벤치

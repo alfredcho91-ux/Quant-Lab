@@ -33,3 +33,4 @@ journal/*.db
 journal/*.db-shm
 journal/*.db-wal
 **/AGENTS.md
+/Windows/

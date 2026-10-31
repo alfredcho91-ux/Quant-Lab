@@ -34,3 +34,24 @@ def test_data_cache_falls_back_to_memory_when_diskcache_fails(monkeypatch, tmp_p
 
     assert cache.get("foo") == "bar"
     assert cache.stats()["persistent"] is False
+
+
+def test_packaged_cache_uses_writable_profile_but_preserves_explicit_external_paths(tmp_path, monkeypatch):
+    from backend.config import settings
+    bundle = tmp_path / "read-only-install" / "_internal"
+    profile = tmp_path / "user-profile"
+    monkeypatch.setattr(settings, "IS_FROZEN", True)
+    monkeypatch.setattr(settings, "SOURCE_ROOT", bundle)
+    monkeypatch.setattr(settings, "PROJECT_ROOT", profile)
+    assert cache_module.DataCache()._resolve_cache_dir() == str(profile / ".cache" / "data")
+    raw = cache_module.DataCache(cache_dir=str(bundle / ".cache" / "data_service" / "klines"))
+    assert raw._resolve_cache_dir() == str(profile / ".cache" / "data_service" / "klines")
+    external = str(tmp_path / "custom-cache")
+    assert cache_module.DataCache(cache_dir=external)._resolve_cache_dir() == external
+
+
+def test_source_cache_keeps_existing_paths(tmp_path, monkeypatch):
+    from backend.config import settings
+    monkeypatch.setattr(settings, "IS_FROZEN", False)
+    configured = str(tmp_path / ".cache" / "raw")
+    assert cache_module.DataCache(cache_dir=configured)._resolve_cache_dir() == configured

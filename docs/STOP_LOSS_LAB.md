@@ -29,6 +29,11 @@ orders, causal findings, guaranteed returns or an automated trading system.
   existing application authentication/local-request and offline sample boundary.
 - `POST /api/stop-loss-lab/statistics` fetches daily candles only and returns full
   and UTC-weekend observed distributions without entering the optimizer.
+  Its form uses a recent completed candle count (1–10,000, default 90), not dates.
+  The server fetches additional ATR/MTR warmup history, excludes the forming daily
+  candle and selects only the last requested candles for the sample. If market
+  history is insufficient, actual counts are returned and the UI warns explicitly.
+  Weekend statistics are a subset of those selected candles, not extra older bars.
 - UI uses existing React Query mutations, public API client, language store,
   number formatting, card/table styles and EChart. Only BarChart is added to the
   existing renderer registry. Heatmap is an accessible clickable table.
@@ -74,8 +79,10 @@ the first fetched warmup candle, not a newly introduced SMA seed. Warmup is N+8
 reference bars, reported through the data fingerprint. The old table retains its
 arithmetic TR mean and **close** normalization and labels that difference.
 
-Explorer summaries describe completed reference candles in the selected dates;
-N controls ATR/MTR and pre-entry rolling calibration, not the date-range count.
+The independent statistics view describes the requested recent completed candles;
+its sample count is separate from the ATR/MTR lookback. Strategy-experiment
+summaries still describe completed reference candles in the selected dates, with
+N controlling ATR/MTR and pre-entry rolling calibration rather than sample count.
 Weekend statistics include only completed daily candles whose Binance open time
 falls on Saturday or Sunday in UTC. Wick/TR observations come from those candles.
 ATR/MTR retain contiguous daily history for indicator validity, then only weekend
